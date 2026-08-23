@@ -633,21 +633,55 @@ theorem fullLedger_multiplicitySum (hwf : trace.WellFormed) (hfit : trace.Counts
   simp only [tablesCleanAccesses_append, LookupAccessList.multiplicitySum_append]
   ring
 
-/-- **Byte and Program balance, for a realized trace.**
+/-- **What a provider ledger must supply for the preprocessed buses to cancel**: exactly each
+demanded key's recount, and nothing at any other key.
 
-The theorem this whole file exists for: given only that the shard's demand is servable and that no
+Factored out of `byteProgram_balanced` deliberately. `providerLedger_multiplicitySum` supplies this
+from the *canonical* realization — one aggregated row per demanded key — but that is not the only
+provider that works. A generator emitting one unit-multiplicity row per occurrence supplies the
+same per-key sums with different lists, and the ledger cannot tell the difference. Stating balance
+against the sums rather than the lists keeps both in scope. -/
+def SuppliesDemand : Prop :=
+  ∀ key, multiplicitySum trace.providerLedger key =
+    if key ∈ trace.closingKeyList then (trace.providerDemand key : ℤ) else 0
+
+/-- The canonical realization supplies the demand. -/
+theorem suppliesDemand_of_closureRealized (hreal : trace.ClosureRealized)
+    (hserv : trace.DemandServable) : trace.SuppliesDemand :=
+  trace.providerLedger_multiplicitySum hreal hserv
+
+/-- **`SuppliesDemand` is a finite check.**
+
+Only keys the provider ledger actually emits, or that the consumers actually demand, can witness a
+failure — everywhere else both sides are zero. That makes the condition decidable on a concrete
+shard, which is what lets a hand-assembled trace discharge it by evaluation rather than by proof. -/
+theorem suppliesDemand_of_keys
+    (h : ∀ key ∈ trace.providerLedger.map LookupAccessList.keyOf ++ trace.closingKeyList,
+      multiplicitySum trace.providerLedger key =
+        if key ∈ trace.closingKeyList then (trace.providerDemand key : ℤ) else 0) :
+    trace.SuppliesDemand := by
+  intro key
+  by_cases hk : key ∈ trace.providerLedger.map LookupAccessList.keyOf ++ trace.closingKeyList
+  · exact h key hk
+  · rw [List.mem_append, not_or] at hk
+    rw [if_neg hk.2]
+    exact LookupAccessList.multiplicitySum_eq_zero_of_keyOf_ne
+      fun a ha hka => hk.1 (hka ▸ List.mem_map_of_mem ha)
+
+/-- **Byte and Program balance.**
+
+The theorem this whole file exists for: given only that the providers supply the demand and that no
 consumer key is already net-supplied, the ledger the ensemble sees cancels on both preprocessed
 buses. No compiled evaluation, no concrete shard. State and Memory are untouched and remain
 explicit — `closingAccesses_state` / `closingAccesses_memory` record that. -/
 theorem byteProgram_balanced (hwf : trace.WellFormed) (hfit : trace.CountsFit)
-    (hreal : trace.ClosureRealized) (hserv : trace.DemandServable)
+    (hsupply : trace.SuppliesDemand)
     (hnonpos : ∀ key ∈ trace.closingKeyList,
       multiplicitySum trace.skeletonLedger key ≤ 0)
     {k : LookupKey} (hsel : preprocessedKey k = true) :
     multiplicitySum trace.fullLedger k = 0 := by
   rw [fullLedger_multiplicitySum trace hwf hfit,
-    LookupAccessList.multiplicitySum_append,
-    providerLedger_multiplicitySum trace hreal hserv]
+    LookupAccessList.multiplicitySum_append, hsupply k]
   by_cases hk : k ∈ trace.closingKeyList
   · rw [if_pos hk]
     have hbal := trace.closingAccesses_balances hnonpos hsel
@@ -661,7 +695,6 @@ theorem byteProgram_balanced (hwf : trace.WellFormed) (hfit : trace.CountsFit)
     rw [LookupAccessList.multiplicitySum_append, closingAccesses,
       LookupAccessList.multiplicitySum_closingAccesses_of_not_mem _ hk', add_zero] at hbal
     exact hbal
-
 
 /-! ## From the whole ledger to one channel's
 
@@ -734,7 +767,7 @@ The `isConsistentBalanced` half of `AIRCompleteness.lean`'s `BalancedOn`, for th
 provider closure can supply. Keys of the wrong kind or table name are vacuous; keys of the right
 shape go through the orientation bridge to `byteProgram_balanced`. -/
 theorem channelLedger_isConsistentBalanced (hwf : trace.WellFormed) (hfit : trace.CountsFit)
-    (hreal : trace.ClosureRealized) (hserv : trace.DemandServable)
+    (hsupply : trace.SuppliesDemand)
     (hnonpos : ∀ key ∈ trace.closingKeyList,
       multiplicitySum trace.skeletonLedger key ≤ 0)
     (channel : RawChannel (ZMod p))
@@ -747,7 +780,7 @@ theorem channelLedger_isConsistentBalanced (hwf : trace.WellFormed) (hfit : trac
   by_cases hname : k.2.1 = channel.name
   · by_cases hkey : k.1 = kindOf channel.name
     · rw [trace.fullLedger_multiplicitySum_channel channel hchannel hname]
-      refine trace.byteProgram_balanced hwf hfit hreal hserv hnonpos ?_
+      refine trace.byteProgram_balanced hwf hfit hsupply hnonpos ?_
       rw [preprocessedKey, hkey]
       rcases hkind with h | h <;> rw [h]
     · exact LookupAccessList.multiplicitySum_eq_zero_of_keyOf_ne fun a ha hka =>

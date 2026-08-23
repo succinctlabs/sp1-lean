@@ -135,16 +135,17 @@ def Balanced : Prop :=
 
 The payoff of the provider closure (`Proofs/Completeness/ClosureRealization.lean`): for the Byte and
 Program channels — the two a preprocessed provider supplies unilaterally — `BalancedOn` follows from
-the shard's demand being servable and its provider lists being the ones that demand determines. No
-per-shard evaluation of the ledger is involved.
+the providers supplying exactly the demand. `suppliesDemand_of_closureRealized` derives that
+hypothesis from the canonical realization with no evaluation at all;
+`suppliesDemand_of_keys` reduces it to a finite check for a trace that supplies the same per-key
+sums a different way (one unit-multiplicity row per occurrence, say).
 
 The length bound stays a hypothesis: it is the field's no-wrap premise, a fact about how big this
 shard is, not something the closure can supply. State and Memory are out of scope by construction —
 their balance is a clock telescope and a per-address touch chain, and `closingAccesses_state` /
 `closingAccesses_memory` record that the closure leaves them untouched. -/
 theorem balancedOn_of_closure
-    (hwf : trace.WellFormed) (hfit : trace.CountsFit) (hreal : trace.ClosureRealized)
-    (hserv : trace.DemandServable)
+    (hwf : trace.WellFormed) (hfit : trace.CountsFit) (hsupply : trace.SuppliesDemand)
     (hnonpos : ∀ key ∈ trace.closingKeyList,
       LookupAccessList.multiplicitySum trace.skeletonLedger key ≤ 0)
     (channel : RawChannel (ZMod p))
@@ -153,7 +154,7 @@ theorem balancedOn_of_closure
       kindOf channel.name = InteractionKind.Program)
     (hlen : (trace.witness.interactionsWith channel).length < p) :
     trace.BalancedOn channel :=
-  ⟨hlen, trace.channelLedger_isConsistentBalanced hwf hfit hreal hserv hnonpos channel hchannel
+  ⟨hlen, trace.channelLedger_isConsistentBalanced hwf hfit hsupply hnonpos channel hchannel
     hkind⟩
 
 /-- **A balanced trace assembles into a witness whose channels balance.** The exact integer ledger

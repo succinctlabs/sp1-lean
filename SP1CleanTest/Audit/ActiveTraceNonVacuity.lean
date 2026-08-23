@@ -806,6 +806,22 @@ theorem activeProgramLedger_perm :
 theorem activeMemoryLedger_perm :
     (pushedMessages activeMemoryLedger).Perm (pulledMessages activeMemoryLedger) := by native_decide
 
+/-! ### The provider closure, checked against a real shard
+
+`Proofs/Completeness/ClosureRealization.lean` recounts Byte/Program demand from the consumer
+skeleton alone and proves that supplying it balances both buses. This anchor is the independent
+check: the demand that recount computes agrees, key for key, with what *this* shard's provider
+tables — hand-written months earlier, and in the unit-multiplicity style rather than the closure's
+aggregated one — actually supply.
+
+That the two styles agree is the point. `SuppliesDemand` is stated on per-key sums precisely so it
+does not care whether a provider emits nine rows of multiplicity one or one row of multiplicity
+nine; this anchor is what confirms the recount lands on the same sums either way.
+-/
+theorem activeTrace_suppliesDemand : activeTrace.SuppliesDemand := by
+  refine activeTrace.suppliesDemand_of_keys ?_
+  native_decide
+
 theorem activeTrace_balanced : activeTrace.Balanced := by
   intro channel hchannel
   rw [sp1Ensemble_channels] at hchannel
