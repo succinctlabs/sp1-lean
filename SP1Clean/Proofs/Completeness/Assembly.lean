@@ -1,4 +1,5 @@
 import SP1Clean.Proofs.Completeness.Providers
+import SP1Clean.FormalModel.TraceGen.Bump
 import SP1Clean.Proofs.Chips.AddChip.Complete
 import SP1Clean.Proofs.Chips.AddiChip.Complete
 import SP1Clean.Proofs.Chips.AddwChip.Complete
@@ -141,8 +142,11 @@ structure SupportedCoreTraceWitness (p : ℕ) [Fact p.Prime] [Fact (2 ^ 25 < p)]
   romEntries : List RomEntry
   memoryInitEntries : List MemRecordEntry
   memoryFinalizeEntries : List MemRecordEntry
-  memoryBumpRows : List (MemoryBumpChip.Inputs (ZMod p))
-  stateBumpRows : List (StateBumpChip.Inputs (ZMod p))
+  /-- The two system tables carry *events* like every other chip, not pre-built rows: a bump row is
+  a function of the state at the crossing (`FormalModel/TraceGen/Bump.lean`), so its `Spec` is a
+  theorem rather than a generator promise. -/
+  memoryBumpEvents : List MemoryBumpEvent
+  stateBumpEvents : List StateBumpEvent
   -- Shared prover state and the public boundary.
   data : ProverData (ZMod p)
   hint : ProverHint (ZMod p)
@@ -200,8 +204,8 @@ structure WellFormed : Prop where
   range : ∀ width e, e ∈ trace.rangeEntries width → e.WellFormed width.val
   rom : ∀ e ∈ trace.romEntries, e.WellFormed
   memoryInit : ∀ e ∈ trace.memoryInitEntries, e.WellFormedInit
-  memoryBump : ∀ r ∈ trace.memoryBumpRows, MemoryBumpChip.Spec r
-  stateBump : ∀ r ∈ trace.stateBumpRows, StateBumpChip.Spec r
+  memoryBump : ∀ e ∈ trace.memoryBumpEvents, e.WellFormed
+  stateBump : ∀ e ∈ trace.stateBumpEvents, e.WellFormed
 
 /-! ## The 53 tables -/
 
@@ -293,8 +297,10 @@ def tables : List (Table (ZMod p)) :=
       (MemoryProviderChip.traceInputs trace.memoryInitEntries) trace.data trace.hint,
     Table.build MemoryFinalizeChip.component
       (MemoryFinalizeChip.traceInputs trace.memoryFinalizeEntries) trace.data trace.hint,
-    Table.build MemoryBumpChip.component trace.memoryBumpRows trace.data trace.hint,
-    Table.build StateBumpChip.component trace.stateBumpRows trace.data trace.hint ]
+    Table.build MemoryBumpChip.component (memoryBumpTraceInputs trace.memoryBumpEvents)
+      trace.data trace.hint,
+    Table.build StateBumpChip.component (stateBumpTraceInputs trace.stateBumpEvents)
+      trace.data trace.hint ]
 
 /-- **The assembled tables are the ensemble's tables**, component for component and in order. One
 `rfl`: every completeness-side `component` is by definition the wrapper `sp1Tables` /
@@ -411,8 +417,12 @@ theorem witness_constraints (wf : trace.WellFormed) : trace.witness.Constraints 
       · subst table; exact ProgramProviderChip.traceTable_constraints _ _ _ wf.rom
       · subst table; exact MemoryProviderChip.traceTable_constraints _ _ _ wf.memoryInit
       · subst table; exact MemoryFinalizeChip.traceTable_constraints _ _ _
-      · subst table; exact MemoryBumpChip.traceTable_constraints _ _ _ wf.memoryBump
-      · subst table; exact StateBumpChip.traceTable_constraints _ _ _ wf.stateBump
+      · subst table
+        exact MemoryBumpChip.traceTable_constraints _ _ _
+          (memoryBumpTraceInputs_spec wf.memoryBump)
+      · subst table
+        exact StateBumpChip.traceTable_constraints _ _ _
+          (stateBumpTraceInputs_spec wf.stateBump)
 
 end SupportedCoreTraceWitness
 

@@ -209,6 +209,11 @@ TARGETS = [
     ("SP1Clean/Soundness/EnsembleChannels.lean",
      r"theorem\s+(sp1Tables_channels_subset|sp1ProviderTables_channels_subset|"
      r"sp1Ensemble_allTables_channels_subset|channel_eq_of_name_eq)\b"),
+    # Phase 2: the two system tables' rows are built from crossings, not supplied.
+    ("SP1Clean/FormalModel/TraceGen/Bump.lean",
+     r"theorem\s+(stateBump_spec|memoryBump_spec|stateBumpTraceInputs_spec|"
+     r"memoryBumpTraceInputs_spec|stateBumpEvent_wellFormed_witness|"
+     r"memoryBumpEvent_wellFormed_witness)\b"),
     ("SP1Clean/Proofs/Completeness/ProviderTables.lean",
      r"theorem\s+(u8Range_traceTable_cleanAccesses|msb_traceTable_cleanAccesses|"
      r"and_traceTable_cleanAccesses|or_traceTable_cleanAccesses|"

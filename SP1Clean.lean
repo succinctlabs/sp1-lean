@@ -487,6 +487,7 @@ import SP1Clean.FormalModel.Verifier
 import SP1Clean.FormalModel.Trace.Witness
 import SP1Clean.FormalModel.Contracts.Operations
 import SP1Clean.FormalModel.Contracts.Readers
+import SP1Clean.FormalModel.TraceGen.Bump
 import SP1Clean.FormalModel.TraceGen.Events
 import SP1Clean.FormalModel.TraceGen.Inputs
 import SP1Clean.FormalModel.TraceGen.Readers

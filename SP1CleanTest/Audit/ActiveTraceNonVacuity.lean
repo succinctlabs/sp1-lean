@@ -133,8 +133,8 @@ def activeTrace : SupportedCoreTraceWitness SP1Prime where
   romEntries := [activeRomEntry]
   memoryInitEntries := [activeMemoryInit]
   memoryFinalizeEntries := [activeMemoryFinalize]
-  memoryBumpRows := []
-  stateBumpRows := []
+  memoryBumpEvents := []
+  stateBumpEvents := []
   data := anchorData
   hint := anchorHint
   initClk := 1

@@ -99,8 +99,8 @@ def anchorTrace : SupportedCoreTraceWitness SP1Prime where
   romEntries := []
   memoryInitEntries := []
   memoryFinalizeEntries := []
-  memoryBumpRows := []
-  stateBumpRows := []
+  memoryBumpEvents := []
+  stateBumpEvents := []
   data := anchorData
   hint := anchorHint
   initClk := 1
