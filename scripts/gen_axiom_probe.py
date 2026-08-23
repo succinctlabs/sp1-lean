@@ -197,6 +197,12 @@ TARGETS = [
      r"or_buildRow_cleanAccesses|xor_buildRow_cleanAccesses|"
      r"ltu_buildRow_cleanAccesses|range_buildRow_cleanAccesses|"
      r"program_buildRow_cleanAccesses)\b"),
+    # Tier 2: a whole provider table's ledger is exactly its occurrence list.
+    ("SP1Clean/Proofs/Completeness/ProviderTables.lean",
+     r"theorem\s+(u8Range_traceTable_cleanAccesses|msb_traceTable_cleanAccesses|"
+     r"and_traceTable_cleanAccesses|or_traceTable_cleanAccesses|"
+     r"xor_traceTable_cleanAccesses|ltu_traceTable_cleanAccesses|"
+     r"range_traceTable_cleanAccesses|program_traceTable_cleanAccesses)\b"),
     ("SP1Clean/Model/InteractionBus.lean",
      r"theorem\s+(multiplicitySum_append_closingAccesses|multiplicitySum_append_closing|"
      r"multiplicitySum_closingAccesses|mem_closingKeys_of_multiplicitySum_ne_zero|"
