@@ -295,7 +295,17 @@ EOF
         echo "(rerun with --update from a clean committed tree to repair it)"
         fail=1
       fi
-    elif ! git merge-base --is-ancestor "$stamped" HEAD 2>/dev/null; then
+    elif ! git cat-file -e "${stamped}^{commit}" 2>/dev/null; then
+      # Distinguish "this clone cannot see the stamp" from "the stamp is not an ancestor".
+      # A shallow checkout (actions/checkout's default fetch-depth: 1) has neither the commit
+      # nor the history to decide, and must not be reported as a provenance failure.
+      if [ "$update" -eq 0 ]; then
+        echo "FAIL: the committed census stamp $stamped is not present in this clone"
+        echo "(cannot verify provenance from a shallow checkout; fetch full history, e.g."
+        echo " actions/checkout with 'fetch-depth: 0')"
+        fail=1
+      fi
+    elif ! git merge-base --is-ancestor "$stamped" HEAD; then
       if [ "$update" -eq 0 ]; then
         echo "FAIL: the committed census stamp $stamped is not an ancestor of HEAD"
         echo "(content equality does not repair provenance; rerun with --update from a clean committed tree)"
