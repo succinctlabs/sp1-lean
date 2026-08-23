@@ -1030,22 +1030,23 @@ Stated plainly:
    program/platform contracts (`SailConfigured`, `SailCodeMemoryCompatible`,
    program well-formedness) that are application-level premises no system table will discharge;
    they must remain explicit in the final public theorem type.
-3. **Three completeness defects found by the W4 rollout are fixed in source (final full
-   gate pending).** Carrying chips through the trace-generation layer exposed prover-side contracts
+3. **Three completeness defects (R1–R3) found by the W4 rollout are fixed in source.**
+   Carrying chips through the trace-generation layer exposed prover-side contracts
    stronger than the circuits require, plus one provider witness-generation policy that was too
    restrictive:
-   - `AddressOperation.Assumptions` now guards the non-reserved-address lower bound by
+   - **R1.** `AddressOperation.Assumptions` now guards the non-reserved-address lower bound by
      `is_real = 1`, and all five load plus four store `ProverAssumptions` carry the same gate.
      Active rows still owe `2^16 ≤ address`; padding does not. The named regression
      `AddressOperation.assumptions_zero` proves the literal all-zero operation input satisfies the
      shared address subcontract. The nine event-level memory-table APIs remain unpadded, and no
      full memory-chip zero-row inhabitance theorem is claimed yet; constructing and proving those
      complete padding rows is part of the remaining ensemble-height work.
-   - `LoadByteChip.ProverAssumptions` now states the two AIR branches directly: on LB, `msb` is the
+   - **R2.** `LoadByteChip.ProverAssumptions` now states the two AIR branches directly: on LB, `msb` is the
      selected byte's high bit; on LBU, `msb = 0`. Its completeness layer accepts both opcode 29 and
      32, and `highBitLbuEvent_proverAssumptions` witnesses a concrete well-formed LBU at address
      `0x10000` selecting `0xff`. Thus high-bit unsigned loads are no longer outside completeness.
-   - Provider multiplicity is now an explicit row input rather than a constant local witness.
+   - **R3.** Provider multiplicity is now an explicit row input rather than a constant local
+     witness.
      Byte, Range, and Program entries carry natural counts, admitting zero-multiplicity padding,
      unit occurrences, and aggregated `m > 1` rows. Memory init/finalize entries carry a `Bool`;
      their circuits retain `m * (m - 1) = 0`, preserving the signed-memory-balance invariant while
@@ -1068,7 +1069,8 @@ Stated plainly:
    separates exact per-key integer balance from the interaction-count no-wrap bound `< p`. These
    named regressions pass in the full `lake test` target, and the complete main library builds with
    zero warnings or stray information output. The release axiom census is restamped only after the
-   source commit, so that final audit remains the last publication gate.
+   source commit; that restamp landed in `af6c8b11`, and `check_pins.sh` gates both snapshots'
+   entry counts against their generated probes.
 5. **No cryptographic claim.** Nothing here says anything about STARK soundness, FRI, LogUp/GKR,
    or Fiat–Shamir. The planned final form is probabilistic and lives in the ArkLib/VCVio
    integration: an executable `verifyCore` agreeing with the pinned Rust verifier, ArkLib
@@ -1100,11 +1102,11 @@ Stated plainly:
    transport contracts. Under those hypotheses it constructs the
    redistributed Byte/Range/Program providers, MemoryInit/MemoryFinalize, and both bump tables.
    `CoreEnsemble.lean` assembles those 53 native tables plus the verifier row and proves their
-   complete local constraints. The native provider suffix has all 17 Range widths `0..16`; this
-   closes the balance hole for honest shift rows that request widths outside `8/13/14/16`.
-   Byte/Range/Program counts are recounted from the actual Clean interactions of the verifier,
-   25 transported instruction tables, MemoryInit/MemoryFinalize, and both bumps rather than copied
-   from the full exact cluster. The raw exact Byte/Range/Program assertion lists are empty.
+   complete local constraints. **R4:** the native provider suffix has all 17 Range widths `0..16`,
+   closing the balance hole for honest shift rows that request widths outside `8/13/14/16`.
+   **R5:** Byte/Range/Program counts are recounted from the actual Clean interactions of
+   the verifier, 25 transported instruction tables, MemoryInit/MemoryFinalize, and both bumps
+   rather than copied from the full exact cluster. The raw exact Byte/Range/Program assertion lists are empty.
    `CoreAIR.PreprocessedBinding` only records the named matrix/PCS-opening premise, to be discharged
    by ArkLib; it proves neither row-local meaning nor provider selection.
    `PreprocessedProviderContract` is the explicit caller premise for local semantics. Source main
