@@ -38,6 +38,84 @@ current violation set into it (the standard ratchet). Without `--update`, any *n
 open Lean Core Elab Batteries.Tactic.Lint
 open System (FilePath)
 
+/-! ## The placement linter
+
+`docs/layering.md` law 2: *a public declaration belongs in the lowest stratum that can state it* --
+the join of the strata of the constants in its **type**, not its proof and not its first consumer.
+
+Why the type and not the proof: for a theorem `T`, everything in `Prf(T) \ Stmt(T)` is kernel-checked
+and cannot make `T` say something false, so the whole risk of proving the wrong thing lives in
+`Stmt(T)` (`docs/audit-surface.md`). Placing by statement vocabulary therefore makes module altitude
+and audit altitude the same number, and a declaration above its statement vocabulary is exactly one
+that some legitimate consumer below it cannot reach.
+
+`scripts/check_layering.sh` catches misplaced *files* (by import direction and namespace). This
+catches misplaced *declarations*, which is a strictly finer net: `tableCleanAccesses` sat in
+`Faithful/Transport/Table.lean` under a matching namespace with no upward import, so only this law
+saw it.
+
+Private declarations are exempt -- nothing below can cite them, so they cause no reachability harm.
+So are internal names and anything whose type mentions no stratified constant at all.
+
+The stratum map is read from `scripts/layering.txt`, the same file the shell gate uses, so the two
+cannot drift. -/
+
+/-- The stratum map, parsed once per lint run. `none` until first use. -/
+initialize strataCache : IO.Ref (Option (Array (String × Nat))) ← IO.mkRef none
+
+/-- `<stratum> <pillar> <path-prefix>` lines from `scripts/layering.txt`, most-specific first. -/
+def loadStrata : IO (Array (String × Nat)) := do
+  if let some cached ← strataCache.get then return cached
+  let text ← IO.FS.readFile "scripts/layering.txt"
+  let mut rows : Array (String × Nat) := #[]
+  for line in text.splitOn "\n" do
+    let line := (line.splitOn "#").headD ""
+    let parts := line.splitOn " " |>.filter (!·.isEmpty)
+    match parts with
+    | [lvl, _pillar, pfx] => if let some n := lvl.toNat? then rows := rows.push (pfx, n)
+    | _ => pure ()
+  let sorted := rows.qsort (fun a b => a.1.length > b.1.length)
+  strataCache.set (some sorted)
+  return sorted
+
+/-- Module name to repo path, e.g. `SP1Clean.Model.Foo` to `SP1Clean/Model/Foo.lean`. -/
+def modulePath (m : Name) : String :=
+  (m.components.map toString |> String.intercalate "/") ++ ".lean"
+
+/-- The stratum of a module, or `none` when no prefix matches (globs in the map are skipped here;
+the shell gate owns those, and a miss only makes this linter quieter, never wrong). -/
+def stratumOf (rows : Array (String × Nat)) (m : Name) : Option Nat := Id.run do
+  let path := modulePath m
+  for (pfx, lvl) in rows do
+    if !pfx.contains '*' && path.startsWith pfx then return some lvl
+  return none
+
+/-- Not `@[env_linter]`: `getChecks` reads the attribute extension of the *imported* environment
+(`SP1Clean` + Batteries), which by construction never contains a linter declared in this driver. It
+is appended to the run set in `main` instead. Registering it by attribute silently does nothing --
+the lint run reports "passed" while never calling this at all. -/
+def placementLinter : Batteries.Tactic.Lint.Linter where
+  noErrorsFound := "No declaration sits above its statement vocabulary."
+  errorsFound := "DECLARATIONS ABOVE THEIR STATEMENT VOCABULARY (docs/layering.md law 2). \
+Each could be stated in a lower stratum, so a legitimate consumer below cannot reach it. Move it \
+down, or record why it must stay in scripts/layering_allowlist.txt."
+  test := fun declName => do
+    if declName.isInternal || isPrivateName declName then return none
+    let env ← getEnv
+    let some ci := env.find? declName | return none
+    let some myIdx := env.const2ModIdx[declName]? | return none
+    let rows ← loadStrata
+    let some myLevel := stratumOf rows env.header.moduleNames[myIdx]! | return none
+    let mut best : Nat := 0
+    let mut witness : Name := .anonymous
+    for c in ci.type.getUsedConstants do
+      if let some i := env.const2ModIdx[c]? then
+        if let some l := stratumOf rows env.header.moduleNames[i]! then
+          if l > best then best := l; witness := c
+    if witness == .anonymous || best >= myLevel then return none
+    return some m!"is at stratum {myLevel} but its type only reaches stratum {best} \
+(highest: {witness})"
+
 /-- The curated environment-linter set (short names, as registered by `@[env_linter]`). The
 doc-coverage linters (`docBlame`, `docBlameThm`, `tacticDocs`) are intentionally omitted — they would
 swamp a proofs project — see AGENTS.md § Linters. `structureInType` and `deprecatedNoSince` (both
@@ -90,7 +168,15 @@ def getHandwrittenDecls : CoreM (Array Name) := do
     if keep[env.const2ModIdx[declName]?.get! (α := Nat)]! then decls.push declName else decls
 
 /--
-Usage: `sp1Lint [--update] [-v | --trace]`
+Usage: `sp1Lint [--update] [--placement] [-v | --trace]`
+
+`--placement` additionally runs the placement linter (`docs/layering.md` law 2). It is **advisory and
+opt-in, not part of the `lake lint` gate**, and the reason is a measurement rather than a preference:
+on the 2026-08 tree it reports 2392 declarations across 284 files whose types could be stated in a
+lower stratum. That is a real standing hoist backlog — whole files in `Soundness/` are pure Mathlib,
+and `Composition/PreprocessedProviders.lean` alone accounts for 33 — but it is not a defect list, and
+ratcheting it would mean a 2392-entry `nolints.json` that buries the 20 genuine entries and makes
+`lake lint` useless as a review artifact. Run it deliberately when hunting hoist candidates.
 
 Runs the curated environment linters on the hand-written `SP1Clean.*` declarations (excluding the
 auto-generated `Extracted/` modules and `*Vectors` batteries). The project must already be built
@@ -103,6 +189,8 @@ remains after subtracting `nolints.json`.
 unsafe def main (args : List String) : IO Unit := do
   let update := args.contains "--update"
   let verbose := args.contains "-v" || args.contains "--trace"
+  -- Advisory, opt-in: see the `--placement` note in this file's header.
+  let placement := args.contains "--placement"
   initSearchPath (← findSysroot)
   let projectModule := `SP1Clean
   let lintModule := `Batteries.Tactic.Lint
@@ -131,7 +219,10 @@ unsafe def main (args : List String) : IO Unit := do
     let decls ← getHandwrittenDecls
     traceLint s!"Linting {decls.size} hand-written declarations…"
       (inIO := true) (currentModule := projectModule)
-    let linters ← getChecks (slow := true) (runOnly := some curatedLinters) (runAlways := none)
+    let mut linters ← getChecks (slow := true) (runOnly := some curatedLinters) (runAlways := none)
+    if placement then
+      linters := linters.push
+        { placementLinter with name := `placement, declName := `placementLinter }
     let results ← lintCore decls linters (inIO := true) (currentModule := projectModule)
     if update then
       traceLint s!"Updating nolints file at {nolintsFile}"

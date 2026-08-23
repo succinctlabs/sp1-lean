@@ -32,6 +32,16 @@ concretely, one that a legitimate consumer below it cannot reach.
 
 Private declarations are exempt: nothing below can cite them, so they cause no reachability harm.
 
+**Law 2 is advisory, and the reason is a measurement.** `lake exe sp1Lint --placement` implements it
+(the shell gate covers laws 1 and 3). On the 2026-08 tree it reports **2392 declarations across 284
+files** whose types could be stated in a lower stratum. That is a real standing hoist backlog — whole
+`Soundness/` files are pure Mathlib, `Composition/PreprocessedProviders.lean` alone accounts for 33 —
+but it is not a defect list: much of it is chip-local arithmetic that *could* live in `Math/` without
+anyone wanting it there. Ratcheting it would mean a 2392-entry `nolints.json` burying the 20 genuine
+entries and making `lake lint` useless as a review artifact. So law 2 is the criterion you reach for
+when deciding where a *new* declaration goes, and the linter is how you hunt hoist candidates —
+not a build gate. Laws 1 and 3 are gates.
+
 **3. Namespace agreement.** A file's first `namespace SP1Clean.<Root>` must name the pillar its
 stratum expects. AGENTS.md's "namespaces are decoupled from directory paths" remains true for
 *sub*-namespaces; the pillar root is what must agree. This is nearly free and high-signal — it is the
