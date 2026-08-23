@@ -486,6 +486,13 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Soundness.ltu_buildRow_cleanAccesses
 #print axioms SP1Clean.Soundness.range_buildRow_cleanAccesses
 #print axioms SP1Clean.Soundness.program_buildRow_cleanAccesses
+#print axioms SP1Clean.Soundness.family_ledger_eq
+#print axioms SP1Clean.Soundness.family_multiplicitySum
+#print axioms SP1Clean.Soundness.program_round
+#print axioms SP1Clean.Soundness.SupportedCoreTraceWitness.closureRange_contribution
+#print axioms SP1Clean.Soundness.SupportedCoreTraceWitness.providerLedger_multiplicitySum
+#print axioms SP1Clean.Soundness.SupportedCoreTraceWitness.fullLedger_multiplicitySum
+#print axioms SP1Clean.Soundness.SupportedCoreTraceWitness.byteProgram_balanced
 #print axioms SP1Clean.Soundness.u8Range_traceTable_cleanAccesses
 #print axioms SP1Clean.Soundness.msb_traceTable_cleanAccesses
 #print axioms SP1Clean.Soundness.and_traceTable_cleanAccesses
@@ -503,6 +510,8 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Soundness.SupportedCoreTraceWitness.closingAccesses_not_preprocessed
 #print axioms SP1Clean.Soundness.SupportedCoreTraceWitness.closingAccesses_state
 #print axioms SP1Clean.Soundness.SupportedCoreTraceWitness.closingAccesses_memory
+#print axioms SP1Clean.Soundness.SupportedCoreTraceWitness.preprocessedProviderTables_eq
+#print axioms SP1Clean.Soundness.SupportedCoreTraceWitness.preprocessedProviderLedger_eq
 #print axioms SP1Clean.Soundness.SupportedCoreTraceWitness.tables_map_component
 #print axioms SP1Clean.Soundness.SupportedCoreTraceWitness.witness_constraints
 #print axioms SP1Clean.Soundness.SupportedCoreTraceWitness.balancedOn_of_signed_perm
