@@ -145,6 +145,26 @@ theorem multiplicitySum_active (accesses : LookupAccessList) (k : LookupKey) :
   | cons head tail ih =>
       by_cases hmult : multOf head = 0 <;> simp [active_cons, multiplicitySum_cons, hmult, ih]
 
+/-- **Filtering before projecting is invisible at a key the filter cannot drop.**
+
+The shape every "whole ledger versus one channel's ledger" comparison reduces to: if every source
+item whose projection lands on `k` survives the filter, the two sums agree at `k`. Stated over an
+arbitrary source type because the source is Clean `Interaction`s, which this file cannot mention. -/
+theorem multiplicitySum_filter_map_eq {α : Type*} (l : List α) (f : α → LookupAccess)
+    (q : α → Bool) (k : LookupKey) (hkeep : ∀ a ∈ l, keyOf (f a) = k → q a = true) :
+    multiplicitySum ((l.filter q).map f) k = multiplicitySum (l.map f) k := by
+  induction l with
+  | nil => rfl
+  | cons head tail ih =>
+      have htail : ∀ a ∈ tail, keyOf (f a) = k → q a = true :=
+        fun a ha => hkeep a (List.mem_cons_of_mem _ ha)
+      rw [List.map_cons, multiplicitySum_cons]
+      by_cases hq : q head = true
+      · rw [List.filter_cons_of_pos hq, List.map_cons, multiplicitySum_cons, ih htail]
+      · have hne : keyOf (f head) ≠ k := fun hkey =>
+          hq (hkeep head List.mem_cons_self hkey)
+        rw [List.filter_cons_of_neg (by simpa using hq), ih htail, if_neg hne, zero_add]
+
 /-- A concatenation of per-item ledgers sums per item. The `flatMap` counterpart of
 `multiplicitySum_append`, for a table family indexed by a list (the seventeen fixed Range widths). -/
 theorem multiplicitySum_flatMap {α : Type*} (l : List α) (f : α → LookupAccessList)

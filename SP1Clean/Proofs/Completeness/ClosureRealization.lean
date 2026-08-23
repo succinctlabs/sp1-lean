@@ -1,4 +1,5 @@
 import SP1Clean.Proofs.Completeness.Closure
+import SP1Clean.Soundness.EnsembleChannels
 
 /-!
 # Realizing the closure: the provider entry lists a shard's demand determines
@@ -660,6 +661,99 @@ theorem byteProgram_balanced (hwf : trace.WellFormed) (hfit : trace.CountsFit)
     rw [LookupAccessList.multiplicitySum_append, closingAccesses,
       LookupAccessList.multiplicitySum_closingAccesses_of_not_mem _ hk', add_zero] at hbal
     exact hbal
+
+
+/-! ## From the whole ledger to one channel's
+
+`byteProgram_balanced` is about `fullLedger` — every table's accesses at once.
+`AIRCompleteness.lean`'s `BalancedOn` is about one channel's evaluated interactions. Both are
+`multiplicitySum` over a `LookupAccessList`, and `tableCleanAccesses` projects through the very same
+`Interaction.toAccess`, so what separates them is orientation, not vocabulary.
+
+The bridge is that a key already names its channel: `Interaction.toAccess` puts the emitting
+channel's `name` in the key's table slot. Given that the ensemble's tables speak only on the
+ensemble's channels (`sp1Ensemble_allTables_channels_subset`) and that those four names are
+distinct (`channel_eq_of_name_eq`), an access landing on a key with `channel.name` can only have
+come from `channel` — so filtering to that channel drops nothing the key could see.
+-/
+
+/-- The assembled witness's tables are the ensemble's components — verifier row included. -/
+theorem allTables_component_mem (table : Table (ZMod p)) (h : table ∈ trace.witness.allTables) :
+    table.component ∈ (sp1Ensemble (p := p)).allTables := by
+  rw [Air.Flat.EnsembleWitness.allTables, List.mem_cons] at h
+  rw [Air.Flat.Ensemble.allTables, List.mem_cons]
+  rcases h with rfl | h
+  · exact Or.inl rfl
+  · refine Or.inr ?_
+    rw [← trace.tables_map_component]
+    exact List.mem_map_of_mem (by rwa [witness_tables] at h)
+
+/-- The whole ledger is every table's ledger, verifier row included. -/
+theorem tablesCleanAccesses_allTables :
+    tablesCleanAccesses trace.witness.allTables = trace.fullLedger := by
+  rw [Air.Flat.EnsembleWitness.allTables, tablesCleanAccesses, List.flatMap_cons,
+    witness_verifierTable, witness_tables, fullLedger, skeletonVerifierTable, tablesCleanAccesses]
+
+/-- **One channel's ledger and the whole ledger agree at every key that channel could produce.** -/
+theorem fullLedger_multiplicitySum_channel (channel : RawChannel (ZMod p))
+    (hchannel : channel ∈ (sp1Ensemble (p := p)).channels)
+    {k : LookupKey} (hname : k.2.1 = channel.name) :
+    multiplicitySum ((trace.witness.interactionsWith channel).map Interaction.toAccess) k =
+      multiplicitySum trace.fullLedger k := by
+  have hlhs : (trace.witness.interactionsWith channel).map Interaction.toAccess =
+      trace.witness.allTables.flatMap
+        fun table => (table.interactionsWith channel).map Interaction.toAccess := by
+    rw [Air.Flat.EnsembleWitness.interactionsWith, List.map_flatMap]
+  rw [hlhs, ← trace.tablesCleanAccesses_allTables, tablesCleanAccesses,
+    LookupAccessList.multiplicitySum_flatMap, LookupAccessList.multiplicitySum_flatMap]
+  refine congrArg List.sum (List.map_congr_left fun table htable => ?_)
+  refine multiplicitySum_interactionsWith_eq table channel fun i hi hkey => ?_
+  refine channel_eq_of_name_eq ?_ hchannel ?_
+  · exact sp1Ensemble_allTables_channels_subset _
+      (trace.allTables_component_mem table htable)
+      (Air.Flat.Table.channel_mem_channels_of_mem_interactions table i hi)
+  · rw [channel_name_of_keyOf_toAccess hkey, hname]
+
+
+/-- Every access in one channel's ledger carries that channel's kind and name — because
+`Interaction.toAccess` reads both off the emitting channel, and a channel-filtered list emits only
+on that channel. -/
+theorem keyOf_mem_channelLedger (channel : RawChannel (ZMod p)) {a : LookupAccess}
+    (ha : a ∈ (trace.witness.interactionsWith channel).map Interaction.toAccess) :
+    (LookupAccessList.keyOf a).1 = kindOf channel.name ∧
+      (LookupAccessList.keyOf a).2.1 = channel.name := by
+  obtain ⟨i, hi, rfl⟩ := List.mem_map.mp ha
+  have hchannel : i.channel = channel :=
+    Air.Flat.EnsembleWitness.channel_eq_of_mem_interactionsWith hi
+  rw [← hchannel]
+  exact ⟨rfl, rfl⟩
+
+/-- **A preprocessed bus's ledger balances at every key.**
+
+The `isConsistentBalanced` half of `AIRCompleteness.lean`'s `BalancedOn`, for the two channels a
+provider closure can supply. Keys of the wrong kind or table name are vacuous; keys of the right
+shape go through the orientation bridge to `byteProgram_balanced`. -/
+theorem channelLedger_isConsistentBalanced (hwf : trace.WellFormed) (hfit : trace.CountsFit)
+    (hreal : trace.ClosureRealized) (hserv : trace.DemandServable)
+    (hnonpos : ∀ key ∈ trace.closingKeyList,
+      multiplicitySum trace.skeletonLedger key ≤ 0)
+    (channel : RawChannel (ZMod p))
+    (hchannel : channel ∈ (sp1Ensemble (p := p)).channels)
+    (hkind : kindOf channel.name = InteractionKind.Byte ∨
+      kindOf channel.name = InteractionKind.Program) :
+    LookupAccessList.isConsistentBalanced
+      ((trace.witness.interactionsWith channel).map Interaction.toAccess) := by
+  intro k
+  by_cases hname : k.2.1 = channel.name
+  · by_cases hkey : k.1 = kindOf channel.name
+    · rw [trace.fullLedger_multiplicitySum_channel channel hchannel hname]
+      refine trace.byteProgram_balanced hwf hfit hreal hserv hnonpos ?_
+      rw [preprocessedKey, hkey]
+      rcases hkind with h | h <;> rw [h]
+    · exact LookupAccessList.multiplicitySum_eq_zero_of_keyOf_ne fun a ha hka =>
+        hkey (by rw [← hka]; exact (trace.keyOf_mem_channelLedger channel ha).1)
+  · exact LookupAccessList.multiplicitySum_eq_zero_of_keyOf_ne fun a ha hka =>
+        hname (by rw [← hka]; exact (trace.keyOf_mem_channelLedger channel ha).2)
 
 end SupportedCoreTraceWitness
 

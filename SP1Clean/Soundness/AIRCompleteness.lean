@@ -1,5 +1,6 @@
 import SP1Clean.Proofs.Completeness.Assembly
 import SP1Clean.Proofs.Completeness.Ledger
+import SP1Clean.Proofs.Completeness.ClosureRealization
 import SP1Clean.Model.BalanceBridge
 import SP1Clean.Soundness.AIR
 
@@ -129,6 +130,31 @@ theorem balancedOn_of_signed_perm (channel : RawChannel (ZMod p))
 /-- The generated trace balances on all four buses of `sp1Ensemble`. -/
 def Balanced : Prop :=
   ∀ channel ∈ (sp1Ensemble (p := p)).channels, trace.BalancedOn channel
+
+/-- **`BalancedOn` on a preprocessed bus, derived rather than assumed.**
+
+The payoff of the provider closure (`Proofs/Completeness/ClosureRealization.lean`): for the Byte and
+Program channels — the two a preprocessed provider supplies unilaterally — `BalancedOn` follows from
+the shard's demand being servable and its provider lists being the ones that demand determines. No
+per-shard evaluation of the ledger is involved.
+
+The length bound stays a hypothesis: it is the field's no-wrap premise, a fact about how big this
+shard is, not something the closure can supply. State and Memory are out of scope by construction —
+their balance is a clock telescope and a per-address touch chain, and `closingAccesses_state` /
+`closingAccesses_memory` record that the closure leaves them untouched. -/
+theorem balancedOn_of_closure
+    (hwf : trace.WellFormed) (hfit : trace.CountsFit) (hreal : trace.ClosureRealized)
+    (hserv : trace.DemandServable)
+    (hnonpos : ∀ key ∈ trace.closingKeyList,
+      LookupAccessList.multiplicitySum trace.skeletonLedger key ≤ 0)
+    (channel : RawChannel (ZMod p))
+    (hchannel : channel ∈ (sp1Ensemble (p := p)).channels)
+    (hkind : kindOf channel.name = InteractionKind.Byte ∨
+      kindOf channel.name = InteractionKind.Program)
+    (hlen : (trace.witness.interactionsWith channel).length < p) :
+    trace.BalancedOn channel :=
+  ⟨hlen, trace.channelLedger_isConsistentBalanced hwf hfit hreal hserv hnonpos channel hchannel
+    hkind⟩
 
 /-- **A balanced trace assembles into a witness whose channels balance.** The exact integer ledger
 casts to Clean's field balance without a binary-multiplicity restriction; channel homogeneity is

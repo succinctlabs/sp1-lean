@@ -437,6 +437,7 @@ import SP1Clean.Soundness.MemoryIsU64
 import SP1Clean.Model.Opcode
 import SP1Clean.Soundness.ProgramConsistency
 import SP1Clean.Soundness.ProgramProviderSpike
+import SP1Clean.Soundness.EnsembleChannels
 import SP1Clean.Soundness.SP1Ensemble
 import SP1Clean.Soundness.WitnessDecode
 import SP1Clean.Soundness.TypedInteractions

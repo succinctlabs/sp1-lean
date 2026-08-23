@@ -486,5 +486,24 @@ theorem build_interactionValues (c : Component F) (inputs : List (c.Input F)) (d
         c.operations.interactionValues (Environment.fromArray (c.buildRow input data hint) data) := by
   rw [build_eq_buildHinted, buildHinted_interactionValues, List.flatMap_map]
 
+/-- **Every interaction a table emits is on one of its component's declared channels.**
+
+Clean has the contrapositive shape — `interactionsWith_eq_nil_of_not_mem_channels` — and derives it
+from `channels_subset` inline. The positive form is what a *whole-ledger* argument needs: given a
+key, decide which channel it came from. Splitting it out costs nothing and makes the fact citable.
+
+Gap against upstream: this is a two-line consequence of `channels_subset` that
+`Clean/Air/FlatComponent.lean` proves inside another lemma rather than stating. -/
+theorem channel_mem_channels_of_mem_interactions (table : Table F) :
+    ∀ i ∈ table.interactions, i.channel ∈ table.component.circuit.channels := by
+  rw [Table.forall_interactions_iff]
+  intro _ _ i interactionMem
+  rw [AbstractInteraction.eval_channel]
+  simp only [Component.interactions_eq] at interactionMem
+  refine table.component.circuit.channels_subset table.component.rowInputVar
+    table.component.rowOffset ?_
+  simp only [Operations.channels, List.mem_map]
+  exact ⟨i, interactionMem, rfl⟩
+
 end Table
 end Air.Flat

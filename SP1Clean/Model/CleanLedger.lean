@@ -56,6 +56,39 @@ theorem interactionToAccess_eval (env : Environment (ZMod p))
   simp only [Interaction.toAccess, AbstractInteraction.toAccess, AbstractInteraction.eval,
     Vector.toList]
 
+/-! ## One channel's ledger versus the whole table's
+
+Clean's balance obligations are stated per channel (`EnsembleWitness.interactionsWith channel`),
+while a provider recount reads the whole table at once. The two are the same accesses, and at any
+given key they are the same *sum* — because `Interaction.toAccess` puts the channel's own `name` in
+the key's table slot, so a key already determines which channel could have produced it.
+
+What that argument needs, and all it needs, is that the channel name determines the channel among
+the ones the table can actually emit on. That is supplied by the caller: it is an ensemble-level
+fact (SP1's four buses have four distinct names), not something a single table knows.
+-/
+
+/-- **A table's ledger at a key is that key's own channel's ledger.** -/
+theorem multiplicitySum_interactionsWith_eq (table : Table (ZMod p))
+    (channel : RawChannel (ZMod p)) {k : LookupAccessList.LookupKey}
+    (honly : ∀ i ∈ table.interactions,
+      LookupAccessList.keyOf (Interaction.toAccess i) = k → i.channel = channel) :
+    LookupAccessList.multiplicitySum
+        ((table.interactionsWith channel).map Interaction.toAccess) k =
+      LookupAccessList.multiplicitySum (tableCleanAccesses table) k := by
+  rw [Air.Flat.Table.interactionsWith_eq_filter, tableCleanAccesses]
+  exact LookupAccessList.multiplicitySum_filter_map_eq _ _ _ _
+    fun i hi hkey => by simpa using honly i hi hkey
+
+omit [Fact p.Prime] in
+/-- The key an interaction lands on names its own channel, so a key with a different table name
+cannot have come from this interaction. -/
+theorem channel_name_of_keyOf_toAccess {i : Interaction (ZMod p)}
+    {k : LookupAccessList.LookupKey}
+    (h : LookupAccessList.keyOf (Interaction.toAccess i) = k) : i.channel.name = k.2.1 := by
+  rw [← h]
+  rfl
+
 /-- Closed form for the literal Clean access ledger of an honestly built table. -/
 theorem tableCleanAccesses_build (component : Component (ZMod p))
     (inputs : List (component.Input (ZMod p))) (data : ProverData (ZMod p))

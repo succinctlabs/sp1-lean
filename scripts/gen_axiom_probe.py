@@ -202,7 +202,12 @@ TARGETS = [
     ("SP1Clean/Proofs/Completeness/ClosureRealization.lean",
      r"theorem\s+(family_ledger_eq|family_multiplicitySum|program_round|"
      r"closureRange_contribution|providerLedger_multiplicitySum|"
-     r"fullLedger_multiplicitySum|byteProgram_balanced)\b"),
+     r"fullLedger_multiplicitySum|byteProgram_balanced|"
+     r"fullLedger_multiplicitySum_channel|channelLedger_isConsistentBalanced)\b"),
+    # The ensemble's own channel discipline, which the orientation bridge rests on.
+    ("SP1Clean/Soundness/EnsembleChannels.lean",
+     r"theorem\s+(sp1Tables_channels_subset|sp1ProviderTables_channels_subset|"
+     r"sp1Ensemble_allTables_channels_subset|channel_eq_of_name_eq)\b"),
     ("SP1Clean/Proofs/Completeness/ProviderTables.lean",
      r"theorem\s+(u8Range_traceTable_cleanAccesses|msb_traceTable_cleanAccesses|"
      r"and_traceTable_cleanAccesses|or_traceTable_cleanAccesses|"
@@ -224,7 +229,7 @@ TARGETS = [
      r"theorem\s+(witness_constraints|tables_map_component)\b"),
     ("SP1Clean/Soundness/AIRCompleteness.lean",
      r"theorem\s+(supported_core_native_complete|sp1Ensemble_statement_of_traceGeneratable|"
-     r"balancedOn_of_signed_perm|witness_balancedChannels)\b"),
+     r"balancedOn_of_signed_perm|witness_balancedChannels|balancedOn_of_closure)\b"),
     # The W4 completeness layer: each chip's trace-table constraint/guarantee theorems and its
     # event-to-prover-assumptions discharge. Probed from the pilot onward so the rollout cannot
     # silently introduce a compiler-trusted or deferred step.
