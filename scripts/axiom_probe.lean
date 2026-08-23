@@ -474,6 +474,15 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Ledger.balanceOf_eq_pushed_sub_pulled
 #print axioms SP1Clean.Ledger.balancedInteractions_of_signed_perm
 #print axioms SP1Clean.Ledger.balancedInteractions_of_flatMap_perm
+#print axioms SP1Clean.LookupAccessList.multiplicitySum_closingAccesses
+#print axioms SP1Clean.LookupAccessList.multiplicitySum_append_closingAccesses
+#print axioms SP1Clean.LookupAccessList.mem_closingKeys_of_multiplicitySum_ne_zero
+#print axioms SP1Clean.LookupAccessList.multiplicitySum_closingAccesses_of_not_select
+#print axioms SP1Clean.LookupAccessList.multiplicitySum_append_closing
+#print axioms SP1Clean.Soundness.SupportedCoreTraceWitness.closingAccesses_balances
+#print axioms SP1Clean.Soundness.SupportedCoreTraceWitness.closingAccesses_not_preprocessed
+#print axioms SP1Clean.Soundness.SupportedCoreTraceWitness.closingAccesses_state
+#print axioms SP1Clean.Soundness.SupportedCoreTraceWitness.closingAccesses_memory
 #print axioms SP1Clean.Soundness.SupportedCoreTraceWitness.tables_map_component
 #print axioms SP1Clean.Soundness.SupportedCoreTraceWitness.witness_constraints
 #print axioms SP1Clean.Soundness.SupportedCoreTraceWitness.balancedOn_of_signed_perm

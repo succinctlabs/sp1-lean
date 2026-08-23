@@ -180,6 +180,14 @@ TARGETS = [
     ("SP1Clean/Proofs/Completeness/Ledger.lean",
      r"theorem\s+(balancedInteractions_of_signed_perm|balancedInteractions_of_flatMap_perm|"
      r"balanceOf_eq_pushed_sub_pulled)\b"),
+    # The provider closure. The ledger-level balance theorem and the key-selection lemmas that make
+    # its two side conditions structural rather than caller-supplied; plus the trace-level
+    # instantiation and the two conservativeness results that pin the closure out of State/Memory.
+    ("SP1Clean/Proofs/Completeness/Closure.lean",
+     r"theorem\s+(multiplicitySum_append_closingAccesses|multiplicitySum_append_closing|"
+     r"multiplicitySum_closingAccesses|mem_closingKeys_of_multiplicitySum_ne_zero|"
+     r"multiplicitySum_closingAccesses_of_not_select|closingAccesses_balances|"
+     r"closingAccesses_not_preprocessed|closingAccesses_state|closingAccesses_memory)\b"),
     # W5: the machine-level assembly and its completeness capstone. The assembly's constraint
     # theorem is the join of all 54 tables' own theorems (53 ensemble tables plus verifier), so a
     # regression anywhere in the
