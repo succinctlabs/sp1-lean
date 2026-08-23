@@ -145,6 +145,16 @@ theorem multiplicitySum_active (accesses : LookupAccessList) (k : LookupKey) :
   | cons head tail ih =>
       by_cases hmult : multOf head = 0 <;> simp [active_cons, multiplicitySum_cons, hmult, ih]
 
+/-- A concatenation of per-item ledgers sums per item. The `flatMap` counterpart of
+`multiplicitySum_append`, for a table family indexed by a list (the seventeen fixed Range widths). -/
+theorem multiplicitySum_flatMap {α : Type*} (l : List α) (f : α → LookupAccessList)
+    (k : LookupKey) :
+    multiplicitySum (l.flatMap f) k = (l.map fun a => multiplicitySum (f a) k).sum := by
+  induction l with
+  | nil => rw [List.flatMap_nil, multiplicitySum_nil, List.map_nil, List.sum_nil]
+  | cons head tail ih =>
+      rw [List.flatMap_cons, multiplicitySum_append, ih, List.map_cons, List.sum_cons]
+
 /-- Permutation invariance: reordering rows does not change any per-key sum. This is the structural
 fact that makes `isConsistentBalanced` permutation-invariant. -/
 theorem multiplicitySum_perm (l1 l2 : LookupAccessList) (h : l1.Perm l2) (k : LookupKey) :

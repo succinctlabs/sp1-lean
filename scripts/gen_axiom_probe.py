@@ -198,6 +198,11 @@ TARGETS = [
      r"ltu_buildRow_cleanAccesses|range_buildRow_cleanAccesses|"
      r"program_buildRow_cleanAccesses)\b"),
     # Tier 2: a whole provider table's ledger is exactly its occurrence list.
+    # Tier 3: the provider lists a shard's demand determines, and the balance that follows.
+    ("SP1Clean/Proofs/Completeness/ClosureRealization.lean",
+     r"theorem\s+(family_ledger_eq|family_multiplicitySum|program_round|"
+     r"closureRange_contribution|providerLedger_multiplicitySum|"
+     r"fullLedger_multiplicitySum|byteProgram_balanced)\b"),
     ("SP1Clean/Proofs/Completeness/ProviderTables.lean",
      r"theorem\s+(u8Range_traceTable_cleanAccesses|msb_traceTable_cleanAccesses|"
      r"and_traceTable_cleanAccesses|or_traceTable_cleanAccesses|"

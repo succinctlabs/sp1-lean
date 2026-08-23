@@ -520,3 +520,4 @@ import SP1Clean.Proofs.Completeness.Ledger
 import SP1Clean.Proofs.Completeness.ProviderInteractions
 import SP1Clean.Proofs.Completeness.ProviderTables
 import SP1Clean.Proofs.Completeness.Closure
+import SP1Clean.Proofs.Completeness.ClosureRealization
