@@ -1,5 +1,6 @@
 import SP1Clean.Math.Word
 import SP1Clean.Math.ShiftBounds
+import SP1Clean.Math.HWord
 import Mathlib.Tactic
 
 /-! # ShiftRight native arithmetic — the SRL math layer
@@ -1572,14 +1573,6 @@ lemma sra_close_su16_3_case {p : ℕ} [Fact (Nat.Prime p)] [Fact (2 ^ 17 < p)]
 
 /-! ## SRLW / SRAW chain (low-32 word variants): a 32-bit `HWord` shift, sign-extended to 64. -/
 
-/-- A 32-bit value as two little-endian 16-bit limbs (SP1's `HWord`), for the low-32 word shifts. -/
-@[reducible] def HWord (T : Type) := Vector T 2
-namespace HWord
-/-- Little-endian reassembly of a half-word to `ℕ`. -/
-def toNat {p : ℕ} [NeZero p] (w : HWord (ZMod p)) : ℕ := w[0].val + w[1].val * 2 ^ 16
-/-- The 32-bit value of the half-word. -/
-def toBitVec32 {p : ℕ} [NeZero p] (w : HWord (ZMod p)) : BitVec 32 := BitVec.ofNat 32 (toNat w)
-end HWord
 
 -- This used to be the single declaration in the file that did not fit the default budget: measured
 -- floor (250000, 320000] against a declared 1600000. The earlier note named the cause correctly --

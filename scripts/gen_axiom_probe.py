@@ -183,11 +183,15 @@ TARGETS = [
     # The provider closure. The ledger-level balance theorem and the key-selection lemmas that make
     # its two side conditions structural rather than caller-supplied; plus the trace-level
     # instantiation and the two conservativeness results that pin the closure out of State/Memory.
-    ("SP1Clean/Proofs/Completeness/Closure.lean",
+    # The ledger-level half of the provider closure moved to Model/InteractionBus.lean in 2026-08
+    # (its namespace already said so); the trace-level half stayed in Closure.lean.
+    ("SP1Clean/Model/InteractionBus.lean",
      r"theorem\s+(multiplicitySum_append_closingAccesses|multiplicitySum_append_closing|"
      r"multiplicitySum_closingAccesses|mem_closingKeys_of_multiplicitySum_ne_zero|"
-     r"multiplicitySum_closingAccesses_of_not_select|closingAccesses_balances|"
-     r"closingAccesses_not_preprocessed|closingAccesses_state|closingAccesses_memory)\b"),
+     r"multiplicitySum_closingAccesses_of_not_select)\b"),
+    ("SP1Clean/Proofs/Completeness/Closure.lean",
+     r"theorem\s+(closingAccesses_balances|closingAccesses_not_preprocessed|"
+     r"closingAccesses_state|closingAccesses_memory)\b"),
     # W5: the machine-level assembly and its completeness capstone. The assembly's constraint
     # theorem is the join of all 54 tables' own theorems (53 ensemble tables plus verifier), so a
     # regression anywhere in the

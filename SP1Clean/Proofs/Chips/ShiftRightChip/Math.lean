@@ -126,9 +126,9 @@ lemma low32_msb_eq_b1 [NeZero p] {b : Word (ZMod p)} (h_isU64 : Word.isU64 b) :
 omit [Fact (Nat.Prime p)] in
 /-- `HWord.toBitVec32 #v[a,b]`'s `toNat` is the little-endian sum when both limbs are `< 2^16`. -/
 lemma hword_toNat {a b : ZMod p} (ha : a.val < 2 ^ 16) (hb : b.val < 2 ^ 16) :
-    (ShiftRightMath.HWord.toBitVec32 #v[a, b]).toNat = a.val + b.val * 2 ^ 16 := by
-  unfold ShiftRightMath.HWord.toBitVec32
-  simp only [BitVec.toNat_ofNat, ShiftRightMath.HWord.toNat, Vector.getElem_mk,
+    (HWord.toBitVec32 #v[a, b]).toNat = a.val + b.val * 2 ^ 16 := by
+  unfold HWord.toBitVec32
+  simp only [BitVec.toNat_ofNat, HWord.toNat, Vector.getElem_mk,
     List.getElem_toArray, List.getElem_cons_zero, List.getElem_cons_succ]
   omega
 
@@ -161,8 +161,8 @@ lemma srlw_div_to_bitvec (Wd rs1 rs2 : Word (ZMod p))
     (hr0 : Wd[0].val < 2 ^ 16) (hr1 : Wd[1].val < 2 ^ 16)
     (hm : m = if Wd[1].val ≥ 32768 then 1 else 0)
     (hr2 : Wd[2] = m * 65535) (hr3 : Wd[3] = m * 65535)
-    (hdiv : (ShiftRightMath.HWord.toBitVec32 #v[Wd[0], Wd[1]]).toNat
-        = (ShiftRightMath.HWord.toBitVec32 #v[rs1[0], rs1[1]]).toNat / 2 ^ (rs2[0].val % 32)) :
+    (hdiv : (HWord.toBitVec32 #v[Wd[0], Wd[1]]).toNat
+        = (HWord.toBitVec32 #v[rs1[0], rs1[1]]).toNat / 2 ^ (rs2[0].val % 32)) :
     Word.toBitVec64 Wd = RV64.srlw (Word.toBitVec64 rs2) (Word.toBitVec64 rs1) := by
   obtain ⟨hr1_0, hr1_1, _, _⟩ := Word.lt_cases_of_isU64 h_rs1U
   rw [hword_toNat hr0 hr1, hword_toNat hr1_0 hr1_1] at hdiv
@@ -185,8 +185,8 @@ lemma sraw_div_to_bitvec_false (Wd rs1 rs2 : Word (ZMod p))
     (hm : m = if Wd[1].val ≥ 32768 then 1 else 0)
     (hr2 : Wd[2] = m * 65535) (hr3 : Wd[3] = m * 65535)
     (h_msb : (BitVec.extractLsb' 0 32 (Word.toBitVec64 rs1)).msb = false)
-    (hdiv : (ShiftRightMath.HWord.toBitVec32 #v[Wd[0], Wd[1]]).toNat
-        = (ShiftRightMath.HWord.toBitVec32 #v[rs1[0], rs1[1]]).toNat / 2 ^ (rs2[0].val % 32)) :
+    (hdiv : (HWord.toBitVec32 #v[Wd[0], Wd[1]]).toNat
+        = (HWord.toBitVec32 #v[rs1[0], rs1[1]]).toNat / 2 ^ (rs2[0].val % 32)) :
     Word.toBitVec64 Wd = RV64.sraw (Word.toBitVec64 rs2) (Word.toBitVec64 rs1) := by
   obtain ⟨hr1_0, hr1_1, _, _⟩ := Word.lt_cases_of_isU64 h_rs1U
   rw [hword_toNat hr0 hr1, hword_toNat hr1_0 hr1_1] at hdiv
@@ -206,8 +206,8 @@ lemma sraw_div_to_bitvec_true (Wd rs1 rs2 : Word (ZMod p))
     (hm : m = if Wd[1].val ≥ 32768 then 1 else 0)
     (hr2 : Wd[2] = m * 65535) (hr3 : Wd[3] = m * 65535)
     (h_msb : (BitVec.extractLsb' 0 32 (Word.toBitVec64 rs1)).msb = true)
-    (hdiv : (ShiftRightMath.HWord.toBitVec32 #v[Wd[0], Wd[1]]).toNat
-        = 2 ^ 32 - 1 - (2 ^ 32 - 1 - (ShiftRightMath.HWord.toBitVec32 #v[rs1[0], rs1[1]]).toNat)
+    (hdiv : (HWord.toBitVec32 #v[Wd[0], Wd[1]]).toNat
+        = 2 ^ 32 - 1 - (2 ^ 32 - 1 - (HWord.toBitVec32 #v[rs1[0], rs1[1]]).toNat)
             / 2 ^ (rs2[0].val % 32)) :
     Word.toBitVec64 Wd = RV64.sraw (Word.toBitVec64 rs2) (Word.toBitVec64 rs1) := by
   obtain ⟨hr1_0, hr1_1, _, _⟩ := Word.lt_cases_of_isU64 h_rs1U
