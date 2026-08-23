@@ -192,7 +192,8 @@ TARGETS = [
     ("SP1Clean/Proofs/Completeness/ProviderInteractions.lean",
      r"theorem\s+(interactions_eq_interactionsWith_of_onlyChannel|"
      r"u8Range_interactionsWith_byte|u8Range_buildRow_cleanAccesses|"
-     r"msb_buildRow_result|msb_buildRow_cleanAccesses)\b"),
+     r"msb_buildRow_result|msb_buildRow_cleanAccesses|"
+     r"and_buildRow_result_val|and_buildRow_cleanAccesses)\b"),
     ("SP1Clean/Model/InteractionBus.lean",
      r"theorem\s+(multiplicitySum_append_closingAccesses|multiplicitySum_append_closing|"
      r"multiplicitySum_closingAccesses|mem_closingKeys_of_multiplicitySum_ne_zero|"
