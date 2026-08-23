@@ -509,9 +509,16 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.TraceGen.aluEvents_wellFormed
 #print axioms SP1Clean.TraceGen.witnessStep_wellFormed
 #print axioms SP1Clean.TraceGen.witnessEvents_wellFormed
+#print axioms SP1Clean.TraceGen.aluStepOfState_wellFormed
+#print axioms SP1Clean.TraceGen.aluStepOfState_isSome
+#print axioms SP1Clean.TraceGen.aluStepsFrom_wellFormed
+#print axioms SP1Clean.TraceGen.aluStepsFrom_length_le
 #print axioms SP1Clean.Soundness.aluEvents_addTable_constraints
 #print axioms SP1Clean.Soundness.aluEvents_addTable_guarantees
 #print axioms SP1Clean.Soundness.aluEvents_subTable_constraints
+#print axioms SP1Clean.Soundness.sailRun_addTable_constraints
+#print axioms SP1Clean.Soundness.sailRun_subTable_constraints
+#print axioms SP1Clean.Soundness.sailRun_rows_le
 #print axioms SP1Clean.TraceGen.stateBump_spec
 #print axioms SP1Clean.TraceGen.memoryBump_spec
 #print axioms SP1Clean.TraceGen.stateBumpTraceInputs_spec
