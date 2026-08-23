@@ -130,9 +130,12 @@ TARGETS = [
     # families for each of its twenty-five instantiations, plus the aggregate identity that makes
     # the transported tables the ensemble's own.
     # These are the declarations that put `Faithful/` inside a live import closure.
+    # buildRow_input_get / eval_var_buildRow_input_get moved down to Model/CleanLedger.lean in
+    # 2026-08 (pure Clean Component/ProvableType vocabulary; the completeness layer needs them too).
+    ("SP1Clean/Model/CleanLedger.lean",
+     r"theorem\s+(buildRow_input_get|eval_var_buildRow_input_get)\b"),
     ("SP1Clean/Composition/Table.lean",
-     r"theorem\s+(buildRow_input_get|eval_var_buildRow_input_get|signedVal_eq_zero_iff|"
-     r"transportTable_constraints|"
+     r"theorem\s+(signedVal_eq_zero_iff|transportTable_constraints|"
      r"transportTable_accesses_perm|transportTable_spec)\b"),
     ("SP1Clean/Composition/Chips.lean",
      r"theorem\s+(\w+Chip_transportTable_(?:constraints|accesses|spec))\b"),

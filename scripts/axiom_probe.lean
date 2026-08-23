@@ -324,8 +324,8 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Faithful.supportedChipFaithfulness_length
 #print axioms SP1Clean.Faithful.supportedChipFaithfulness_names
 #print axioms SP1Clean.Faithful.supportedChipFaithfulness_upstream
-#print axioms SP1Clean.Composition.buildRow_input_get
-#print axioms SP1Clean.Composition.eval_var_buildRow_input_get
+#print axioms SP1Clean.buildRow_input_get
+#print axioms SP1Clean.eval_var_buildRow_input_get
 #print axioms SP1Clean.Composition.signedVal_eq_zero_iff
 #print axioms SP1Clean.Composition.transportTable_constraints
 #print axioms SP1Clean.Composition.transportTable_accesses_perm

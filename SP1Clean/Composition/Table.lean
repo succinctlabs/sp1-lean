@@ -149,30 +149,11 @@ theorem tableNativeAccesses_build_map_singleton
     rw [rowAccess row (by simp), ih (fun r hr => rowAccess r (by simp [hr]))]
     rfl
 
-/-- A built row keeps its typed input as a literal prefix.  This cell-level form is useful when
-normalizing interactions: after a component's `rowOperations` is unfolded, its input variables are
-plain offsets rather than an occurrence of `rowInput`, so `Component.rowInput_buildRow` cannot
-rewrite them directly. -/
-theorem buildRow_input_get (component : Component (ZMod p))
-    (input : component.Input (ZMod p)) (data : ProverData (ZMod p))
-    (hint : ProverHint (ZMod p)) (i : ℕ) (hi : i < size component.Input) :
-    (Environment.fromArray (component.buildRow input data hint) data).get i =
-      (toElements input)[i] := by
-  have decoded := component.rowInput_buildRow input data data hint
-  have atCell := congrArg
-    (fun value : component.Input (ZMod p) => (toElements value)[i]) decoded
-  simpa only [Component.rowInput, valueFromOffset, ProvableType.toElements_fromElements,
-    Vector.getElem_mapRange, Nat.zero_add] using atCell
-
-/-- Expression-level form of `buildRow_input_get`, matching the variables that remain after a
-component's interaction list has been normalized without unfolding `Expression.eval`. -/
-theorem eval_var_buildRow_input_get (component : Component (ZMod p))
-    (input : component.Input (ZMod p)) (data : ProverData (ZMod p))
-    (hint : ProverHint (ZMod p)) (i : ℕ) (hi : i < size component.Input) :
-    Expression.eval
-        (Environment.fromArray (component.buildRow input data hint) data)
-        (var ⟨i⟩) = (toElements input)[i] := by
-  simpa only [Expression.eval] using buildRow_input_get component input data hint i hi
+/-! `buildRow_input_get` and `eval_var_buildRow_input_get` moved to `Model/CleanLedger.lean` in
+2026-08. Their vocabulary is Clean's `Component`/`ProvableType` and nothing else — no chip, no
+oracle, no extracted row — so the placement law (`docs/layering.md`) puts them at the Model stratum,
+where the completeness layer can also reach them. Exported, not redefined. -/
+export SP1Clean (buildRow_input_get eval_var_buildRow_input_get)
 
 /-! ## Single-channel access normalization -/
 
