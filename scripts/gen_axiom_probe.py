@@ -193,7 +193,10 @@ TARGETS = [
      r"theorem\s+(interactions_eq_interactionsWith_of_onlyChannel|"
      r"u8Range_interactionsWith_byte|u8Range_buildRow_cleanAccesses|"
      r"msb_buildRow_result|msb_buildRow_cleanAccesses|"
-     r"and_buildRow_result_val|and_buildRow_cleanAccesses)\b"),
+     r"and_buildRow_result_val|and_buildRow_cleanAccesses|"
+     r"or_buildRow_cleanAccesses|xor_buildRow_cleanAccesses|"
+     r"ltu_buildRow_cleanAccesses|range_buildRow_cleanAccesses|"
+     r"program_buildRow_cleanAccesses)\b"),
     ("SP1Clean/Model/InteractionBus.lean",
      r"theorem\s+(multiplicitySum_append_closingAccesses|multiplicitySum_append_closing|"
      r"multiplicitySum_closingAccesses|mem_closingKeys_of_multiplicitySum_ne_zero|"
