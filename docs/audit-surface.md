@@ -93,10 +93,10 @@ granularity gap is recorded on the definitions themselves.
 | `ChipFaithful` | `SP1Clean/Faithful/ChipOracle.lean` | What "faithful to Rust" means |
 | `ChipOracle` | `SP1Clean/Faithful/ChipOracle.lean` | The generated Rust side of the comparison |
 | `FaithfulPropFor` | `SP1Clean/Faithful/SupportedMachine.lean` | That an anchor is bound to *its own* table's theorem |
-| `CanonicalPreprocessedInventory` | `SP1Clean/Faithful/Transport/PreprocessedProviders.lean` | Caller-supplied provider carriers + projected-key `Nodup` |
-| `PreprocessedProviderContract` | `SP1Clean/Faithful/Transport/PreprocessedProviders.lean` | Caller-supplied row-local provider semantics |
-| `PreprocessedProviderRecountContract` | `SP1Clean/Faithful/Transport/PreprocessedProviders.lean` | Coverage, nonpositivity, canonical capacity |
-| `ExactNativeGlobalContract` | `SP1Clean/Faithful/Transport/CoreArtifact.lean` | What the artifact still assumes globally |
+| `CanonicalPreprocessedInventory` | `SP1Clean/Composition/PreprocessedProviders.lean` | Caller-supplied provider carriers + projected-key `Nodup` |
+| `PreprocessedProviderContract` | `SP1Clean/Composition/PreprocessedProviders.lean` | Caller-supplied row-local provider semantics |
+| `PreprocessedProviderRecountContract` | `SP1Clean/Composition/PreprocessedProviders.lean` | Coverage, nonpositivity, canonical capacity |
+| `ExactNativeGlobalContract` | `SP1Clean/Composition/CoreArtifact.lean` | What the artifact still assumes globally |
 | `CoreAIRRefinementObligations` | `SP1Clean/Soundness/CoreAIR.lean` | The 14-field exact-refinement bundle (`executionCase` open) |
 
 ## The completeness direction

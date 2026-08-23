@@ -43,3 +43,13 @@ namespace SP1Clean/Model/Semantics/Decode.lean
 namespace SP1Clean/Model/Semantics/GuestProgram.lean
 namespace SP1Clean/FormalModel/OpcodeTable.lean
 namespace SP1Clean/FormalModel/Trace/Witness.lean
+
+# ---------------------------------------------------------------------------
+# 4. The faithfulness coverage certificate deliberately pins itself to the machine's chip registry.
+#    Faithful/SupportedMachine.lean is stratum-7 content -- it declares ChipFaithfulnessAnchor and
+#    supportedChipFaithfulness, and renaming those into a higher pillar would make the names worse,
+#    not better. It reaches stratum 8 for exactly one thing: Soundness.supportedChips, so that (in
+#    its own words) "adding, removing, or reordering a supported instruction table requires updating
+#    the faithfulness coverage certificate in the same change". The coupling IS the file's purpose;
+#    breaking it to satisfy the direction law would remove the property the file exists to provide.
+import SP1Clean/Faithful/SupportedMachine.lean SP1Clean/Soundness/SupportedMachine.lean

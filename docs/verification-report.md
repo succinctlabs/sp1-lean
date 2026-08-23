@@ -80,7 +80,7 @@ The deliverables:
   separate one-instruction anchor hand-assembles the semantic trace record, proves one event and one
   decoded physical instruction row, supplies the matching native provider occurrences, and carries
   the circuit-generated witness through D5 (§7.4). It is not a verified or full trace generator.
-- **D9 — Extracted-to-native local ensemble artifact.** `SP1Clean/Faithful/Transport/`
+- **D9 — Extracted-to-native local ensemble artifact.** `SP1Clean/Composition/`
   composes D3 with the native side, which Alex Hicks's 2026-08 PR #110 review found were never
   joined inside Lean. From valid witnesses of the pinned execution and memory-boundary clusters,
   **a caller-supplied `CanonicalPreprocessedInventory`, plus named preprocessing, memory-boundary,
@@ -737,7 +737,7 @@ repository's core honesty discipline: conditional results are *named* as conditi
 headline names are not spent early.
 
 The exact/native construction beneath that still-open semantic refinement is now explicit at its
-local boundary. `Faithful/Transport/CoreEnsemble.lean` consumes valid exact execution and
+local boundary. `Composition/CoreEnsemble.lean` consumes valid exact execution and
 memory-boundary witnesses, a caller-supplied `CanonicalPreprocessedInventory`, and named
 preprocessing, memory-boundary, and public-limb contracts, constructs exactly the native 53 tables
 and verifier row, and proves every local constraint.
@@ -1096,7 +1096,7 @@ Stated plainly:
    former Bitwise/Lt/Addw/ShiftLeft/ShiftRight immediate-row and UType/JAL x0 carve-outs are now
    closed.
 7. **The extracted-to-native local ensemble transport is complete under named contracts; its global
-   semantic refinement is not.** `SP1Clean/Faithful/Transport/` composes every chip anchor with valid
+   semantic refinement is not.** `SP1Clean/Composition/` composes every chip anchor with valid
    exact execution and separately authenticated memory-boundary witnesses, a caller-supplied
    `CanonicalPreprocessedInventory`, plus named preprocessing, memory-boundary, and public-limb
    transport contracts. Under those hypotheses it constructs the

@@ -68,7 +68,7 @@ The repository also contains a complete list-level model of the pinned upstream 
 - a preprocessed-commitment and exact natural interaction-balance relation.
 
 That exact upstream relation has not yet been connected all the way to Sail, though the two theorem
-families are no longer disconnected. `SP1Clean/Faithful/Transport/` turns each chip's whole-chip
+families are no longer disconnected. `SP1Clean/Composition/` turns each chip's whole-chip
 `ChipFaithful` anchor into a table-level transport — a valid extracted table becomes a native Clean
 table satisfying the whole native circuit's constraints — and proves the twenty-five transported
 tables *are* the ensemble's instruction tables. The separate generic `transportTable_spec` reaches a

@@ -1,4 +1,4 @@
-import SP1Clean.Faithful.Transport.CoreEnsemble
+import SP1Clean.Composition.CoreEnsemble
 import SP1Clean.Soundness.AIR
 
 /-! # Exact Core artifact at the native semantic boundary
@@ -28,7 +28,12 @@ reachability, shard composition, or cryptographic verifier theorem is asserted h
 
 set_option autoImplicit false
 
-namespace SP1Clean.Faithful.Transport
+namespace SP1Clean.Composition
+
+-- The faithfulness vocabulary (`ChipOracle`, `ChipFaithful`, `ChipRowCodec`,
+-- `nativeAccesses`) is at the stratum below; this namespace no longer encloses it since the
+-- 2026-08 move out of `Faithful/Transport/`.
+open SP1Clean.Faithful
 
 open Circuit
 open Air.Flat (EnsembleWitness)
@@ -394,4 +399,4 @@ theorem exactNativeArtifact_localExecution {Digest : Type}
     (exactNativeArtifact_supportedCoreNativeRelation program statement executionWitness
       memoryBoundaryWitness inventory data hint transport boundary global)
 
-end SP1Clean.Faithful.Transport
+end SP1Clean.Composition

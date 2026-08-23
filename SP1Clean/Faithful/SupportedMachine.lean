@@ -36,7 +36,7 @@ instruction table requires updating the faithfulness coverage certificate in the
 The certificate covers whole-chip assertions and active interaction multisets. It does not identify
 the 28 proof-oriented native provider/system tables row-for-row with upstream's differently shaped
 Core AIR tables. Exact upstream table coverage lives in `Faithful/CoreAIR.lean`; the explicit
-redistribution and consumer-recount boundary lives in `Faithful/Transport/`. -/
+redistribution and consumer-recount boundary lives in `Composition/`. -/
 
 namespace SP1Clean.Faithful
 

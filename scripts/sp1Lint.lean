@@ -15,7 +15,8 @@ project in the two ways the stock `runLinter` exe cannot do:
   environment. `nolints.json` / `@[nolint]` are the only env-linter suppressions.
 
   INVARIANT: `getHandwrittenDecls` keeps the hand-written declarations of this project — the
-  `SP1Clean.*` tree minus the auto-gen ones (the `SP1Clean.Extracted` prefix: the constraint structs
+  `SP1Clean.*` tree minus the auto-gen ones (the `SP1Clean.Extracted` prefix except its two
+  hand-written members, `ExtractionDSL` and `InteractionModel`: the constraint structs
   + the main-lib `Circuit/` forms; and any module ending in "Vectors") — plus the two
   upstream-destined libraries `ToClean.*` / `ToMathlib.*`, which are hand-written and deliberately
   get no linter relaxation (material heading upstream should meet the same bar). Those two are
@@ -74,9 +75,16 @@ auto-gen `SP1Clean.Extracted.*` and `*Vectors` batteries) plus the two upstream-
 namespace root. -/
 def getHandwrittenDecls : CoreM (Array Name) := do
   let env ← getEnv
+  -- `Extracted/` is dropped as auto-generated, but two of its modules are hand-written and say so
+  -- in their own docstrings: `ExtractionDSL` (the vocabulary the constraint-compiler backend
+  -- targets) and `InteractionModel` (its projection to `LookupAccess`). They live there because
+  -- that is the stratum their vocabulary puts them at — see `docs/layering.md` — not because a
+  -- script emitted them, so they get the same linting as any other hand-written file.
+  let handWrittenExtracted : List Name :=
+    [`SP1Clean.Extracted.ExtractionDSL, `SP1Clean.Extracted.InteractionModel]
   let keep := env.header.moduleNames.map fun m =>
     ((`SP1Clean).isPrefixOf m || (`ToClean).isPrefixOf m || (`ToMathlib).isPrefixOf m)
-      && !(`SP1Clean.Extracted).isPrefixOf m
+      && (!(`SP1Clean.Extracted).isPrefixOf m || handWrittenExtracted.contains m)
       && !m.toString.endsWith "Vectors"
   return env.constants.map₁.fold (init := #[]) fun decls declName _ =>
     if keep[env.const2ModIdx[declName]?.get! (α := Nat)]! then decls.push declName else decls

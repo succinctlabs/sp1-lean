@@ -1,5 +1,5 @@
 import SP1Clean.Faithful.CoreAIR
-import SP1Clean.Faithful.Transport.Table
+import SP1Clean.Composition.Table
 import SP1Clean.Proofs.Completeness.Providers
 
 /-! # Exact memory-boundary rows to native boundary providers
@@ -20,7 +20,12 @@ cross-table balance can provide.
 
 set_option autoImplicit false
 
-namespace SP1Clean.Faithful.Transport
+namespace SP1Clean.Composition
+
+-- The faithfulness vocabulary (`ChipOracle`, `ChipFaithful`, `ChipRowCodec`,
+-- `nativeAccesses`) is at the stratum below; this namespace no longer encloses it since the
+-- 2026-08 move out of `Faithful/Transport/`.
+open SP1Clean.Faithful
 
 open Circuit
 open Air.Flat (Component Table)
@@ -714,4 +719,4 @@ theorem extractedMemoryBoundaryTables_activeAccesses
   simp only [activeMemoryGlobalInitRows, activeMemoryGlobalFinalizeRows,
     List.filter_filter, Bool.and_self]
 
-end SP1Clean.Faithful.Transport
+end SP1Clean.Composition

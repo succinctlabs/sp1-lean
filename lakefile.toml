@@ -201,7 +201,7 @@ moreLeanArgs = [
 # and the whole-machine/trace layer (Soundness/). Same linter set as the other core pillars above.
 [[lean_lib]]
 name = "SP1Proofs"
-globs = ["SP1Clean.Proofs.+", "SP1Clean.Faithful.+", "SP1Clean.Soundness.+"]
+globs = ["SP1Clean.Proofs.+", "SP1Clean.Faithful.+", "SP1Clean.Soundness.+", "SP1Clean.Composition.+"]
 moreLeanArgs = [
   "-Dlinter.style.lambdaSyntax=true", "-Dlinter.style.dollarSyntax=true",
   "-Dlinter.style.refine=true", "-Dlinter.style.cases=true",

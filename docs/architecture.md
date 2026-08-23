@@ -30,6 +30,7 @@ No one of these objects is silently treated as another.
 | `Proofs/` | circuit soundness/completeness and Sail bridges |
 | `Faithful/` | whole-chip comparisons on canonical native rows reconstructed from extracted Rust rows |
 | `Soundness/` | machine registry, typed decoding, grounding, and capstones |
+| `Composition/` | the composed exact→native artifact: transport, provider redistribution, the 53-table assembly |
 | `SP1CleanTest/` | compiler-trusted executable conformance tests, isolated from the main library |
 
 `SP1Clean.lean` imports the complete main proof library (`scripts/check_root_index.sh` gates that it
@@ -168,7 +169,7 @@ StateBump at 51/52. The complete Range family is semantic, not padding: shift co
 outside the former `8/13/14/16` subset, so that subset could not balance an honest shift trace.
 These provider circuits are not asserted to be row-wise copies of the exact upstream Core system
 tables. They are the small native interface used to prove the instruction execution theorem;
-`Faithful/Transport/ProviderSegment.lean` consumes a caller-supplied, source-backed
+`Composition/ProviderSegment.lean` consumes a caller-supplied, source-backed
 `CanonicalPreprocessedInventory` together with the exact memory-boundary and bump rows, and
 `CoreEnsemble.lean` proves the complete 53-table local constraint system.
 

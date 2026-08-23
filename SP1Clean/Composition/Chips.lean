@@ -1,5 +1,5 @@
 import SP1Clean.Faithful.SupportedMachine
-import SP1Clean.Faithful.Transport.Table
+import SP1Clean.Composition.Table
 
 /-! # The twenty-five per-chip table transports
 
@@ -24,7 +24,12 @@ opportunities for one of them to be quietly weaker than the rest.
 
 set_option autoImplicit false
 
-namespace SP1Clean.Faithful.Transport
+namespace SP1Clean.Composition
+
+-- The faithfulness vocabulary (`ChipOracle`, `ChipFaithful`, `ChipRowCodec`,
+-- `nativeAccesses`) is at the stratum below; this namespace no longer encloses it since the
+-- 2026-08 move out of `Faithful/Transport/`.
+open SP1Clean.Faithful
 
 open Circuit
 open Air.Flat (Component Table)
@@ -740,4 +745,4 @@ theorem aluX0Chip_transportTable_spec (rustRows : List (Extracted.AluX0Oracle.Al
   transportTable_spec aluX0Chip_faithful rustRows data valid assumptions guarantees
 
 
-end SP1Clean.Faithful.Transport
+end SP1Clean.Composition

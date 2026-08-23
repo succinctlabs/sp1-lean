@@ -1,7 +1,7 @@
 import SP1Clean.Faithful.CoreAIR
 import SP1Clean.Faithful.MemoryBumpChip
 import SP1Clean.Faithful.StateBumpChip
-import SP1Clean.Faithful.Transport.Table
+import SP1Clean.Composition.Table
 import ToClean.Air.TableBuild
 
 /-! # Exact Core system tables transported to native Clean tables
@@ -26,7 +26,12 @@ closed unconditionally from `CoreAIR.Current.Relation`.
 
 set_option autoImplicit false
 
-namespace SP1Clean.Faithful.Transport
+namespace SP1Clean.Composition
+
+-- The faithfulness vocabulary (`ChipOracle`, `ChipFaithful`, `ChipRowCodec`,
+-- `nativeAccesses`) is at the stratum below; this namespace no longer encloses it since the
+-- 2026-08 move out of `Faithful/Transport/`.
+open SP1Clean.Faithful
 
 open Circuit
 open Air.Flat (Component Table)
@@ -238,4 +243,4 @@ theorem extractedBumpTables_accesses {Digest : Type}
   simp only [extractedBumpTables, List.flatMap_cons, List.flatMap_nil, List.append_nil]
   rw [transportMemoryBumpTable_accesses, transportStateBumpTable_accesses]
 
-end SP1Clean.Faithful.Transport
+end SP1Clean.Composition

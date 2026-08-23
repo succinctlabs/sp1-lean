@@ -1,4 +1,4 @@
-import SP1Clean.Faithful.Transport.Chips
+import SP1Clean.Composition.Chips
 import SP1Clean.Soundness.SP1Ensemble
 
 /-! # Transported tables *are* the ensemble's instruction tables
@@ -27,7 +27,12 @@ equality.
 
 set_option autoImplicit false
 
-namespace SP1Clean.Faithful.Transport
+namespace SP1Clean.Composition
+
+-- The faithfulness vocabulary (`ChipOracle`, `ChipFaithful`, `ChipRowCodec`,
+-- `nativeAccesses`) is at the stratum below; this namespace no longer encloses it since the
+-- 2026-08 move out of `Faithful/Transport/`.
+open SP1Clean.Faithful
 
 open Circuit
 open Air.Flat (Component Table)
@@ -331,4 +336,4 @@ theorem transported_constraints (valid : rows.Valid) :
 
 end ExtractedInstructionRows
 
-end SP1Clean.Faithful.Transport
+end SP1Clean.Composition

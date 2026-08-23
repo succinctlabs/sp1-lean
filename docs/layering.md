@@ -70,8 +70,14 @@ ordering below is supported by measured import counts, not by intent.
   whose own closure reaches all 25 chips. The latter two already declare `namespace SP1Clean.Soundness`.
 - `Soundness/` holds three. `RowView.lean` reaches nothing above stratum 3; `AIRCompleteness.lean`
   sits above `Proofs/Completeness/`; the rest is the machine.
-- `Faithful/` holds two. The per-chip anchors sit below the machine; `Transport/` and
-  `SupportedMachine.lean` sit above it.
+- `Faithful/` held two until 2026-08. The composition half — the exact→native artifact — is now its
+  own top-level pillar, `SP1Clean/Composition/`, so the directory names match the strata and the
+  Faithful ↔ Soundness mutual pair is gone. `Faithful/SupportedMachine.lean` stayed behind: its
+  content is stratum-7 faithfulness (it declares `ChipFaithfulnessAnchor` and
+  `supportedChipFaithfulness`, and renaming those into a higher pillar would make them worse), and it
+  reaches the machine for one thing only — `Soundness.supportedChips`, so the coverage certificate
+  cannot drift from the registry. That coupling is the file's purpose, so it is an allowlist entry
+  with a reason rather than a move.
 - `FormalModel/` holds two — `TraceGen/` belongs with the chips.
 
 Adding a narrower rule is always preferable to adding an allowlist entry. Splitting

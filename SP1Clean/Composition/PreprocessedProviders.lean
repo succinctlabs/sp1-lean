@@ -1,5 +1,5 @@
 import SP1Clean.Faithful.CoreAIR
-import SP1Clean.Faithful.Transport.Table
+import SP1Clean.Composition.Table
 import SP1Clean.Proofs.Completeness.Providers
 
 /-! # Exact preprocessing to native Byte/Range/Program providers
@@ -29,7 +29,12 @@ skeleton.
 
 set_option autoImplicit false
 
-namespace SP1Clean.Faithful.Transport
+namespace SP1Clean.Composition
+
+-- The faithfulness vocabulary (`ChipOracle`, `ChipFaithful`, `ChipRowCodec`,
+-- `nativeAccesses`) is at the stratum below; this namespace no longer encloses it since the
+-- 2026-08 move out of `Faithful/Transport/`.
+open SP1Clean.Faithful
 
 open Circuit
 open Air.Flat (Component Table)
@@ -2449,4 +2454,4 @@ theorem skeleton_append_recountedPreprocessedProviderAccesses_balanced
     rw [if_pos keyMem, contract.recount_eq_neg keyMem]
     omega
 
-end SP1Clean.Faithful.Transport
+end SP1Clean.Composition

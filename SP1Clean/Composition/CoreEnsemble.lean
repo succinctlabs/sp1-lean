@@ -1,5 +1,5 @@
-import SP1Clean.Faithful.Transport.Extracted
-import SP1Clean.Faithful.Transport.ProviderSegment
+import SP1Clean.Composition.Extracted
+import SP1Clean.Composition.ProviderSegment
 import ToClean.Air.EnsembleBuild
 
 /-! # Exact Core rows assembled as the native fifty-three-table ensemble
@@ -33,7 +33,12 @@ transport/refinement seams.
 
 set_option autoImplicit false
 
-namespace SP1Clean.Faithful.Transport
+namespace SP1Clean.Composition
+
+-- The faithfulness vocabulary (`ChipOracle`, `ChipFaithful`, `ChipRowCodec`,
+-- `nativeAccesses`) is at the stratum below; this namespace no longer encloses it since the
+-- 2026-08 move out of `Faithful/Transport/`.
+open SP1Clean.Faithful
 
 open Circuit
 open Air.Flat (EnsembleWitness Table)
@@ -434,4 +439,4 @@ theorem exactNativeAllCleanAccesses_preprocessedBalance {Digest : Type}
       data hint recount) key]
   exact skeleton_append_recountedPreprocessedProviderAccesses_balanced recount key keyKind
 
-end SP1Clean.Faithful.Transport
+end SP1Clean.Composition

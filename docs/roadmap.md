@@ -59,7 +59,7 @@ Deliverable: a theorem that projects the exact 25 instruction tables into the in
 valid native witness, with assertion and bus-balance transport proved once at the registry layer.
 
 **Status (2026-08-22): the instruction-table transport and its access aggregation are delivered.**
-`SP1Clean/Faithful/Transport/` proves the transport once over an
+`SP1Clean/Composition/` proves the transport once over an
 arbitrary codec/oracle/`ChipFaithful` triple — no chip is named, so the 25 instantiations cannot
 drift apart — and `extracted_instructionTables_constraints` runs it against the real extracted
 relation: a witness satisfying `CoreAIR.Current.Relation` yields 25 native Clean tables satisfying their whole

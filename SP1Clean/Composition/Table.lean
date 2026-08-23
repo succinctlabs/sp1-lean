@@ -58,7 +58,12 @@ translation, but it does not directly balance a differently shaped reduced nativ
 
 set_option autoImplicit false
 
-namespace SP1Clean.Faithful.Transport
+namespace SP1Clean.Composition
+
+-- The faithfulness vocabulary (`ChipOracle`, `ChipFaithful`, `ChipRowCodec`,
+-- `nativeAccesses`) is at the stratum below; this namespace no longer encloses it since the
+-- 2026-08 move out of `Faithful/Transport/`.
+open SP1Clean.Faithful
 
 open Circuit
 open Air.Flat (Component Table)
@@ -427,4 +432,4 @@ theorem transportTable_spec
   (Table.weakSoundness assumptions
     (transportTable_constraints faithful rustRows data valid) guarantees).1
 
-end SP1Clean.Faithful.Transport
+end SP1Clean.Composition

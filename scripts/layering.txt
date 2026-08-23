@@ -58,6 +58,7 @@
 # 10 — the converse capstone.
 10  Soundness     SP1Clean/Soundness/AIRCompleteness.lean
 
-# 11 — the composed exact -> native artifact.
-11  Faithful      SP1Clean/Faithful/Transport/
-11  Faithful      SP1Clean/Faithful/SupportedMachine.lean
+# 11 — the composed exact -> native artifact. Its own pillar since 2026-08: it sits ABOVE the
+# machine (CoreArtifact imports Soundness.AIR), so keeping it inside Faithful/ made the two pillars
+# mutually dependent. Moving it made the directory names match the strata.
+11  Composition   SP1Clean/Composition/

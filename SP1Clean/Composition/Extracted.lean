@@ -1,5 +1,5 @@
 import SP1Clean.Faithful.CoreAIR
-import SP1Clean.Faithful.Transport.Ensemble
+import SP1Clean.Composition.Ensemble
 
 set_option autoImplicit false
 
@@ -33,7 +33,12 @@ ledger, while State/Memory translation remains explicit. Exact `Balance.Valid` t
 evidence, not a direct four-channel equality for the native ensemble. See `docs/roadmap.md`.
 -/
 
-namespace SP1Clean.Faithful.Transport
+namespace SP1Clean.Composition
+
+-- The faithfulness vocabulary (`ChipOracle`, `ChipFaithful`, `ChipRowCodec`,
+-- `nativeAccesses`) is at the stratum below; this namespace no longer encloses it since the
+-- 2026-08 move out of `Faithful/Transport/`.
+open SP1Clean.Faithful
 
 open Circuit
 open Air.Flat (Component Table)
@@ -218,4 +223,4 @@ theorem extracted_instructionTables_constraints
   ExtractedInstructionRows.transported_constraints _ _
     (extractedInstructionRows_valid statement witness valid)
 
-end SP1Clean.Faithful.Transport
+end SP1Clean.Composition

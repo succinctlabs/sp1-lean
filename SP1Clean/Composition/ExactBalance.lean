@@ -1,4 +1,4 @@
-import SP1Clean.Faithful.Transport.Balance
+import SP1Clean.Composition.Balance
 
 /-! # Exact AIR balance transported through the native access projection
 
@@ -16,7 +16,7 @@ the reversal changes a sum by `-1`, so it preserves zero.
 
 set_option autoImplicit false
 
-namespace SP1Clean.Faithful.Transport
+namespace SP1Clean.Composition
 
 open SP1Clean.CoreAIR.Current
 open SP1Clean.Extracted (AirInteraction AirInteractionKind)
@@ -199,4 +199,4 @@ theorem exactRelation_projectedActiveInteractions_balanced {Digest : Type}
   have global := valid.2.2.2
   exact projectedActiveInteractions_balanced _ hp global.2.2.2.2.1 small
 
-end SP1Clean.Faithful.Transport
+end SP1Clean.Composition

@@ -1,6 +1,6 @@
-import SP1Clean.Faithful.Transport.MemoryBoundary
-import SP1Clean.Faithful.Transport.PreprocessedProviders
-import SP1Clean.Faithful.Transport.SystemTables
+import SP1Clean.Composition.MemoryBoundary
+import SP1Clean.Composition.PreprocessedProviders
+import SP1Clean.Composition.SystemTables
 
 /-! # Exact Core rows as the native twenty-eight-table provider segment
 
@@ -29,7 +29,12 @@ their literal Clean ledger as recounted preprocessing followed by the actual bou
 
 set_option autoImplicit false
 
-namespace SP1Clean.Faithful.Transport
+namespace SP1Clean.Composition
+
+-- The faithfulness vocabulary (`ChipOracle`, `ChipFaithful`, `ChipRowCodec`,
+-- `nativeAccesses`) is at the stratum below; this namespace no longer encloses it since the
+-- 2026-08 move out of `Faithful/Transport/`.
+open SP1Clean.Faithful
 
 open Circuit
 open Air.Flat (Table)
@@ -178,4 +183,4 @@ theorem exactProviderTables_cleanAccesses
   unfold tablesCleanAccesses at preprocessing
   rw [preprocessing]
 
-end SP1Clean.Faithful.Transport
+end SP1Clean.Composition

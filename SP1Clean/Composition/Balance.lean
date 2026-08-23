@@ -39,7 +39,7 @@ every payload's signed multiplicity sum is zero. Turning that into
 per-table access permutations of `Transport/Table.lean`. See `docs/roadmap.md`.
 -/
 
-namespace SP1Clean.Faithful.Transport
+namespace SP1Clean.Composition
 
 open SP1Clean.CoreAIR.Current
 open SP1Clean.Extracted (Dir AirInteraction)
@@ -166,4 +166,4 @@ theorem signedSum_eq_zero (all : List (Extracted.Interaction (ZMod p))) (hp : 2 
     signedSum all payload = 0 := by
   rw [signedSum_eq_sent_sub_received all hp valid.1 small payload, valid.2 payload, sub_self]
 
-end SP1Clean.Faithful.Transport
+end SP1Clean.Composition

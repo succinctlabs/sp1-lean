@@ -172,7 +172,7 @@ The rest do not acquire artificial row-wise native counterparts, because the nat
 proof-oriented provider interface (28 provider/boundary tables alongside the 25 instruction chips —
 a 53-table Clean ensemble). The provider family contains six Byte-op tables, all 17 Range widths
 `0..16`, Program, MemoryInit, MemoryFinalize, MemoryBump, and StateBump; the complete Range family
-closes the provider side of honest shift-row lookups. `SP1Clean/Faithful/Transport/{PreprocessedProviders,
+closes the provider side of honest shift-row lookups. `SP1Clean/Composition/{PreprocessedProviders,
 MemoryBoundary,SystemTables,ProviderSegment,CoreEnsemble}.lean` now constructively connects the two
 local interfaces under a caller-supplied `CanonicalPreprocessedInventory` and proves all 53 native
 tables plus the verifier row satisfy their constraints.
