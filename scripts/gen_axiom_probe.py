@@ -209,7 +209,8 @@ TARGETS = [
      r"multiplicitySum_closingAccesses_of_not_select)\b"),
     ("SP1Clean/Proofs/Completeness/Closure.lean",
      r"theorem\s+(closingAccesses_balances|closingAccesses_not_preprocessed|"
-     r"closingAccesses_state|closingAccesses_memory)\b"),
+     r"closingAccesses_state|closingAccesses_memory|"
+     r"preprocessedProviderTables_eq|preprocessedProviderLedger_eq)\b"),
     # W5: the machine-level assembly and its completeness capstone. The assembly's constraint
     # theorem is the join of all 54 tables' own theorems (53 ensemble tables plus verifier), so a
     # regression anywhere in the

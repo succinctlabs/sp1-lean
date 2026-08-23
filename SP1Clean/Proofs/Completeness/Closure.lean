@@ -1,5 +1,6 @@
 import SP1Clean.Model.CleanLedger
 import SP1Clean.Proofs.Completeness.Assembly
+import SP1Clean.Proofs.Completeness.ProviderTables
 
 /-! # The provider closure: recounting Byte/Range/Program demand from the consumers
 
@@ -158,6 +159,93 @@ theorem closingAccesses_state (key : LookupAccessList.LookupKey) (hkind : key.1 
 theorem closingAccesses_memory (key : LookupAccessList.LookupKey) (hkind : key.1 = .Memory) :
     LookupAccessList.multiplicitySum trace.closingAccesses key = 0 :=
   trace.closingAccesses_not_preprocessed (by simp [preprocessedKey, hkind])
+
+
+/-! ### The supply side: what the twenty-four preprocessed provider tables actually emit
+
+The demand side above is a recount against a ledger the providers are absent from. This is the
+other half: the ledger those providers *do* emit, computed from the eight Tier-2 table lemmas
+rather than assumed. Together they are what turns Byte/Program balance from a per-shard evaluation
+into a theorem.
+-/
+
+/-- The twenty-four preprocessed provider tables: the window the skeleton omits. -/
+def preprocessedProviderTables : List (Table (ZMod p)) :=
+  (trace.tables.drop instructionTableCount).take preprocessedProviderTableCount
+
+/-- The window really is the six byte tables, the seventeen fixed-width range tables, and the
+program table — one `rfl`, so it cannot drift from `tables` under a reordering. -/
+theorem preprocessedProviderTables_eq :
+    trace.preprocessedProviderTables =
+      [Table.build ByteChip.U8Range.component
+          (ByteChip.U8Range.traceInputs trace.u8RangeEntries) trace.data trace.hint,
+        Table.build ByteChip.MSB.component
+          (ByteChip.MSB.traceInputs trace.msbEntries) trace.data trace.hint,
+        Table.build ByteChip.AndByte.component
+          (ByteChip.AndByte.traceInputs trace.andByteEntries) trace.data trace.hint,
+        Table.build ByteChip.OrByte.component
+          (ByteChip.OrByte.traceInputs trace.orByteEntries) trace.data trace.hint,
+        Table.build ByteChip.XorByte.component
+          (ByteChip.XorByte.traceInputs trace.xorByteEntries) trace.data trace.hint,
+        Table.build ByteChip.Ltu.component
+          (ByteChip.Ltu.traceInputs trace.ltuEntries) trace.data trace.hint] ++
+      trace.rangeTables ++
+      [Table.build ProgramProviderChip.component
+        (ProgramProviderChip.traceInputs trace.romEntries) trace.data trace.hint] := rfl
+
+/--
+**The capacity contract a trace generator owes the ledger.**
+
+A provider row carries its aggregate count in one field element, and the machine's centered ledger
+reads that field element back as a signed integer. Recovering the count exactly therefore needs the
+count to be under half the field — a fact about the *generator*, not a constraint any provider
+circuit can impose on itself. `Assembly.lean`'s `WellFormed` collects what each table needs of its
+occurrences' semantic content; this collects what the ledger needs of their magnitudes, plus the
+five Program key cells the program circuit passes through unchecked.
+-/
+structure CountsFit : Prop where
+  u8Range : ∀ e ∈ trace.u8RangeEntries, e.MultiplicityFits p
+  msb : ∀ e ∈ trace.msbEntries, e.MultiplicityFits p
+  andByte : ∀ e ∈ trace.andByteEntries, e.MultiplicityFits p
+  orByte : ∀ e ∈ trace.orByteEntries, e.MultiplicityFits p
+  xorByte : ∀ e ∈ trace.xorByteEntries, e.MultiplicityFits p
+  ltu : ∀ e ∈ trace.ltuEntries, e.MultiplicityFits p
+  range : ∀ width e, e ∈ trace.rangeEntries width → e.MultiplicityFits p
+  rom : ∀ e ∈ trace.romEntries, e.MultiplicityFits p
+  romKeys : ∀ e ∈ trace.romEntries, RomKeyFits e
+
+/-- The ledger the preprocessed providers supply, as an occurrence list rather than as a fold over
+built rows. -/
+def providerLedger : LookupAccessList :=
+  trace.u8RangeEntries.map u8RangeAccess ++
+    trace.msbEntries.map msbAccess ++
+    trace.andByteEntries.map andAccess ++
+    trace.orByteEntries.map orAccess ++
+    trace.xorByteEntries.map xorAccess ++
+    trace.ltuEntries.map ltuAccess ++
+    (RangeChip.allWidths.flatMap fun width =>
+      (trace.rangeEntries width).map (rangeAccess width)) ++
+    trace.romEntries.map programEntryAccess
+
+/-- **What the twenty-four provider tables emit is exactly their occurrence lists.**
+
+Every step is one of the eight Tier-2 lemmas; nothing here evaluates a row. -/
+theorem preprocessedProviderLedger_eq (hwf : trace.WellFormed) (hfit : trace.CountsFit) :
+    tablesCleanAccesses trace.preprocessedProviderTables = trace.providerLedger := by
+  rw [preprocessedProviderTables_eq]
+  simp only [tablesCleanAccesses, List.flatMap_cons, List.flatMap_nil, List.flatMap_append,
+    List.append_nil, rangeTables,
+    u8Range_traceTable_cleanAccesses _ _ _ hwf.u8Range hfit.u8Range,
+    msb_traceTable_cleanAccesses _ _ _ hwf.msb hfit.msb,
+    and_traceTable_cleanAccesses _ _ _ hwf.andByte hfit.andByte,
+    or_traceTable_cleanAccesses _ _ _ hwf.orByte hfit.orByte,
+    xor_traceTable_cleanAccesses _ _ _ hwf.xorByte hfit.xorByte,
+    ltu_traceTable_cleanAccesses _ _ _ hwf.ltu hfit.ltu,
+    program_traceTable_cleanAccesses _ _ _ hfit.romKeys hfit.rom]
+  simp only [providerLedger, List.flatMap_def, List.map_map, Function.comp_def,
+    range_traceTable_cleanAccesses _ _ _ _ (fun e he => hwf.range _ e he)
+      (fun e he => hfit.range _ e he)]
+  simp [List.append_assoc]
 
 end SupportedCoreTraceWitness
 
