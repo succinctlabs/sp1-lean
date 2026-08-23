@@ -481,6 +481,11 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Soundness.msb_buildRow_cleanAccesses
 #print axioms SP1Clean.Soundness.and_buildRow_result_val
 #print axioms SP1Clean.Soundness.and_buildRow_cleanAccesses
+#print axioms SP1Clean.Soundness.or_buildRow_cleanAccesses
+#print axioms SP1Clean.Soundness.xor_buildRow_cleanAccesses
+#print axioms SP1Clean.Soundness.ltu_buildRow_cleanAccesses
+#print axioms SP1Clean.Soundness.range_buildRow_cleanAccesses
+#print axioms SP1Clean.Soundness.program_buildRow_cleanAccesses
 #print axioms SP1Clean.LookupAccessList.multiplicitySum_closingAccesses
 #print axioms SP1Clean.LookupAccessList.multiplicitySum_append_closingAccesses
 #print axioms SP1Clean.LookupAccessList.mem_closingKeys_of_multiplicitySum_ne_zero
