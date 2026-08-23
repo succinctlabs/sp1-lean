@@ -218,9 +218,13 @@ TARGETS = [
     ("SP1Clean/FormalModel/TraceGen/AluGenerator.lean",
      r"theorem\s+(aluEvents_wellFormed|witnessStep_wellFormed|"
      r"witnessEvents_wellFormed)\b"),
+    ("SP1Clean/FormalModel/TraceGen/SailAlu.lean",
+     r"theorem\s+(aluStepOfState_wellFormed|aluStepOfState_isSome|"
+     r"aluStepsFrom_wellFormed|aluStepsFrom_length_le)\b"),
     ("SP1Clean/Proofs/Completeness/AluGeneration.lean",
      r"theorem\s+(aluEvents_addTable_constraints|aluEvents_addTable_guarantees|"
-     r"aluEvents_subTable_constraints)\b"),
+     r"aluEvents_subTable_constraints|sailRun_addTable_constraints|"
+     r"sailRun_subTable_constraints|sailRun_rows_le)\b"),
     # Phase 2: the two system tables' rows are built from crossings, not supplied.
     ("SP1Clean/FormalModel/TraceGen/Bump.lean",
      r"theorem\s+(stateBump_spec|memoryBump_spec|stateBumpTraceInputs_spec|"

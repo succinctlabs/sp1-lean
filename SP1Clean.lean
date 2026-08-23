@@ -491,6 +491,7 @@ import SP1Clean.FormalModel.TraceGen.Bump
 import SP1Clean.FormalModel.TraceGen.ClockBridge
 import SP1Clean.FormalModel.TraceGen.AluGenerator
 import SP1Clean.FormalModel.TraceGen.GenState
+import SP1Clean.FormalModel.TraceGen.SailAlu
 import SP1Clean.FormalModel.TraceGen.Events
 import SP1Clean.FormalModel.TraceGen.Inputs
 import SP1Clean.FormalModel.TraceGen.Readers
