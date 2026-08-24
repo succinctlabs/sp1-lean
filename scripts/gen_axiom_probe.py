@@ -237,6 +237,12 @@ TARGETS = [
      r"and_traceTable_cleanAccesses|or_traceTable_cleanAccesses|"
      r"xor_traceTable_cleanAccesses|ltu_traceTable_cleanAccesses|"
      r"range_traceTable_cleanAccesses|program_traceTable_cleanAccesses)\b"),
+    # A1: a built instruction table's State ledger — registry-wide, no case split.
+    ("SP1Clean/Proofs/Completeness/ChipLedger.lean",
+     r"theorem\s+(stateLedger_build|stateLedger_build_of_mem|"
+     r"stateLedger_buildHinted_of_mem|supportedChip_table_mem_allTables)\b"),
+    ("SP1Clean/Soundness/EnsembleChannels.lean",
+     r"theorem\s+(channel_eq_of_kindOf_eq|interactions_channel_eq_of_kindOf)\b"),
     # A0: the ledger decomposition a per-chip sweep peels with.
     ("SP1Clean/Model/CleanLedger.lean",
      r"theorem\s+(tablesCleanAccesses_cons|tableCleanAccesses_buildHinted|"

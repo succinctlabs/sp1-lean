@@ -1,4 +1,5 @@
 import SP1Clean.Soundness.SP1Ensemble
+import ToClean.Air.TableBuild
 
 /-!
 # Every table speaks only on the ensemble's channels
@@ -495,5 +496,35 @@ theorem channel_eq_of_name_eq {c₁ c₂ : RawChannel (ZMod p)}
          revert hname
          simp only [Channel.toRaw_name, stateChannel, byteChannel, programChannel, memoryChannel]
          decide)
+
+
+/-- **The four buses have four distinct kinds too**, so an access's `InteractionKind` identifies its
+channel just as its name does. This is the form the ledger's kind-filter needs. -/
+theorem channel_eq_of_kindOf_eq {c₁ c₂ : RawChannel (ZMod p)}
+    (h₁ : c₁ ∈ (sp1Ensemble (p := p)).channels) (h₂ : c₂ ∈ (sp1Ensemble (p := p)).channels)
+    (hkind : kindOf c₁.name = kindOf c₂.name) : c₁ = c₂ := by
+  simp only [sp1Ensemble_channels, List.mem_cons, List.not_mem_nil, or_false] at h₁ h₂
+  rcases h₁ with rfl | rfl | rfl | rfl <;> rcases h₂ with rfl | rfl | rfl | rfl <;>
+    first
+      | rfl
+      | (exfalso
+         revert hkind
+         simp [Channel.toRaw_name, stateChannel, byteChannel, programChannel, memoryChannel,
+           kindOf])
+
+/-- **The side condition `Model/CleanLedger.lean`'s kind-filter asks of a table**, discharged for
+every table of this ensemble: an interaction whose kind matches a declared channel's *is* on that
+channel. Both halves are already proved — the table emits only on the ensemble's channels, and those
+four have four distinct kinds. -/
+theorem interactions_channel_eq_of_kindOf (table : Table (ZMod p))
+    (hcomponent : table.component ∈ (sp1Ensemble (p := p)).allTables)
+    (channel : RawChannel (ZMod p)) (hchannel : channel ∈ (sp1Ensemble (p := p)).channels) :
+    ∀ i ∈ table.interactions, kindOf i.channel.name = kindOf channel.name →
+      i.channel = channel := by
+  intro i hi hkind
+  exact channel_eq_of_kindOf_eq
+    (sp1Ensemble_allTables_channels_subset _ hcomponent
+      (Air.Flat.Table.channel_mem_channels_of_mem_interactions table i hi))
+    hchannel hkind
 
 end SP1Clean.Soundness
