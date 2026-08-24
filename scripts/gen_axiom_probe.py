@@ -237,6 +237,10 @@ TARGETS = [
      r"and_traceTable_cleanAccesses|or_traceTable_cleanAccesses|"
      r"xor_traceTable_cleanAccesses|ltu_traceTable_cleanAccesses|"
      r"range_traceTable_cleanAccesses|program_traceTable_cleanAccesses)\b"),
+    # A0: the ledger decomposition a per-chip sweep peels with.
+    ("SP1Clean/Model/CleanLedger.lean",
+     r"theorem\s+(tablesCleanAccesses_cons|tableCleanAccesses_buildHinted|"
+     r"tableCleanAccesses_filterKind)\b"),
     ("SP1Clean/Model/InteractionBus.lean",
      r"theorem\s+(multiplicitySum_append_closingAccesses|multiplicitySum_append_closing|"
      r"multiplicitySum_closingAccesses|mem_closingKeys_of_multiplicitySum_ne_zero|"

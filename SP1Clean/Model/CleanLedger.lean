@@ -56,6 +56,39 @@ theorem interactionToAccess_eval (env : Environment (ZMod p))
   simp only [Interaction.toAccess, AbstractInteraction.toAccess, AbstractInteraction.eval,
     Vector.toList]
 
+/-! ## List-level decomposition
+
+`tablesCleanAccesses` is a `flatMap`, so peeling it needs only the two structural equations. They
+were previously done by hand at each of the five sites that needed them (`Closure.lean`,
+`ClosureRealization.lean`, `Composition/CoreEnsemble.lean`), each unfolding to `List.flatMap` first;
+a per-chip decomposition peels twenty-five times, so they are worth naming. -/
+
+@[simp] theorem tablesCleanAccesses_nil : tablesCleanAccesses ([] : List (Table (ZMod p))) = [] :=
+  rfl
+
+theorem tablesCleanAccesses_cons (table : Table (ZMod p)) (tables : List (Table (ZMod p))) :
+    tablesCleanAccesses (table :: tables) =
+      tableCleanAccesses table ++ tablesCleanAccesses tables := by
+  simp only [tablesCleanAccesses, List.flatMap_cons]
+
+/-- The `buildHinted` companion of `tableCleanAccesses_build`.
+
+Seven of the twenty-five instruction chips build through `Table.buildHinted` rather than
+`Table.build` — the ones whose witness generation reads a per-row prover hint (the flag one-hots of
+Bitwise/Lt/the shifts/Mul/DivRem, and Branch's comparison selector). Without this they are simply
+unreachable from the ledger layer. -/
+theorem tableCleanAccesses_buildHinted (component : Component (ZMod p))
+    (inputs : List (component.Input (ZMod p) × ProverHint (ZMod p)))
+    (data : ProverData (ZMod p)) :
+    tableCleanAccesses (Table.buildHinted component inputs data) =
+      inputs.flatMap fun input =>
+        component.operations.interactions.map
+          (AbstractInteraction.toAccess
+            (Environment.fromArray (component.buildRow input.1 data input.2) data)) := by
+  simp only [tableCleanAccesses, Table.buildHinted_interactionValues,
+    Operations.interactionValues, List.map_flatMap, List.map_map, Function.comp_def,
+    interactionToAccess_eval]
+
 /-! ## One channel's ledger versus the whole table's
 
 Clean's balance obligations are stated per channel (`EnsembleWitness.interactionsWith channel`),
@@ -67,6 +100,40 @@ What that argument needs, and all it needs, is that the channel name determines 
 the ones the table can actually emit on. That is supplied by the caller: it is an ensemble-level
 fact (SP1's four buses have four distinct names), not something a single table knows.
 -/
+
+private theorem filter_map_eq {α β : Type*} (l : List α) (f : α → β) (q : β → Bool) :
+    (l.map f).filter q = (l.filter fun a => q (f a)).map f := by
+  induction l with
+  | nil => rfl
+  | cons head tail ih => by_cases hq : q (f head) <;> simp [hq, ih]
+
+/-- **A table's ledger restricted to one bus IS that bus's own interaction list.**
+
+The multi-bus counterpart of the providers' route. A provider component names exactly one channel,
+so `Ledger.OnlyChannel` lets its whole `interactions` list be read as that channel's — an
+instruction chip names up to four, so that lemma is unavailable to it. Filtering by
+`InteractionKind` is the replacement, and it works because `Interaction.toAccess` reads the kind off
+the emitting channel's own `name`: the kind *is* the channel, as long as no two channels the table
+can emit on share one.
+
+That last condition is `honly`, and it is the caller's: for `sp1Ensemble` it comes from
+`Soundness/EnsembleChannels.lean` (tables emit only on the ensemble's four channels, whose names —
+hence kinds — are distinct). Stating it here rather than assuming it keeps this file free of the
+ensemble.
+
+Unlike `multiplicitySum_interactionsWith_eq`, which compares the two at a single key, this is a
+**list** equality — which is what a permutation obligation needs. -/
+theorem tableCleanAccesses_filterKind (table : Table (ZMod p)) (channel : RawChannel (ZMod p))
+    (K : InteractionKind) (hkind : kindOf channel.name = K)
+    (honly : ∀ i ∈ table.interactions, kindOf i.channel.name = K → i.channel = channel) :
+    (tableCleanAccesses table).filter (fun a => a.1 = K) =
+      (table.interactionsWith channel).map Interaction.toAccess := by
+  rw [tableCleanAccesses, filter_map_eq, Air.Flat.Table.interactionsWith_eq_filter]
+  refine congrArg (List.map Interaction.toAccess) (List.filter_congr fun i hi => ?_)
+  by_cases hc : i.channel = channel
+  · simp only [hc, hkind, decide_true, Interaction.toAccess]
+  · have hne : kindOf i.channel.name ≠ K := fun h => hc (honly i hi h)
+    simp only [Interaction.toAccess, hne, hc, decide_false]
 
 /-- **A table's ledger at a key is that key's own channel's ledger.** -/
 theorem multiplicitySum_interactionsWith_eq (table : Table (ZMod p))
