@@ -660,6 +660,8 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.LookupAccessList.isConsistentBalanced_of_balancedInteractions
 #print axioms SP1Clean.LookupAccessList.balancedInteractions_of_isConsistentBalanced
 #print axioms SP1Clean.signedVal_natCast_of_twice_le
+#print axioms SP1Clean.toAccess_pulledIfValue
+#print axioms SP1Clean.toAccess_pushedIfValue
 #print axioms SP1Clean.Soundness.sp1StateVerifierMain
 #print axioms SP1Clean.Soundness.sp1StateVerifier_soundness
 #print axioms SP1Clean.Soundness.sp1StateVerifierProverAssumptions
