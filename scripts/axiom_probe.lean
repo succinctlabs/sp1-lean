@@ -543,6 +543,9 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Soundness.memoryLedger_eq_channelLedger
 #print axioms SP1Clean.Soundness.active_stateLedger_eq
 #print axioms SP1Clean.Soundness.stateLedger_perm_handoff
+#print axioms SP1Clean.Soundness.memoryLedger_eq
+#print axioms SP1Clean.Soundness.memoryLedger_perm_handoff
+#print axioms SP1Clean.Soundness.stateLedger_perm_handoff_singleChain
 #print axioms SP1Clean.Soundness.channel_eq_of_kindOf_eq
 #print axioms SP1Clean.Soundness.interactions_channel_eq_of_kindOf
 #print axioms SP1Clean.tablesCleanAccesses_cons
@@ -555,6 +558,8 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.LookupAccessList.isConsistentBalanced_of_perm_handoff
 #print axioms SP1Clean.LookupAccessList.active_flatMap_gatedPair
 #print axioms SP1Clean.LookupAccessList.chainLedger_perm_handoff
+#print axioms SP1Clean.LookupAccessList.handoff_append
+#print axioms SP1Clean.LookupAccessList.multiChainLedger_perm_handoff
 #print axioms SP1Clean.LookupAccessList.multiplicitySum_chainLedger
 #print axioms SP1Clean.LookupAccessList.multiplicitySum_closingAccesses
 #print axioms SP1Clean.LookupAccessList.multiplicitySum_append_closingAccesses
