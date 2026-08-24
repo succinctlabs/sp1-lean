@@ -495,6 +495,7 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Soundness.SupportedCoreTraceWitness.byteProgram_balanced
 #print axioms SP1Clean.Soundness.SupportedCoreTraceWitness.fullLedger_multiplicitySum_channel
 #print axioms SP1Clean.Soundness.SupportedCoreTraceWitness.channelLedger_isConsistentBalanced
+#print axioms SP1Clean.Soundness.SupportedCoreTraceWitness.channelLedger_isConsistentBalanced_of_handoff
 #print axioms SP1Clean.Soundness.sp1Tables_channels_subset
 #print axioms SP1Clean.Soundness.sp1ProviderTables_channels_subset
 #print axioms SP1Clean.Soundness.sp1Ensemble_allTables_channels_subset
@@ -533,6 +534,10 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Soundness.ltu_traceTable_cleanAccesses
 #print axioms SP1Clean.Soundness.range_traceTable_cleanAccesses
 #print axioms SP1Clean.Soundness.program_traceTable_cleanAccesses
+#print axioms SP1Clean.LookupAccessList.multiplicitySum_filterKind
+#print axioms SP1Clean.LookupAccessList.multiplicitySum_handoff
+#print axioms SP1Clean.LookupAccessList.multiplicitySum_of_perm_handoff
+#print axioms SP1Clean.LookupAccessList.isConsistentBalanced_of_perm_handoff
 #print axioms SP1Clean.LookupAccessList.multiplicitySum_closingAccesses
 #print axioms SP1Clean.LookupAccessList.multiplicitySum_append_closingAccesses
 #print axioms SP1Clean.LookupAccessList.mem_closingKeys_of_multiplicitySum_ne_zero
@@ -548,9 +553,12 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Soundness.SupportedCoreTraceWitness.witness_constraints
 #print axioms SP1Clean.Soundness.SupportedCoreTraceWitness.balancedOn_of_signed_perm
 #print axioms SP1Clean.Soundness.SupportedCoreTraceWitness.balancedOn_of_closure
+#print axioms SP1Clean.Soundness.SupportedCoreTraceWitness.balancedOn_of_handoff
+#print axioms SP1Clean.Soundness.SupportedCoreTraceWitness.balanced_of_closure_and_handoff
 #print axioms SP1Clean.Soundness.SupportedCoreTraceWitness.witness_balancedChannels
 #print axioms SP1Clean.Soundness.supported_core_native_complete
 #print axioms SP1Clean.Soundness.sp1Ensemble_statement_of_traceGeneratable
+#print axioms SP1Clean.Soundness.sp1Ensemble_statement_of_structural_balance
 #print axioms SP1Clean.AddChip.proverAssumptions_of_event
 #print axioms SP1Clean.AddChip.traceTable_constraints
 #print axioms SP1Clean.AddChip.traceTable_guarantees

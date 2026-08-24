@@ -48,6 +48,8 @@ Run via `lake env lean scripts/axiom_probe_test.lean` (see `scripts/run_audit.sh
 #print axioms SP1Clean.Audit.ActiveTraceNonVacuity.active_decoded_instruction_row_count
 #print axioms SP1Clean.Audit.ActiveTraceNonVacuity.active_real_decoded_instruction_row_count
 #print axioms SP1Clean.Audit.ActiveTraceNonVacuity.activeTrace_suppliesDemand
+#print axioms SP1Clean.Audit.ActiveTraceNonVacuity.activeTrace_stateHandoff
+#print axioms SP1Clean.Audit.ActiveTraceNonVacuity.activeTrace_memoryHandoff
 #print axioms SP1Clean.Audit.ActiveTraceNonVacuity.activeTrace_traceGeneratable
 #print axioms SP1Clean.Audit.ActiveTraceNonVacuity.activeTrace_nativeRelation
 #print axioms SP1Clean.Audit.ActiveTraceNonVacuity.activeTrace_yields_airWitness
