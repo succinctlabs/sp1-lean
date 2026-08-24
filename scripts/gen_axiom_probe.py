@@ -291,6 +291,8 @@ TARGETS = [
      r"balancedInteractions_of_isConsistentBalanced)\b"),
     ("SP1Clean/Model/InteractionProjection.lean",
      r"lemma\s+(signedVal_natCast_of_twice_le)\b"),
+    ("SP1Clean/Model/InteractionProjection.lean",
+     r"theorem\s+(toAccess_pulledIfValue|toAccess_pushedIfValue)\b"),
     ("SP1Clean/Soundness/SP1Ensemble.lean",
      r"(?:theorem|def)\s+((?:sp1|balanced)\w*)\b"),
     ("SP1Clean/Soundness/AIR.lean",
