@@ -1,7 +1,7 @@
 import SP1Clean.Model.CleanLedger
 import SP1Clean.Soundness.EnsembleChannels
 import SP1Clean.Soundness.TypedState
-import SP1Clean.Proofs.Completeness.Assembly
+import SP1Clean.Proofs.Completeness.ClosureRealization
 
 /-!
 # A built instruction table's State ledger
@@ -105,6 +105,75 @@ theorem stateLedger_buildHinted_of_mem (chip : SupportedChip p)
     Table.buildHinted_interactions, List.map_flatMap]
   refine congrArg (List.flatMap · inputs) (funext fun input => ?_)
   rw [supportedChip_stateEmissionShape chip hmem data (chip.table.buildRow input.1 data input.2)]
+  rfl
+
+
+/-! ## Decomposing the trace's State ledger
+
+`stateLedger` is `fullLedger.filter (kind = State)`, and `fullLedger` is the verifier row's accesses
+appended to a `flatMap` over the fifty-three tables. `List.filter` distributes over both, so the
+bus's ledger is the per-table State halves — which is what turns the whole-trace obligation into
+per-table content. -/
+
+/-- One table's State half. -/
+def tableStateLedger (table : Table (ZMod p)) : LookupAccessList :=
+  (tableCleanAccesses table).filter fun a => a.1 = InteractionKind.State
+
+/-- **A table that never names the State channel contributes nothing to it.** Twenty-six of the
+twenty-eight provider tables are in this case — besides the instruction chips, only `StateBump` and
+the verifier row touch the State bus at all. -/
+theorem tableStateLedger_eq_nil (table : Table (ZMod p))
+    (hcomponent : table.component ∈ (sp1Ensemble (p := p)).allTables)
+    (hnot : (stateChannel (p := p)).toRaw ∉ table.component.circuit.channels) :
+    tableStateLedger table = [] := by
+  rw [tableStateLedger, tableCleanAccesses_filterKind _ (stateChannel (p := p)).toRaw
+      InteractionKind.State rfl
+      (interactions_channel_eq_of_kindOf _ hcomponent (stateChannel (p := p)).toRaw
+        (by simp [sp1Ensemble_channels])),
+    Air.Flat.Table.interactionsWith_nil_of_channel_not_mem hnot, List.map_nil]
+
+section Trace
+
+variable [Fact (2 ^ 25 < p)]
+
+omit [Fact (2 ^ 24 < p)] in
+/-- **The trace's State ledger is its tables' State halves**, verifier row first. -/
+theorem stateLedger_eq_flatMap (trace : SupportedCoreTraceWitness p) :
+    trace.stateLedger =
+      tableStateLedger trace.skeletonVerifierTable ++
+        trace.tables.flatMap tableStateLedger := by
+  simp only [SupportedCoreTraceWitness.stateLedger, SupportedCoreTraceWitness.fullLedger,
+    List.filter_append, tablesCleanAccesses, List.filter_flatMap]
+  rfl
+
+end Trace
+
+
+
+
+/-- **Any table of a registered chip has that chip's pull/push pair per physical row** — however it
+was built.
+
+Stated over the table's own `table` rows rather than over a builder's inputs, which is strictly
+better: it needs no `Table.build`/`Table.buildHinted` split (the seven hint-reading chips are
+covered by the same statement), and it says the thing that is actually true — the State ledger is a
+function of the *rows*, not of how they were produced.
+
+Both side conditions are discharged from registry membership. -/
+theorem tableStateLedger_eq_of_component (table : Table (ZMod p)) (chip : SupportedChip p)
+    (hmem : chip ∈ supportedChips (p := p)) (hcomp : table.component = chip.table) :
+    tableStateLedger table =
+      table.table.flatMap fun row => rowStateAccesses chip table.data row := by
+  have hcomponent : table.component ∈ (sp1Ensemble (p := p)).allTables :=
+    hcomp ▸ supportedChip_table_mem_allTables chip hmem
+  rw [tableStateLedger, tableCleanAccesses_filterKind _ (stateChannel (p := p)).toRaw
+      InteractionKind.State rfl
+      (interactions_channel_eq_of_kindOf _ hcomponent (stateChannel (p := p)).toRaw
+        (by simp [sp1Ensemble_channels])),
+    Air.Flat.Table.interactionsWith, List.map_flatMap]
+  refine congrArg (List.flatMap · table.table) (funext fun row => ?_)
+  rw [Air.Flat.Table.environment, hcomp,
+    supportedChip_stateEmissionShape chip hmem table.data row]
   rfl
 
 end SP1Clean.Soundness

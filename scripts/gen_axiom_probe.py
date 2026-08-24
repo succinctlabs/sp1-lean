@@ -240,7 +240,9 @@ TARGETS = [
     # A1: a built instruction table's State ledger — registry-wide, no case split.
     ("SP1Clean/Proofs/Completeness/ChipLedger.lean",
      r"theorem\s+(stateLedger_build|stateLedger_build_of_mem|"
-     r"stateLedger_buildHinted_of_mem|supportedChip_table_mem_allTables)\b"),
+     r"stateLedger_buildHinted_of_mem|supportedChip_table_mem_allTables|"
+     r"tableStateLedger_eq_nil|tableStateLedger_eq_of_component|"
+     r"stateLedger_eq_flatMap)\b"),
     ("SP1Clean/Soundness/EnsembleChannels.lean",
      r"theorem\s+(channel_eq_of_kindOf_eq|interactions_channel_eq_of_kindOf)\b"),
     # A0: the ledger decomposition a per-chip sweep peels with.
