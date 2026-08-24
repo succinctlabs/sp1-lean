@@ -387,6 +387,51 @@ theorem stateLedger_perm_handoff_singleChain (trace : SupportedCoreTraceWitness 
   stateLedger_perm_handoff trace hbinary hbump hchain
 
 
+/-! ## The closure's nonpositivity premise, pointwise
+
+`byteProgram_balanced` needs `hnonpos`: at every demanded key, the consumer skeleton's signed sum is
+nonpositive. Without it `providerRecount`'s `Int.toNat` silently rounds a negative demand to zero
+and the closure supplies nothing where something was needed.
+
+Stated as an aggregate it is awkward — a sum over fifty-odd tables. Stated pointwise it is the
+property that is actually true: **a consumer only ever pulls on a provider-supplied bus**, so every
+Byte or Program access the skeleton emits carries multiplicity `-is_real ≤ 0`.
+
+`ConsumersOnlyPull` is that pointwise form and `hnonpos_of_consumersOnlyPull` discharges the
+aggregate from it.
+
+**What deriving `ConsumersOnlyPull` itself would take, stated plainly.** It is not available from
+Clean's channel bookkeeping: `channelsWithGuarantees` / `channelsWithRequirements` record which
+channels a circuit owes *guarantees* and *requirements* on, not which polarity it emits with — a
+circuit in neither list could still push. Nor is it available from the trace-level Byte shadow
+(`Soundness/ByteConsistency.lean`'s `byteSend` carries `+is_real`, the pre-W11-flip orientation).
+What remains is the per-chip route `Proofs/Completeness/Closure.lean` describes and declines: for
+eight of the twenty-five chips the Byte pulls descend through the `CPUState` reader and the
+arithmetic operation subcircuits, so exposing them means extending each chip's `exposedChannels_eq`
+lawfulness proof through those subcircuits.
+
+Program is the cheap half — `Soundness/TypedProgram.lean`'s `supportedChip_programEmissionShape` is
+proved 25/25 and gives each chip's single Program pull outright. Byte is the expensive half, and it
+should be costed on its own rather than folded into this section's estimate. -/
+
+/-- **Consumers only pull.** Every access the trace's consumer skeleton emits on a bus a preprocessed
+provider supplies carries nonpositive multiplicity. -/
+def ConsumersOnlyPull (trace : SupportedCoreTraceWitness p) : Prop :=
+  ∀ a ∈ trace.skeletonLedger,
+    SupportedCoreTraceWitness.preprocessedKey (LookupAccessList.keyOf a) = true →
+    LookupAccessList.multOf a ≤ 0
+
+omit [Fact (2 ^ 24 < p)] in
+/-- The closure's aggregate premise, from the pointwise one. -/
+theorem hnonpos_of_consumersOnlyPull (trace : SupportedCoreTraceWitness p)
+    (h : ConsumersOnlyPull trace) :
+    ∀ key ∈ trace.closingKeyList,
+      LookupAccessList.multiplicitySum trace.skeletonLedger key ≤ 0 := by
+  intro key hkey
+  refine LookupAccessList.multiplicitySum_nonpos _ fun a ha hka => ?_
+  exact h a ha (hka ▸ LookupAccessList.select_of_mem_closingKeys hkey)
+
+
 end Trace
 
 end SP1Clean.Soundness

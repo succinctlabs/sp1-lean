@@ -441,6 +441,25 @@ def accessAt (key : LookupKey) (mult : ℤ) : LookupAccess := (key.1, key.2.1, k
 @[simp] theorem multOf_accessAt (key : LookupKey) (mult : ℤ) :
     multOf (accessAt key mult) = mult := rfl
 
+/-- **A ledger whose accesses at a key are all nonpositive sums nonpositive there.**
+
+The pointwise form of the closure's nonpositivity side condition. The aggregate statement
+(`multiplicitySum skeleton key ≤ 0`) is awkward to supply — it is about a sum over fifty-odd tables
+— while the pointwise one is the property that is actually *true* of a consumer bus: every access a
+consumer emits on a provider-supplied channel is a pull, so its multiplicity is `-is_real ≤ 0`. -/
+theorem multiplicitySum_nonpos (l : LookupAccessList) {k : LookupKey}
+    (h : ∀ a ∈ l, keyOf a = k → multOf a ≤ 0) : multiplicitySum l k ≤ 0 := by
+  induction l with
+  | nil => exact le_refl 0
+  | cons head tail ih =>
+      rw [multiplicitySum_cons]
+      have htail := ih fun a ha => h a (List.mem_cons_of_mem _ ha)
+      by_cases hkey : keyOf head = k
+      · rw [if_pos hkey]
+        exact add_nonpos (h head List.mem_cons_self hkey) htail
+      · rw [if_neg hkey, zero_add]
+        exact htail
+
 /-! ## Why a bus balances: exactly two reasons
 
 A bus balances at a key when that key's pushes and pulls cancel, and in `sp1Ensemble` there are
