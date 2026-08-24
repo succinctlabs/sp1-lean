@@ -173,6 +173,38 @@ private lemma stateMsg_toList {T : Type} (msg : StateMsg T) :
     List.nil_append]
 
 omit [NeZero p] in
+/-! ## The evaluated gated pair, generically
+
+The kernels below are per-bus, over `AbstractInteraction` (expressions in an environment). These two
+are their *evaluated* counterparts — over Clean's `Interaction`, which is what an ensemble's
+`interactionsWith` list actually holds — and they are stated once for an arbitrary channel rather
+than seven times.
+
+That genericity is the point. A hand-off bus's completeness obligation is that its accesses pair
+off, and `msgToken` is the key both halves of a pair land on: `pulledIfValue` at `signedVal (-gate)`
+and `pushedIfValue` at `signedVal gate`. Nothing about State or Memory enters. -/
+
+/-- The `LookupKey` an evaluated message lands on: its channel's kind and name, and the message's
+own field values. -/
+def msgToken {Message : TypeMap} [ProvableType Message] (channel : Channel (ZMod p) Message)
+    (msg : Message (ZMod p)) : LookupAccessList.LookupKey :=
+  (kindOf channel.name, channel.name, (toElements msg).toList.map ZMod.val)
+
+omit [NeZero p] in
+/-- An evaluated gated pull lands on its message's token, at the negated gate. -/
+theorem toAccess_pulledIfValue {Message : TypeMap} [ProvableType Message]
+    (channel : Channel (ZMod p) Message) (gate : ZMod p) (msg : Message (ZMod p)) :
+    Interaction.toAccess (channel.pulledIfValue gate msg) =
+      LookupAccessList.accessAt (msgToken channel msg) (signedVal (-gate)) := rfl
+
+omit [NeZero p] in
+/-- An evaluated gated push lands on the same token, at the gate. -/
+theorem toAccess_pushedIfValue {Message : TypeMap} [ProvableType Message]
+    (channel : Channel (ZMod p) Message) (gate : ZMod p) (msg : Message (ZMod p)) :
+    Interaction.toAccess (channel.pushedIfValue gate msg) =
+      LookupAccessList.accessAt (msgToken channel msg) (signedVal gate) := rfl
+
+omit [NeZero p] in
 /-- **Kernel of the State "emitted = projection".** The `toAccess`-image of a pushed `stateChannel`
 message (post-#398 `circuit_norm` normal form: `pushIf`) is exactly the `stateLookups`-style
 `LookupAccess`: bus `.State`, table `"SP1State"`, the five message fields val-projected, and the signed

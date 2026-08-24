@@ -69,6 +69,10 @@ theorem active_cons (head : LookupAccess) (tail : LookupAccessList) :
   by_cases hmult : multOf head = 0 <;> simp [active, hmult]
 
 /-- Filtering for a bus or table commutes with discarding zero-multiplicity entries. -/
+theorem active_append (left right : LookupAccessList) :
+    active (left ++ right) = active left ++ active right := by
+  simp only [active, List.filter_append]
+
 theorem active_filter (accesses : LookupAccessList) (keep : LookupAccess → Bool) :
     active (accesses.filter keep) = (active accesses).filter keep := by
   simp only [active, List.filter_filter, Bool.and_comm]
@@ -516,6 +520,33 @@ the level at which the fact is true. -/
 /-- What one row of a hand-off bus emits: it consumes the token it holds and produces the next. -/
 def linkAccesses (held next : LookupKey) : LookupAccessList :=
   [accessAt held (-1), accessAt next 1]
+
+/-- **Padding rows drop out.**
+
+Every row of a hand-off bus emits its pull/push pair whether or not it is real; a padding row emits
+the pair at multiplicity `0`. `active` is what removes them, and this is the computation: filtering
+the *accesses* by nonzero multiplicity is the same as filtering the *rows* by their gate.
+
+That equality is why the hand-off obligation is stated over `active` — without it the padding rows'
+zero-multiplicity accesses sit in the ledger with no token's life to belong to, and the permutation
+is false for every trace that pads. -/
+theorem active_flatMap_gatedPair {α : Type*} (items : List α) (gate : α → ℤ)
+    (held next : α → LookupKey) (hgate : ∀ a ∈ items, gate a = 0 ∨ gate a = 1) :
+    active (items.flatMap fun a => [accessAt (held a) (-gate a), accessAt (next a) (gate a)]) =
+      (items.filter fun a => gate a = 1).flatMap fun a => linkAccesses (held a) (next a) := by
+  induction items with
+  | nil => rfl
+  | cons head tail ih =>
+      have htail : ∀ a ∈ tail, gate a = 0 ∨ gate a = 1 :=
+        fun a ha => hgate a (List.mem_cons_of_mem _ ha)
+      rw [List.flatMap_cons, active_append, ih htail, List.filter_cons]
+      rcases hgate head List.mem_cons_self with hzero | hone
+      · rw [if_neg (by simp [hzero]), hzero]
+        simp only [active, List.filter_cons, neg_zero, multOf_accessAt, ne_eq, not_true_eq_false,
+          decide_false, Bool.false_eq_true, if_false, List.filter_nil, List.nil_append]
+      · rw [if_pos (by simp [hone]), hone, List.flatMap_cons]
+        simp only [active, List.filter_cons, multOf_accessAt, linkAccesses]
+        norm_num
 
 /-- **The chain condition**: each link consumes what its predecessor produced, starting from the
 token the boundary pushed and ending with the one the boundary pulls.
