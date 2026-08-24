@@ -72,25 +72,6 @@ theorem tableStateLedger_eq_nil (table : Table (ZMod p))
         (by simp [sp1Ensemble_channels])),
     Air.Flat.Table.interactionsWith_nil_of_channel_not_mem hnot, List.map_nil]
 
-section Trace
-
-variable [Fact (2 ^ 25 < p)]
-
-omit [Fact (2 ^ 24 < p)] in
-/-- **The trace's State ledger is its tables' State halves**, verifier row first. -/
-theorem stateLedger_eq_flatMap (trace : SupportedCoreTraceWitness p) :
-    trace.stateLedger =
-      tableStateLedger trace.skeletonVerifierTable ++
-        trace.tables.flatMap tableStateLedger := by
-  simp only [SupportedCoreTraceWitness.stateLedger, SupportedCoreTraceWitness.fullLedger,
-    List.filter_append, tablesCleanAccesses, List.filter_flatMap]
-  rfl
-
-end Trace
-
-
-
-
 /-- **Any table of a registered chip has that chip's pull/push pair per physical row** — however it
 was built.
 
@@ -115,5 +96,67 @@ theorem tableStateLedger_eq_of_component (table : Table (ZMod p)) (chip : Suppor
   rw [Air.Flat.Table.environment, hcomp,
     supportedChip_stateEmissionShape chip hmem table.data row]
   rfl
+
+
+section Trace
+
+variable [Fact (2 ^ 25 < p)]
+
+omit [Fact (2 ^ 24 < p)] in
+/-- **The trace's State ledger is its tables' State halves**, verifier row first. -/
+theorem stateLedger_eq_flatMap (trace : SupportedCoreTraceWitness p) :
+    trace.stateLedger =
+      tableStateLedger trace.skeletonVerifierTable ++
+        trace.tables.flatMap tableStateLedger := by
+  simp only [SupportedCoreTraceWitness.stateLedger, SupportedCoreTraceWitness.fullLedger,
+    List.filter_append, tablesCleanAccesses, List.filter_flatMap]
+  rfl
+
+
+
+
+
+/-- **A bus's half of the trace's ledger IS that channel's evaluated interaction list.**
+
+The bridge that makes the soundness layer's ensemble assemblies reusable here.
+`Soundness/TypedState.lean` and `Soundness/TypedMemoryBalance.lean` already decompose
+`typedEnsembleInteractionsWith witness channel` — State into the boundary pair plus the decoded
+rows' and StateBump rows' pull/push pairs, Memory into the decoded rows' interactions plus the
+init/finalize/bump tables'. Both are exactly the chain shape
+`LookupAccessList.chainLedger_perm_handoff` consumes.
+
+What was missing was only the change of orientation: those layers work in Clean `Interaction`s on
+one channel, this one in `LookupAccess`es filtered from the whole computable ledger. Both sides are
+`allTables.flatMap`, and per table the two agree by `tableCleanAccesses_filterKind`.
+
+Stated for an arbitrary channel because the State and Memory halves need the identical fact —
+writing it twice would have been the same proof with two names. -/
+theorem busLedger_eq_channelLedger (trace : SupportedCoreTraceWitness p)
+    (channel : RawChannel (ZMod p)) (hchannel : channel ∈ (sp1Ensemble (p := p)).channels)
+    (K : InteractionKind) (hkind : kindOf channel.name = K) :
+    trace.fullLedger.filter (fun a => a.1 = K) =
+      (trace.witness.interactionsWith channel).map Interaction.toAccess := by
+  rw [← trace.tablesCleanAccesses_allTables, tablesCleanAccesses, List.filter_flatMap,
+    Air.Flat.EnsembleWitness.interactionsWith, List.map_flatMap]
+  refine List.flatMap_congr fun table htable => ?_
+  refine tableCleanAccesses_filterKind table channel K hkind fun i hi hk => ?_
+  exact interactions_channel_eq_of_kindOf _ (trace.allTables_component_mem table htable)
+    channel hchannel i hi (by rw [hk, hkind])
+
+/-- The State instance. -/
+theorem stateLedger_eq_channelLedger (trace : SupportedCoreTraceWitness p) :
+    trace.stateLedger =
+      (trace.witness.interactionsWith (stateChannel (p := p)).toRaw).map Interaction.toAccess :=
+  busLedger_eq_channelLedger trace _ (by simp [sp1Ensemble_channels]) InteractionKind.State rfl
+
+/-- The Memory instance — the same fact, and the reason the Memory half of the sweep is not the
+ten-family assembly it looked like. -/
+theorem memoryLedger_eq_channelLedger (trace : SupportedCoreTraceWitness p) :
+    trace.memoryLedger =
+      (trace.witness.interactionsWith (Channels.memoryChannel (p := p)).toRaw).map
+        Interaction.toAccess :=
+  busLedger_eq_channelLedger trace _ (by simp [sp1Ensemble_channels]) InteractionKind.Memory rfl
+
+end Trace
 
 end SP1Clean.Soundness
