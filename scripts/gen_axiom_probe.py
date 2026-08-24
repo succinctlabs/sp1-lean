@@ -242,7 +242,8 @@ TARGETS = [
      r"theorem\s+(supportedChip_table_mem_allTables|tableStateLedger_eq_nil|"
      r"tableStateLedger_eq_of_component|stateLedger_eq_flatMap|"
      r"busLedger_eq_channelLedger|stateLedger_eq_channelLedger|"
-     r"memoryLedger_eq_channelLedger)\b"),
+     r"memoryLedger_eq_channelLedger|active_stateLedger_eq|"
+     r"stateLedger_perm_handoff)\b"),
     ("SP1Clean/Soundness/EnsembleChannels.lean",
      r"theorem\s+(channel_eq_of_kindOf_eq|interactions_channel_eq_of_kindOf)\b"),
     # A0: the ledger decomposition a per-chip sweep peels with.

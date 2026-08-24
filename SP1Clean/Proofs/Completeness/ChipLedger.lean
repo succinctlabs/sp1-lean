@@ -1,6 +1,7 @@
 import SP1Clean.Model.CleanLedger
 import SP1Clean.Soundness.EnsembleChannels
 import SP1Clean.Soundness.TypedState
+import SP1Clean.Soundness.TypedState
 import SP1Clean.Proofs.Completeness.ClosureRealization
 
 /-!
@@ -30,6 +31,7 @@ namespace SP1Clean.Soundness
 open SP1Clean
 open Air.Flat (Component Table)
 open SP1Clean.Channels (stateChannel)
+open LookupAccessList
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
@@ -156,6 +158,147 @@ theorem memoryLedger_eq_channelLedger (trace : SupportedCoreTraceWitness p) :
       (trace.witness.interactionsWith (Channels.memoryChannel (p := p)).toRaw).map
         Interaction.toAccess :=
   busLedger_eq_channelLedger trace _ (by simp [sp1Ensemble_channels]) InteractionKind.Memory rfl
+
+/-! ## The State bus is a hand-off
+
+Everything above composes here. `Soundness/TypedState.lean` already decomposes an arbitrary
+`EnsembleWitness`'s State interactions into the public boundary pair, the decoded instruction rows'
+pull/push pairs, and the StateBump rows'. `busLedger_eq_channelLedger` puts that in this layer's
+orientation, `active_flatMap_gatedPair` drops the padding rows, and `chainLedger_perm_handoff`
+turns the resulting chain into a hand-off.
+
+The tokens are the messages themselves: `msgToken` of the boundary's init/final states, and of each
+row's pulled and pushed state. -/
+
+noncomputable def stateInitToken (trace : SupportedCoreTraceWitness p) : LookupKey :=
+  msgToken stateChannel
+    ⟨trace.witness.publicInput.init_clk_high, trace.witness.publicInput.init_clk_low,
+      trace.witness.publicInput.init_pc0, trace.witness.publicInput.init_pc1,
+      trace.witness.publicInput.init_pc2⟩
+
+noncomputable def stateFinalToken (trace : SupportedCoreTraceWitness p) : LookupKey :=
+  msgToken stateChannel
+    ⟨trace.witness.publicInput.final_clk_high, trace.witness.publicInput.final_clk_low,
+      trace.witness.publicInput.final_pc0, trace.witness.publicInput.final_pc1,
+      trace.witness.publicInput.final_pc2⟩
+
+noncomputable def stateInstrLinks (trace : SupportedCoreTraceWitness p) :
+    List (LookupKey × LookupKey) :=
+  ((decodedInstructionRows (p := p) trace.witness.tables).filter fun d =>
+      signedVal (d.toChipRow trace.witness.data).is_real = 1).map fun d =>
+    (msgToken stateChannel (statePullMessage (d.toChipRow trace.witness.data)),
+      msgToken stateChannel (statePushMessage (d.toChipRow trace.witness.data)))
+
+noncomputable def stateBumpLinks (trace : SupportedCoreTraceWitness p) :
+    List (LookupKey × LookupKey) :=
+  ((stateBumpTable trace.witness).table.filter fun row =>
+      signedVal (stateBumpRow (stateBumpTable trace.witness) row).is_real = 1).map fun row =>
+    (msgToken stateChannel
+        (StateBumpChip.pulledMessage (stateBumpRow (stateBumpTable trace.witness) row)),
+      msgToken stateChannel
+        (StateBumpChip.pushedMessage (stateBumpRow (stateBumpTable trace.witness) row)))
+
+theorem active_stateLedger_eq (trace : SupportedCoreTraceWitness p)
+    (hbinary : ∀ d ∈ decodedInstructionRows (p := p) trace.witness.tables,
+      (d.toChipRow trace.witness.data).is_real = 0 ∨
+        (d.toChipRow trace.witness.data).is_real = 1)
+    (hbump : ∀ row ∈ (stateBumpTable trace.witness).table,
+      (stateBumpRow (stateBumpTable trace.witness) row).is_real = 0 ∨
+        (stateBumpRow (stateBumpTable trace.witness) row).is_real = 1) :
+    active trace.stateLedger =
+      ([accessAt (stateFinalToken trace) (-1), accessAt (stateInitToken trace) 1] ++
+        (stateInstrLinks trace).flatMap fun l => linkAccesses l.1 l.2) ++
+        ((stateBumpLinks trace).flatMap fun l => linkAccesses l.1 l.2) := by
+  have hp : 2 < p := by have := Fact.out (p := 2 ^ 24 < p); omega
+  have h1 : signedVal (1 : ZMod p) = 1 := by
+    rw [signedVal_is_real hp (Or.inr rfl), ZMod.val_one_eq_one_mod, Nat.mod_eq_of_lt (by omega)]
+    rfl
+  have hm1 : signedVal (-1 : ZMod p) = -1 := by
+    rw [signedVal_neg_is_real hp (Or.inr rfl), ZMod.val_one_eq_one_mod,
+      Nat.mod_eq_of_lt (by omega)]
+    rfl
+  rw [stateLedger_eq_channelLedger, ← typedEnsembleInteractionsWith_raw,
+    typedEnsembleStateInteractions_eq]
+  simp only [List.map_append, List.map_flatMap, List.map_cons, List.map_nil,
+    TypedInteraction.pulledIfValue, TypedInteraction.pushedIfValue,
+    toAccess_pulledIfValue, toAccess_pushedIfValue, h1, hm1, active_append]
+  have h0 : signedVal (0 : ZMod p) = 0 := by
+    rw [signedVal_is_real hp (Or.inl rfl), ZMod.val_zero]
+    rfl
+  have hgateInstr : ∀ a ∈ decodedInstructionRows (p := p) trace.witness.tables,
+      signedVal (a.toChipRow trace.witness.data).is_real = 0 ∨
+        signedVal (a.toChipRow trace.witness.data).is_real = 1 := by
+    intro a ha
+    rcases hbinary a ha with h | h <;> rw [h]
+    · exact Or.inl h0
+    · exact Or.inr h1
+  have hgateBump : ∀ row ∈ (stateBumpTable trace.witness).table,
+      signedVal (stateBumpRow (stateBumpTable trace.witness) row).is_real = 0 ∨
+        signedVal (stateBumpRow (stateBumpTable trace.witness) row).is_real = 1 := by
+    intro row hrow
+    rcases hbump row hrow with h | h <;> rw [h]
+    · exact Or.inl h0
+    · exact Or.inr h1
+  have hneg : ∀ (x : ZMod p), (x = 0 ∨ x = 1) → signedVal (-x) = -signedVal x := by
+    intro x hx
+    rw [signedVal_neg_is_real hp hx, signedVal_is_real hp hx]
+  rw [show (decodedInstructionRows (p := p) trace.witness.tables).flatMap
+      (fun a => [accessAt (msgToken stateChannel (statePullMessage (a.toChipRow trace.witness.data)))
+          (signedVal (-(a.toChipRow trace.witness.data).is_real)),
+        accessAt (msgToken stateChannel (statePushMessage (a.toChipRow trace.witness.data)))
+          (signedVal (a.toChipRow trace.witness.data).is_real)])
+      = (decodedInstructionRows (p := p) trace.witness.tables).flatMap
+      (fun a => [accessAt (msgToken stateChannel (statePullMessage (a.toChipRow trace.witness.data)))
+          (-signedVal (a.toChipRow trace.witness.data).is_real),
+        accessAt (msgToken stateChannel (statePushMessage (a.toChipRow trace.witness.data)))
+          (signedVal (a.toChipRow trace.witness.data).is_real)]) from
+    List.flatMap_congr fun a ha => by rw [hneg _ (hbinary a ha)]]
+  rw [show ((stateBumpTable trace.witness).table).flatMap
+      (fun row => [accessAt (msgToken stateChannel
+            (StateBumpChip.pulledMessage (stateBumpRow (stateBumpTable trace.witness) row)))
+          (signedVal (-(stateBumpRow (stateBumpTable trace.witness) row).is_real)),
+        accessAt (msgToken stateChannel
+            (StateBumpChip.pushedMessage (stateBumpRow (stateBumpTable trace.witness) row)))
+          (signedVal (stateBumpRow (stateBumpTable trace.witness) row).is_real)])
+      = ((stateBumpTable trace.witness).table).flatMap
+      (fun row => [accessAt (msgToken stateChannel
+            (StateBumpChip.pulledMessage (stateBumpRow (stateBumpTable trace.witness) row)))
+          (-signedVal (stateBumpRow (stateBumpTable trace.witness) row).is_real),
+        accessAt (msgToken stateChannel
+            (StateBumpChip.pushedMessage (stateBumpRow (stateBumpTable trace.witness) row)))
+          (signedVal (stateBumpRow (stateBumpTable trace.witness) row).is_real)]) from
+    List.flatMap_congr fun row hrow => by rw [hneg _ (hbump row hrow)]]
+  rw [active_flatMap_gatedPair _ _ _ _ hgateInstr,
+    active_flatMap_gatedPair _ _ _ _ hgateBump]
+  simp only [stateInstrLinks, stateBumpLinks, stateInitToken, stateFinalToken,
+    List.flatMap_map, active, List.filter_cons, multOf_accessAt, List.filter_nil]
+  norm_num
+
+/-- **The State bus's ledger is its tokens' complete lives.**
+
+The obligation `balancedOn_of_handoff` asks for, discharged from the chain. `IsHandoffChain` is the
+PC chain in this layer's vocabulary: the machine starts holding the public initial state, each real
+row consumes what it holds and produces its successor, and the boundary pulls the final state.
+
+The two binarity hypotheses are the selector facts the ensemble's constraints already supply
+(`witness_stateBumpRows_selectorBinary` and the decoded-row analogue); they are what makes a padding
+row's pair vanish rather than land on a token nobody holds. -/
+theorem stateLedger_perm_handoff (trace : SupportedCoreTraceWitness p)
+    (hbinary : ∀ d ∈ decodedInstructionRows (p := p) trace.witness.tables,
+      (d.toChipRow trace.witness.data).is_real = 0 ∨
+        (d.toChipRow trace.witness.data).is_real = 1)
+    (hbump : ∀ row ∈ (stateBumpTable trace.witness).table,
+      (stateBumpRow (stateBumpTable trace.witness) row).is_real = 0 ∨
+        (stateBumpRow (stateBumpTable trace.witness) row).is_real = 1)
+    (hchain : IsHandoffChain (stateInitToken trace)
+      (stateInstrLinks trace ++ stateBumpLinks trace) (stateFinalToken trace)) :
+    (active trace.stateLedger).Perm
+      (handoff (stateInitToken trace ::
+        (stateInstrLinks trace ++ stateBumpLinks trace).map Prod.snd)) := by
+  rw [active_stateLedger_eq trace hbinary hbump, List.append_assoc, ← List.flatMap_append]
+  exact List.Perm.trans (List.Perm.swap _ _ _)
+    (chainLedger_perm_handoff _ _ _ hchain)
+
 
 end Trace
 
