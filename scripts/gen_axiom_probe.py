@@ -174,7 +174,8 @@ TARGETS = [
      r"active_instruction_count|active_decoded_instruction_row_count|"
      r"active_real_decoded_instruction_row_count|"
      r"activeTrace_yields_airWitness|activeTrace_yields_localExecution|"
-     r"activeTrace_suppliesDemand|activeTrace_stateHandoff|activeTrace_memoryHandoff)\b"),
+     r"activeTrace_suppliesDemand|activeTrace_stateHandoff|activeTrace_memoryHandoff|"
+     r"activePaddedTrace_stateHandoff|activePaddedTrace_stateHandoff_raw_false)\b"),
     # The W4 completeness layer's provider/ledger half: the built provider and verifier tables'
     # constraint theorems, and the generic push/pull balance bridge the W5 assembly consumes.
     ("SP1Clean/Proofs/Completeness/Providers.lean",

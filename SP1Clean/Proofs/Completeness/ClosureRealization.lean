@@ -819,15 +819,20 @@ def programLedger : LookupAccessList :=
 
 /-- **A bus-local hand-off obligation discharges that channel's `isConsistentBalanced`.**
 
-Two steps, and they are the two facts this file exists to supply: the orientation bridge takes the
-channel projection to the whole ledger, and `multiplicitySum_filterKind` takes the whole ledger to
-the bus's own half — where the permutation lives. -/
+Three steps: the orientation bridge takes the channel projection to the whole ledger,
+`multiplicitySum_filterKind` takes that to the bus's own half, and `multiplicitySum_active` drops
+the zero-multiplicity entries — where the permutation lives.
+
+**The `active` filter is not cosmetic.** Padding rows emit their State and Memory accesses at
+multiplicity `0` (`stateLookups_padding`, `memoryLookups_padding`), and `handoff` contains only
+`±1` entries, so a permutation stated on the raw filtered ledger is false for any trace with
+padding — which is every real trace. `active` is what makes the obligation the true one. -/
 theorem channelLedger_isConsistentBalanced_of_handoff
     (channel : RawChannel (ZMod p))
     (hchannel : channel ∈ (sp1Ensemble (p := p)).channels)
     (K : InteractionKind) (hkind : kindOf channel.name = K)
     (keys : List LookupKey)
-    (hperm : (trace.fullLedger.filter fun a => a.1 = K).Perm
+    (hperm : (LookupAccessList.active (trace.fullLedger.filter fun a => a.1 = K)).Perm
       (LookupAccessList.handoff keys)) :
     LookupAccessList.isConsistentBalanced
       ((trace.witness.interactionsWith channel).map Interaction.toAccess) := by
@@ -835,7 +840,8 @@ theorem channelLedger_isConsistentBalanced_of_handoff
   by_cases hname : k.2.1 = channel.name
   · by_cases hkey : k.1 = K
     · rw [trace.fullLedger_multiplicitySum_channel channel hchannel hname,
-        ← LookupAccessList.multiplicitySum_filterKind trace.fullLedger hkey]
+        ← LookupAccessList.multiplicitySum_filterKind trace.fullLedger hkey,
+        ← LookupAccessList.multiplicitySum_active]
       exact LookupAccessList.multiplicitySum_of_perm_handoff hperm k
     · refine LookupAccessList.multiplicitySum_eq_zero_of_keyOf_ne fun a ha hka => hkey ?_
       rw [← hka, (trace.keyOf_mem_channelLedger channel ha).1, hkind]

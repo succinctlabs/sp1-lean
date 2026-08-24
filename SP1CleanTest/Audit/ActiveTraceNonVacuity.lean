@@ -831,7 +831,7 @@ verifier and pulled by the JAL row, and its `(clk_low = 9)` successor, pushed by
 by the verifier as the final state — and the Memory bus carries two records for `x0`, one at
 timestamp `0` from memory-init and its refresh at timestamp `5`.
 
-These two anchors are the demonstration that the obligation is **computable**: `stateLedger` and
+These anchors are the demonstration that the obligation is **computable**: `stateLedger` and
 `memoryLedger` are `List.filter` on the computable `fullLedger`, `handoff` is a `flatMap`, and
 `List.Perm` on `LookupAccess` is decidable — so the hand-off condition on a concrete shard is
 *decided*, not proved. That is why the ledger obligation was stated over the filtered whole ledger
@@ -849,11 +849,42 @@ def activeMemoryTokens : List LookupAccessList.LookupKey :=
    (InteractionKind.Memory, "SP1Memory", [0, 5, 0, 0, 0, 0, 0, 0, 0])]
 
 theorem activeTrace_stateHandoff :
-    activeTrace.stateLedger.Perm (LookupAccessList.handoff activeStateTokens) := by
+    (LookupAccessList.active activeTrace.stateLedger).Perm
+      (LookupAccessList.handoff activeStateTokens) := by
   native_decide
 
 theorem activeTrace_memoryHandoff :
-    activeTrace.memoryLedger.Perm (LookupAccessList.handoff activeMemoryTokens) := by
+    (LookupAccessList.active activeTrace.memoryLedger).Perm
+      (LookupAccessList.handoff activeMemoryTokens) := by
+  native_decide
+
+/-! ### Why the obligation is stated over `active` — a shard that shows it
+
+`activeTrace` pads nothing (every `*Padding := 0`), so on it the `active` filter is the identity and
+the two anchors above would hold with or without it. That makes them silent about the one thing
+`active` is there for, so here is a shard that is not silent.
+
+`activePaddedTrace` is `activeTrace` with a single JAL padding row. A padding row still *emits* its
+State and Memory accesses — at multiplicity `0` (`stateLookups_padding`) — so the raw ledger gains
+two entries that no token's life contains. The pair below is the demonstration: **the raw
+permutation is false and the `active` one is true**, on the same shard, for the same tokens.
+
+Without `active` the hand-off obligation would be unprovable for every trace that pads, which is
+every real trace. -/
+
+/-- The same shard with one padding row. -/
+def activePaddedTrace : SupportedCoreTraceWitness SP1Prime :=
+  { activeTrace with jalPadding := 1 }
+
+/-- A padding row's accesses really are in the raw ledger, and really are not a token's life. -/
+theorem activePaddedTrace_stateHandoff_raw_false :
+    ¬ activePaddedTrace.stateLedger.Perm (LookupAccessList.handoff activeStateTokens) := by
+  native_decide
+
+/-- Dropping the zero-multiplicity entries recovers exactly the same two tokens. -/
+theorem activePaddedTrace_stateHandoff :
+    (LookupAccessList.active activePaddedTrace.stateLedger).Perm
+      (LookupAccessList.handoff activeStateTokens) := by
   native_decide
 
 theorem activeTrace_balanced : activeTrace.Balanced := by

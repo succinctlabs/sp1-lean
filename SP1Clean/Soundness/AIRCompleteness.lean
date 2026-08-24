@@ -185,13 +185,16 @@ proved. `LookupAccessList.handoff` needs no side condition to balance, which is 
 with `balancedOn_of_closure`'s three: a structural fact about tokens, not an arithmetic one about
 counts.
 
+The `active` filter is load-bearing: padding rows emit their accesses at multiplicity `0`, and a
+token's life is `±1`, so without it the permutation is false for every trace that pads.
+
 The length bound stays a hypothesis on every bus for the same reason — it is the field's no-wrap
 premise, a fact about how big this shard is. -/
 theorem balancedOn_of_handoff (channel : RawChannel (ZMod p))
     (hchannel : channel ∈ (sp1Ensemble (p := p)).channels)
     (K : InteractionKind) (hkind : kindOf channel.name = K)
     (keys : List LookupAccessList.LookupKey)
-    (hperm : (trace.fullLedger.filter fun a => a.1 = K).Perm
+    (hperm : (LookupAccessList.active (trace.fullLedger.filter fun a => a.1 = K)).Perm
       (LookupAccessList.handoff keys))
     (hlen : (trace.witness.interactionsWith channel).length < p) :
     trace.BalancedOn channel :=
@@ -222,8 +225,10 @@ theorem balanced_of_closure_and_handoff
     (hnonpos : ∀ key ∈ trace.closingKeyList,
       LookupAccessList.multiplicitySum trace.skeletonLedger key ≤ 0)
     (stateKeys memoryKeys : List LookupAccessList.LookupKey)
-    (hstate : trace.stateLedger.Perm (LookupAccessList.handoff stateKeys))
-    (hmemory : trace.memoryLedger.Perm (LookupAccessList.handoff memoryKeys))
+    (hstate : (LookupAccessList.active trace.stateLedger).Perm
+      (LookupAccessList.handoff stateKeys))
+    (hmemory : (LookupAccessList.active trace.memoryLedger).Perm
+      (LookupAccessList.handoff memoryKeys))
     (hlen : ∀ channel ∈ (sp1Ensemble (p := p)).channels,
       (trace.witness.interactionsWith channel).length < p) :
     trace.Balanced := by
@@ -337,8 +342,10 @@ theorem sp1Ensemble_statement_of_structural_balance
     (hnonpos : ∀ key ∈ trace.closingKeyList,
       LookupAccessList.multiplicitySum trace.skeletonLedger key ≤ 0)
     (stateKeys memoryKeys : List LookupAccessList.LookupKey)
-    (hstate : trace.stateLedger.Perm (LookupAccessList.handoff stateKeys))
-    (hmemory : trace.memoryLedger.Perm (LookupAccessList.handoff memoryKeys))
+    (hstate : (LookupAccessList.active trace.stateLedger).Perm
+      (LookupAccessList.handoff stateKeys))
+    (hmemory : (LookupAccessList.active trace.memoryLedger).Perm
+      (LookupAccessList.handoff memoryKeys))
     (hlen : ∀ channel ∈ (sp1Ensemble (p := p)).channels,
       (trace.witness.interactionsWith channel).length < p)
     (publicEq : trace.witness.publicInput = statement.publicValues) :
