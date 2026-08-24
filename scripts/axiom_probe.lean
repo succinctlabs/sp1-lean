@@ -534,6 +534,9 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Soundness.ltu_traceTable_cleanAccesses
 #print axioms SP1Clean.Soundness.range_traceTable_cleanAccesses
 #print axioms SP1Clean.Soundness.program_traceTable_cleanAccesses
+#print axioms SP1Clean.tablesCleanAccesses_cons
+#print axioms SP1Clean.tableCleanAccesses_buildHinted
+#print axioms SP1Clean.tableCleanAccesses_filterKind
 #print axioms SP1Clean.LookupAccessList.multiplicitySum_filterKind
 #print axioms SP1Clean.LookupAccessList.multiplicitySum_handoff
 #print axioms SP1Clean.LookupAccessList.multiplicitySum_of_perm_handoff
