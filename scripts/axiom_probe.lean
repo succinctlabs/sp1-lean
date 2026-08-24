@@ -534,10 +534,7 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Soundness.ltu_traceTable_cleanAccesses
 #print axioms SP1Clean.Soundness.range_traceTable_cleanAccesses
 #print axioms SP1Clean.Soundness.program_traceTable_cleanAccesses
-#print axioms SP1Clean.Soundness.stateLedger_build
 #print axioms SP1Clean.Soundness.supportedChip_table_mem_allTables
-#print axioms SP1Clean.Soundness.stateLedger_build_of_mem
-#print axioms SP1Clean.Soundness.stateLedger_buildHinted_of_mem
 #print axioms SP1Clean.Soundness.tableStateLedger_eq_nil
 #print axioms SP1Clean.Soundness.stateLedger_eq_flatMap
 #print axioms SP1Clean.Soundness.tableStateLedger_eq_of_component
