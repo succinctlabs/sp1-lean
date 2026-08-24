@@ -41,72 +41,12 @@ noncomputable def rowStateAccesses (chip : SupportedChip p) (data : ProverData (
   [Interaction.toAccess (stateChannel.pulledIfValue row.is_real (statePullMessage row)),
     Interaction.toAccess (stateChannel.pushedIfValue row.is_real (statePushMessage row))]
 
-/-- **A built instruction table's State ledger is its rows' pull/push pairs.**
-
-The `honly` side condition is the ensemble's, not the chip's — it says the table emits only on
-channels whose kinds are distinct, which `EnsembleChannels.interactions_channel_eq_of_kindOf`
-supplies for every table of `sp1Ensemble`. -/
-theorem stateLedger_build (chip : SupportedChip p) (hshape : StateEmissionShape chip)
-    (inputs : List (chip.table.Input (ZMod p))) (data : ProverData (ZMod p))
-    (hint : ProverHint (ZMod p))
-    (honly : ∀ i ∈ (Table.build chip.table inputs data hint).interactions,
-      kindOf i.channel.name = InteractionKind.State →
-        i.channel = (stateChannel (p := p)).toRaw) :
-    (tableCleanAccesses (Table.build chip.table inputs data hint)).filter
-        (fun a => a.1 = InteractionKind.State) =
-      inputs.flatMap fun input =>
-        rowStateAccesses chip data (chip.table.buildRow input data hint) := by
-  rw [tableCleanAccesses_filterKind _ (stateChannel (p := p)).toRaw InteractionKind.State rfl
-      honly,
-    Table.build_interactions, List.map_flatMap]
-  refine congrArg (List.flatMap · inputs) (funext fun input => ?_)
-  rw [hshape data (chip.table.buildRow input data hint)]
-  rfl
-
-
 /-- A registered chip's component is one of the ensemble's tables. -/
 theorem supportedChip_table_mem_allTables (chip : SupportedChip p)
     (hmem : chip ∈ supportedChips (p := p)) :
     chip.table ∈ (sp1Ensemble (p := p)).allTables := by
   rw [Air.Flat.Ensemble.allTables, List.mem_cons, sp1Ensemble_tables, List.mem_append]
   exact Or.inr (Or.inl (List.mem_map_of_mem hmem))
-
-/-- **The State ledger of any registered chip's built table**, with both side conditions discharged:
-the emission shape from `supportedChip_stateEmissionShape`, the channel-kind condition from
-`EnsembleChannels`. A caller supplies only registry membership.
-
-This is the whole State half of the per-chip sweep. There is no case split, because the two facts it
-composes are themselves registry-wide. -/
-theorem stateLedger_build_of_mem (chip : SupportedChip p) (hmem : chip ∈ supportedChips (p := p))
-    (inputs : List (chip.table.Input (ZMod p))) (data : ProverData (ZMod p))
-    (hint : ProverHint (ZMod p)) :
-    (tableCleanAccesses (Table.build chip.table inputs data hint)).filter
-        (fun a => a.1 = InteractionKind.State) =
-      inputs.flatMap fun input =>
-        rowStateAccesses chip data (chip.table.buildRow input data hint) :=
-  stateLedger_build chip (supportedChip_stateEmissionShape chip hmem) inputs data hint
-    (interactions_channel_eq_of_kindOf _ (supportedChip_table_mem_allTables chip hmem)
-      (stateChannel (p := p)).toRaw (by simp [sp1Ensemble_channels]))
-
-/-- The `buildHinted` companion, for the seven chips whose witness generation reads a per-row hint
-(Bitwise, Lt, the two shifts, Branch, Mul, DivRem). Same three facts; only the table constructor
-differs. -/
-theorem stateLedger_buildHinted_of_mem (chip : SupportedChip p)
-    (hmem : chip ∈ supportedChips (p := p))
-    (inputs : List (chip.table.Input (ZMod p) × ProverHint (ZMod p)))
-    (data : ProverData (ZMod p)) :
-    (tableCleanAccesses (Table.buildHinted chip.table inputs data)).filter
-        (fun a => a.1 = InteractionKind.State) =
-      inputs.flatMap fun input =>
-        rowStateAccesses chip data (chip.table.buildRow input.1 data input.2) := by
-  rw [tableCleanAccesses_filterKind _ (stateChannel (p := p)).toRaw InteractionKind.State rfl
-      (interactions_channel_eq_of_kindOf _ (supportedChip_table_mem_allTables chip hmem)
-        (stateChannel (p := p)).toRaw (by simp [sp1Ensemble_channels])),
-    Table.buildHinted_interactions, List.map_flatMap]
-  refine congrArg (List.flatMap · inputs) (funext fun input => ?_)
-  rw [supportedChip_stateEmissionShape chip hmem data (chip.table.buildRow input.1 data input.2)]
-  rfl
-
 
 /-! ## Decomposing the trace's State ledger
 
