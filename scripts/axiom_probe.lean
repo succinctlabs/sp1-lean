@@ -547,6 +547,8 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.LookupAccessList.multiplicitySum_handoff
 #print axioms SP1Clean.LookupAccessList.multiplicitySum_of_perm_handoff
 #print axioms SP1Clean.LookupAccessList.isConsistentBalanced_of_perm_handoff
+#print axioms SP1Clean.LookupAccessList.chainLedger_perm_handoff
+#print axioms SP1Clean.LookupAccessList.multiplicitySum_chainLedger
 #print axioms SP1Clean.LookupAccessList.multiplicitySum_closingAccesses
 #print axioms SP1Clean.LookupAccessList.multiplicitySum_append_closingAccesses
 #print axioms SP1Clean.LookupAccessList.mem_closingKeys_of_multiplicitySum_ne_zero
