@@ -385,6 +385,20 @@ theorem multiplicitySum_zero_of_kind {l : LookupAccessList} {k : LookupKey} {K :
     (h_pure : ∀ a ∈ l, (keyOf a).1 = K) (hk : k.1 ≠ K) : multiplicitySum l k = 0 :=
   multiplicitySum_eq_zero_of_keyOf_ne (fun a ha heq => hk (by rw [← heq]; exact h_pure a ha))
 
+/-- **Restricting a ledger to one bus changes nothing at that bus's keys.**
+
+The computability lever. `List.filter` computes; Clean's per-channel `interactionsWith` projection
+does not (it decides `RawChannel` equality classically). So a bus-local obligation stated over the
+*filtered whole ledger* is a closed term an evaluator can reduce on a concrete shard, while the same
+obligation stated over the channel projection is not — and this says the two agree where it
+matters. -/
+theorem multiplicitySum_filterKind (l : LookupAccessList) {K : InteractionKind} {k : LookupKey}
+    (h : k.1 = K) :
+    multiplicitySum (l.filter fun a => a.1 = K) k = multiplicitySum l k := by
+  have := multiplicitySum_filter_map_eq l id (fun a => a.1 = K) k
+    (fun a _ hka => by simp only [id] at hka; rw [← hka] at h; simpa using h)
+  simpa using this
+
 /-! ## Partition by interaction kind (the recombine lemma for combined faithfulness anchors)
 
 A `LookupAccessList` permutes to the concatenation of its four per-kind filters — every access
@@ -414,6 +428,78 @@ theorem perm_filter_by_kind (l : LookupAccessList) :
   rcases x with ⟨k, rest⟩
   cases k <;> simp
 
+/-- **The access at a key**, carrying a chosen multiplicity. The shared primitive of both reasons
+a bus balances: a hand-off spends it at `±1`, a closure at a recounted total. -/
+def accessAt (key : LookupKey) (mult : ℤ) : LookupAccess := (key.1, key.2.1, key.2.2, mult)
+
+@[simp] theorem keyOf_accessAt (key : LookupKey) (mult : ℤ) : keyOf (accessAt key mult) = key := rfl
+
+@[simp] theorem multOf_accessAt (key : LookupKey) (mult : ℤ) :
+    multOf (accessAt key mult) = mult := rfl
+
+/-! ## Why a bus balances: exactly two reasons
+
+A bus balances at a key when that key's pushes and pulls cancel, and in `sp1Ensemble` there are
+exactly two structural reasons that happens. Both are explicit list constructions over
+`LookupAccess`, so both **compute**: on a concrete shard either side is a closed term a kernel or an
+evaluator can reduce, with no circuit, no environment and no field arithmetic in the way.
+
+* **Hand-off.** The bus carries *tokens*, and a token is created once and consumed once. The State
+  bus carries a single token — the machine's `(clock, pc)`, pushed by the boundary verifier, pulled
+  and re-pushed by each instruction row, pulled again at the end. The Memory bus carries one token
+  per *record*: a location's `(address, value, timestamp)`, pushed by whoever wrote it and pulled by
+  the next access to that location. `handoff` is the ledger of a token's whole life.
+
+* **Closure.** The bus has designated *providers*, and consumers pull whatever they like; the
+  provider supplies each demanded key's aggregate. That is the Byte bus (all six opcode tables and
+  all seventeen Range widths) and the Program bus. `closingAccesses`, below.
+
+The distinction is structural rather than stylistic, and each reason is unavailable to the other's
+bus. A hand-off bus cannot be closed: recounting would invent a supplier for a token nobody created,
+and the multiplicity it invented would have no row to live on. A closed bus has no chain to
+telescope: a byte key is pulled by however many unrelated rows happen to need it, in no order.
+Which reason applies to which bus is `preprocessedKey`'s scope decision
+(`Proofs/Completeness/Closure.lean`), made once rather than per proof.
+
+The asymmetry in what the two need is the tell. Closure carries real side conditions — the keys must
+not repeat, the consumer side must not be net-positive, nothing with nonzero demand may be omitted —
+because it is an arithmetic argument about counts. Hand-off carries **none**: the balance is a fact
+about the tokens themselves.
+-/
+
+/-- **One token's complete life**: created once, consumed once. A bus's hand-off ledger is the
+concatenation of the lives of the tokens it carried. -/
+def handoff (keys : List LookupKey) : LookupAccessList :=
+  keys.flatMap fun key => [accessAt key 1, accessAt key (-1)]
+
+@[simp] theorem handoff_nil : handoff [] = [] := rfl
+
+theorem handoff_cons (key : LookupKey) (keys : List LookupKey) :
+    handoff (key :: keys) = accessAt key 1 :: accessAt key (-1) :: handoff keys := rfl
+
+/-- **A bus of complete lives balances at every key** — with no side condition whatsoever: no
+`Nodup`, no bound, no nonpositivity premise. That is the whole force of the hand-off model, and the
+sharpest contrast with the closure below, which needs all three. -/
+theorem multiplicitySum_handoff (keys : List LookupKey) (k : LookupKey) :
+    multiplicitySum (handoff keys) k = 0 := by
+  induction keys with
+  | nil => rfl
+  | cons key rest ih =>
+      rw [handoff_cons, multiplicitySum_cons, multiplicitySum_cons, ih,
+        keyOf_accessAt, keyOf_accessAt, multOf_accessAt, multOf_accessAt]
+      by_cases h : key = k <;> simp [h]
+
+/-- **A ledger that merely *permutes* complete lives balances**, which is the form a real trace
+takes: its accesses are spread across fifty-three tables in emission order, never grouped by token.
+This is the shape a completeness obligation on a hand-off bus should be stated in. -/
+theorem multiplicitySum_of_perm_handoff {l : LookupAccessList} {keys : List LookupKey}
+    (h : l.Perm (handoff keys)) (k : LookupKey) : multiplicitySum l k = 0 := by
+  rw [multiplicitySum_perm _ _ h, multiplicitySum_handoff]
+
+theorem isConsistentBalanced_of_perm_handoff {l : LookupAccessList} {keys : List LookupKey}
+    (h : l.Perm (handoff keys)) : isConsistentBalanced l :=
+  fun k => multiplicitySum_of_perm_handoff h k
+
 /-! ## The closing ledger, and why it balances
 
 This is the arithmetic heart of the closure, stated over bare `LookupAccessList`s so it can be read
@@ -435,14 +521,6 @@ The two side conditions are exactly the two ways this can fail, and neither is h
 makes this a closure rather than another premise.
 -/
 
-
-/-- The access a provider emits at `key` with multiplicity `mult`. -/
-def accessAt (key : LookupKey) (mult : ℤ) : LookupAccess := (key.1, key.2.1, key.2.2, mult)
-
-@[simp] theorem keyOf_accessAt (key : LookupKey) (mult : ℤ) : keyOf (accessAt key mult) = key := rfl
-
-@[simp] theorem multOf_accessAt (key : LookupKey) (mult : ℤ) :
-    multOf (accessAt key mult) = mult := rfl
 
 /-- The provider ledger closing `skeleton` over `keys`: one recounted access per key. -/
 def closingAccesses (skeleton : LookupAccessList) (keys : List LookupKey) : LookupAccessList :=

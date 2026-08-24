@@ -788,6 +788,60 @@ theorem channelLedger_isConsistentBalanced (hwf : trace.WellFormed) (hfit : trac
   · exact LookupAccessList.multiplicitySum_eq_zero_of_keyOf_ne fun a ha hka =>
         hname (by rw [← hka]; exact (trace.keyOf_mem_channelLedger channel ha).2)
 
+
+/-! ## The per-bus ledgers, computably
+
+`fullLedger` computes — `Table.build`, `Table.interactions` and `Interaction.toAccess` are all plain
+`def`s — and so does `List.filter`. Clean's per-channel `interactionsWith` projection does not: it
+decides `RawChannel` equality classically. So a bus-local obligation belongs on the *filtered whole
+ledger*, where on a concrete shard it is a closed term an evaluator reduces, rather than on the
+channel projection, where it is not.
+
+These four are that formulation. `stateLedger` and `memoryLedger` are the ones a hand-off obligation
+is stated over; the byte and program halves are here for symmetry and for reading a shard's ledger
+apart. -/
+
+/-- The State bus's half of a trace's ledger. -/
+def stateLedger : LookupAccessList :=
+  trace.fullLedger.filter fun a => a.1 = InteractionKind.State
+
+/-- The Memory bus's half. -/
+def memoryLedger : LookupAccessList :=
+  trace.fullLedger.filter fun a => a.1 = InteractionKind.Memory
+
+/-- The Byte bus's half (all six opcode tables and all seventeen Range widths). -/
+def byteLedger : LookupAccessList :=
+  trace.fullLedger.filter fun a => a.1 = InteractionKind.Byte
+
+/-- The Program bus's half. -/
+def programLedger : LookupAccessList :=
+  trace.fullLedger.filter fun a => a.1 = InteractionKind.Program
+
+/-- **A bus-local hand-off obligation discharges that channel's `isConsistentBalanced`.**
+
+Two steps, and they are the two facts this file exists to supply: the orientation bridge takes the
+channel projection to the whole ledger, and `multiplicitySum_filterKind` takes the whole ledger to
+the bus's own half — where the permutation lives. -/
+theorem channelLedger_isConsistentBalanced_of_handoff
+    (channel : RawChannel (ZMod p))
+    (hchannel : channel ∈ (sp1Ensemble (p := p)).channels)
+    (K : InteractionKind) (hkind : kindOf channel.name = K)
+    (keys : List LookupKey)
+    (hperm : (trace.fullLedger.filter fun a => a.1 = K).Perm
+      (LookupAccessList.handoff keys)) :
+    LookupAccessList.isConsistentBalanced
+      ((trace.witness.interactionsWith channel).map Interaction.toAccess) := by
+  intro k
+  by_cases hname : k.2.1 = channel.name
+  · by_cases hkey : k.1 = K
+    · rw [trace.fullLedger_multiplicitySum_channel channel hchannel hname,
+        ← LookupAccessList.multiplicitySum_filterKind trace.fullLedger hkey]
+      exact LookupAccessList.multiplicitySum_of_perm_handoff hperm k
+    · refine LookupAccessList.multiplicitySum_eq_zero_of_keyOf_ne fun a ha hka => hkey ?_
+      rw [← hka, (trace.keyOf_mem_channelLedger channel ha).1, hkind]
+  · exact LookupAccessList.multiplicitySum_eq_zero_of_keyOf_ne fun a ha hka =>
+      hname (by rw [← hka]; exact (trace.keyOf_mem_channelLedger channel ha).2)
+
 end SupportedCoreTraceWitness
 
 end SP1Clean.Soundness

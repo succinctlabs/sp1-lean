@@ -822,6 +822,40 @@ theorem activeTrace_suppliesDemand : activeTrace.SuppliesDemand := by
   refine activeTrace.suppliesDemand_of_keys ?_
   native_decide
 
+/-! ### The hand-off model, decided on a real shard
+
+`Model/InteractionBus.lean` says the State and Memory buses balance because they carry *tokens*,
+each created once and consumed once. On this shard that is visible in the data rather than argued:
+the State bus carries two tokens — the machine's `(clk_low = 1)` state, pushed by the boundary
+verifier and pulled by the JAL row, and its `(clk_low = 9)` successor, pushed by the row and pulled
+by the verifier as the final state — and the Memory bus carries two records for `x0`, one at
+timestamp `0` from memory-init and its refresh at timestamp `5`.
+
+These two anchors are the demonstration that the obligation is **computable**: `stateLedger` and
+`memoryLedger` are `List.filter` on the computable `fullLedger`, `handoff` is a `flatMap`, and
+`List.Perm` on `LookupAccess` is decidable — so the hand-off condition on a concrete shard is
+*decided*, not proved. That is why the ledger obligation was stated over the filtered whole ledger
+rather than over Clean's `noncomputable` per-channel projection.
+-/
+
+/-- The two `(clock, pc)` tokens this shard's State bus carries. -/
+def activeStateTokens : List LookupAccessList.LookupKey :=
+  [(InteractionKind.State, "SP1State", [0, 1, 0, 1, 0]),
+   (InteractionKind.State, "SP1State", [0, 9, 0, 1, 0])]
+
+/-- The two `x0` records this shard's Memory bus carries: genesis, and its refresh. -/
+def activeMemoryTokens : List LookupAccessList.LookupKey :=
+  [(InteractionKind.Memory, "SP1Memory", [0, 0, 0, 0, 0, 0, 0, 0, 0]),
+   (InteractionKind.Memory, "SP1Memory", [0, 5, 0, 0, 0, 0, 0, 0, 0])]
+
+theorem activeTrace_stateHandoff :
+    activeTrace.stateLedger.Perm (LookupAccessList.handoff activeStateTokens) := by
+  native_decide
+
+theorem activeTrace_memoryHandoff :
+    activeTrace.memoryLedger.Perm (LookupAccessList.handoff activeMemoryTokens) := by
+  native_decide
+
 theorem activeTrace_balanced : activeTrace.Balanced := by
   intro channel hchannel
   rw [sp1Ensemble_channels] at hchannel

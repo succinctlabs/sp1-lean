@@ -86,6 +86,20 @@ structure ProviderMultiplicitiesFit : Prop where
   range : ∀ width e, e ∈ trace.rangeEntries width → e.MultiplicityFits p
   rom : ∀ e ∈ trace.romEntries, e.MultiplicityFits p
 
+/-- `Closure.lean`'s `CountsFit` is this predicate plus the five Program cells that circuit passes
+through unchecked. Both name the same capacity contract, so a caller supplies one and gets the
+other; the closure needs the stronger form because its key round trip reads those cells back. -/
+theorem CountsFit.providerMultiplicitiesFit (h : trace.CountsFit) :
+    trace.ProviderMultiplicitiesFit where
+  u8Range := h.u8Range
+  msb := h.msb
+  andByte := h.andByte
+  orByte := h.orByte
+  xorByte := h.xorByte
+  ltu := h.ltu
+  range := h.range
+  rom := h.rom
+
 /-- **One channel's integer ledger balances.**  `Interaction.toAccess` converts every evaluated
 field multiplicity to its centered integer representative.  Requiring its exact per-key sum to
 vanish supports both the historical `0/±1` occurrence form and aggregate provider rows; the
@@ -157,6 +171,72 @@ theorem balancedOn_of_closure
   ⟨hlen, trace.channelLedger_isConsistentBalanced hwf hfit hsupply hnonpos channel hchannel
     hkind⟩
 
+/-- **`BalancedOn` on a hand-off bus**, from a *computable* obligation.
+
+The State and Memory buses carry tokens rather than aggregate demand, so their completeness
+obligation is not a recount but a permutation: the bus's own half of the trace's ledger is the
+concatenation of the complete lives of the tokens it carried, in whatever order fifty-three tables
+happened to emit them.
+
+Stated over `stateLedger` / `memoryLedger` — `List.filter` on the computable `fullLedger` — rather
+than over Clean's per-channel `interactionsWith`, which is `noncomputable`. On a concrete shard both
+sides of the permutation are then closed list terms, so the obligation is *decided* rather than
+proved. `LookupAccessList.handoff` needs no side condition to balance, which is the whole contrast
+with `balancedOn_of_closure`'s three: a structural fact about tokens, not an arithmetic one about
+counts.
+
+The length bound stays a hypothesis on every bus for the same reason — it is the field's no-wrap
+premise, a fact about how big this shard is. -/
+theorem balancedOn_of_handoff (channel : RawChannel (ZMod p))
+    (hchannel : channel ∈ (sp1Ensemble (p := p)).channels)
+    (K : InteractionKind) (hkind : kindOf channel.name = K)
+    (keys : List LookupAccessList.LookupKey)
+    (hperm : (trace.fullLedger.filter fun a => a.1 = K).Perm
+      (LookupAccessList.handoff keys))
+    (hlen : (trace.witness.interactionsWith channel).length < p) :
+    trace.BalancedOn channel :=
+  ⟨hlen, trace.channelLedger_isConsistentBalanced_of_handoff channel hchannel K hkind keys hperm⟩
+
+/--
+**The whole ensemble's channels balance — for the two structural reasons, and nothing else.**
+
+The ensemble's completeness obligation, stated in the model's own terms rather than as four opaque
+assumptions. What it costs:
+
+* **Byte and Program** cost *nothing beyond the trace itself*. The providers supply the demand
+  (`hsupply`) and no consumer key is already net-supplied (`hnonpos`); the demand is recounted from
+  the consumers' own ledger, so there is no separate promise about what a provider row carries.
+* **State and Memory** cost one permutation each — `stateKeys` are the machine's successive
+  `(clock, pc)` tokens, `memoryKeys` the successive `(address, value, timestamp)` records, and the
+  obligation is that each bus's ledger is exactly those tokens' complete lives. Both are stated over
+  computable lists.
+* **All four** cost the field's no-wrap bound, a fact about shard size that belongs to whoever chose
+  the shard.
+
+What is *absent* is as informative. No per-chip hypothesis, no promise about what any individual row
+emits, and no appeal to the execution: four buses discharged by two constructions over
+`LookupAccess` lists plus a size bound.
+-/
+theorem balanced_of_closure_and_handoff
+    (hwf : trace.WellFormed) (hfit : trace.CountsFit) (hsupply : trace.SuppliesDemand)
+    (hnonpos : ∀ key ∈ trace.closingKeyList,
+      LookupAccessList.multiplicitySum trace.skeletonLedger key ≤ 0)
+    (stateKeys memoryKeys : List LookupAccessList.LookupKey)
+    (hstate : trace.stateLedger.Perm (LookupAccessList.handoff stateKeys))
+    (hmemory : trace.memoryLedger.Perm (LookupAccessList.handoff memoryKeys))
+    (hlen : ∀ channel ∈ (sp1Ensemble (p := p)).channels,
+      (trace.witness.interactionsWith channel).length < p) :
+    trace.Balanced := by
+  intro channel hchannel
+  have hlenc := hlen channel hchannel
+  have hmem := hchannel
+  simp only [sp1Ensemble_channels, List.mem_cons, List.not_mem_nil, or_false] at hmem
+  rcases hmem with rfl | rfl | rfl | rfl
+  · exact trace.balancedOn_of_handoff _ hchannel InteractionKind.State rfl stateKeys hstate hlenc
+  · exact trace.balancedOn_of_closure hwf hfit hsupply hnonpos _ hchannel (Or.inl rfl) hlenc
+  · exact trace.balancedOn_of_closure hwf hfit hsupply hnonpos _ hchannel (Or.inr rfl) hlenc
+  · exact trace.balancedOn_of_handoff _ hchannel InteractionKind.Memory rfl memoryKeys hmemory hlenc
+
 /-- **A balanced trace assembles into a witness whose channels balance.** The exact integer ledger
 casts to Clean's field balance without a binary-multiplicity restriction; channel homogeneity is
 provided by the ensemble's own `interactionsWith` membership theorem. -/
@@ -222,5 +302,50 @@ theorem sp1Ensemble_statement_of_traceGeneratable
   obtain ⟨wf, _, balanced, publicEq, -⟩ := valid
   exact ⟨trace.witness, publicEq, trace.witness_constraints wf,
     trace.witness_balancedChannels balanced⟩
+
+
+/-!
+## Whole-ensemble propositional completeness
+
+The composition, and the point of the framing. `Ensemble.Statement` is what the verifier layer
+consumes: *there exists a witness whose public input matches, whose fifty-four tables all satisfy
+their constraints, and whose four channels balance*. Every part of it is now discharged from
+properties of the **trace**, and each part by a named mechanism rather than an assumption:
+
+| Part | Mechanism | Costs |
+|---|---|---|
+| public input | construction | nothing |
+| 54 tables' constraints | each table's own completeness proof | `WellFormed` |
+| Byte + Program balance | closure — providers supply recounted demand | `CountsFit`, `SuppliesDemand`, nonpositivity |
+| State + Memory balance | hand-off — each token created once, consumed once | one permutation per bus |
+| all four | the field's no-wrap bound | shard size |
+
+The two balance mechanisms are the whole content of the bus model, and they are disjoint by
+structure rather than by convention: a hand-off bus cannot be closed (a recount would invent a
+supplier for a token nobody created) and a closed bus has no chain to telescope.
+
+The two permutation obligations are stated over `stateLedger` / `memoryLedger` — `List.filter` on
+the computable `fullLedger` — so on a concrete shard both sides are closed list terms and the
+obligation is decided rather than proved.
+-/
+
+/-- **A trace whose buses balance for the two structural reasons proves the ensemble's public
+statement.** -/
+theorem sp1Ensemble_statement_of_structural_balance
+    (statement : SupportedCoreStatement p) (trace : SupportedCoreTraceWitness p)
+    (wf : trace.WellFormed) (fit : trace.CountsFit) (hsupply : trace.SuppliesDemand)
+    (hnonpos : ∀ key ∈ trace.closingKeyList,
+      LookupAccessList.multiplicitySum trace.skeletonLedger key ≤ 0)
+    (stateKeys memoryKeys : List LookupAccessList.LookupKey)
+    (hstate : trace.stateLedger.Perm (LookupAccessList.handoff stateKeys))
+    (hmemory : trace.memoryLedger.Perm (LookupAccessList.handoff memoryKeys))
+    (hlen : ∀ channel ∈ (sp1Ensemble (p := p)).channels,
+      (trace.witness.interactionsWith channel).length < p)
+    (publicEq : trace.witness.publicInput = statement.publicValues) :
+    (sp1Ensemble (p := p)).Statement statement.publicValues :=
+  ⟨trace.witness, publicEq, trace.witness_constraints wf,
+    trace.witness_balancedChannels
+      (trace.balanced_of_closure_and_handoff wf fit hsupply hnonpos stateKeys memoryKeys
+        hstate hmemory hlen)⟩
 
 end SP1Clean.Soundness
