@@ -596,6 +596,44 @@ theorem chainLedger_perm_handoff :
       refine List.Perm.cons _ (List.Perm.trans List.perm_middle.symm ?_)
       exact List.Perm.cons _ hstep
 
+theorem handoff_append (left right : List LookupKey) :
+    handoff (left ++ right) = handoff left ++ handoff right := by
+  simp only [handoff, List.flatMap_append]
+
+/-- The ledger one chain emits: its boundary push, its links, its boundary pull. -/
+def chainLedger (chain : LookupKey × List (LookupKey × LookupKey) × LookupKey) :
+    LookupAccessList :=
+  [accessAt chain.1 1, accessAt chain.2.2 (-1)] ++
+    chain.2.1.flatMap fun link => linkAccesses link.1 link.2
+
+/-- The tokens one chain carries: the one it opens holding, then each link's product. -/
+def chainTokens (chain : LookupKey × List (LookupKey × LookupKey) × LookupKey) :
+    List LookupKey :=
+  chain.1 :: chain.2.1.map Prod.snd
+
+/-- **A family of independent chains is still a hand-off.**
+
+The State bus carries one token and needs one chain. The Memory bus carries one token per *location*
+— a record is pushed by whoever wrote it and pulled by the next access to that same address — so its
+ledger is a family of chains, one per touched location, each opened by memory-init and closed by
+memory-finalize.
+
+Nothing about the chains has to relate: `handoff` distributes over concatenation, so independent
+chains compose without interacting. That is what makes "one chain per location" cost no more than
+one chain. -/
+theorem multiChainLedger_perm_handoff
+    (chains : List (LookupKey × List (LookupKey × LookupKey) × LookupKey))
+    (hchains : ∀ chain ∈ chains, IsHandoffChain chain.1 chain.2.1 chain.2.2) :
+    (chains.flatMap chainLedger).Perm (handoff (chains.flatMap chainTokens)) := by
+  induction chains with
+  | nil => exact List.Perm.refl _
+  | cons chain rest ih =>
+      rw [List.flatMap_cons, List.flatMap_cons, handoff_append]
+      exact List.Perm.append
+        (chainLedger_perm_handoff chain.1 chain.2.1 chain.2.2
+          (hchains chain List.mem_cons_self))
+        (ih fun c hc => hchains c (List.mem_cons_of_mem _ hc))
+
 /-- **A chain's ledger balances at every key** — the form a bus-local obligation consumes. -/
 theorem multiplicitySum_chainLedger {first last : LookupKey}
     {links : List (LookupKey × LookupKey)} (hchain : IsHandoffChain first links last)

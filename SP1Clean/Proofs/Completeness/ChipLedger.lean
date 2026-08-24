@@ -1,6 +1,7 @@
 import SP1Clean.Model.CleanLedger
 import SP1Clean.Soundness.EnsembleChannels
 import SP1Clean.Soundness.TypedState
+import SP1Clean.Soundness.TypedMemoryBalance
 import SP1Clean.Soundness.TypedState
 import SP1Clean.Proofs.Completeness.ClosureRealization
 
@@ -298,6 +299,92 @@ theorem stateLedger_perm_handoff (trace : SupportedCoreTraceWitness p)
   rw [active_stateLedger_eq trace hbinary hbump, List.append_assoc, ← List.flatMap_append]
   exact List.Perm.trans (List.Perm.swap _ _ _)
     (chainLedger_perm_handoff _ _ _ hchain)
+
+
+/-! ## The Memory bus
+
+Memory follows the same route as State up to one real difference, and it is structural rather than
+incidental.
+
+The State bus carries **one** token — the machine's `(clock, pc)` — so its ledger is one chain, and
+the chain condition is `pcChainProp`, a fact about adjacent rows that the trace layer already
+states. The Memory bus carries **one token per location**: a record is pushed by whoever wrote it
+and pulled by the next access to that same address. So its ledger is a *family* of chains, one per
+touched location, each opened by memory-init and closed by memory-finalize
+(`multiChainLedger_perm_handoff` is why that costs no more than one chain).
+
+The consequence for this layer: the decomposition below is generic, but the **regrouping** of the
+emitted ledger — which is ordered by row and table — into per-location chains is not. Which accesses
+belong to which chain is determined by the addresses in the messages, so it is a fact about the
+trace rather than about any chip, and it is supplied rather than derived. That is a different kind
+of premise from State's, and the docstring on `memoryLedger_perm_handoff` says so. -/
+
+/-- **The Memory bus's ledger, decomposed.** The decoded instruction rows' accesses, then the three
+boundary tables' — memory-init, memory-finalize, and MemoryBump.
+
+The per-row terms stay folded. That is deliberate and it is what
+`TypedMemoryBalance.typedEnsembleMemoryInteractions_eq` does too: unlike State, whose emission shape
+is uniform across all twenty-five chips, Memory's is family-typed by design, so there is no single
+closed form to expand into. Nothing downstream needs one — a hand-off asks that accesses pair off,
+not what any particular row's look like. -/
+theorem memoryLedger_eq (trace : SupportedCoreTraceWitness p) :
+    trace.memoryLedger =
+      ((decodedInstructionRows (p := p) trace.witness.tables).flatMap fun decoded =>
+        (decoded.interactionsWith trace.witness.data (Channels.memoryChannel (p := p))).map
+          fun i => Interaction.toAccess i.raw) ++
+      (((typedTableInteractionsWith (memoryInitProviderTable trace.witness)
+            (Channels.memoryChannel (p := p))).map fun i => Interaction.toAccess i.raw) ++
+        (((typedTableInteractionsWith (memoryFinalizeProviderTable trace.witness)
+              (Channels.memoryChannel (p := p))).map fun i => Interaction.toAccess i.raw) ++
+          ((typedTableInteractionsWith (memoryBumpTable trace.witness)
+              (Channels.memoryChannel (p := p))).map fun i => Interaction.toAccess i.raw))) := by
+  rw [memoryLedger_eq_channelLedger, ← typedEnsembleInteractionsWith_raw,
+    typedEnsembleMemoryInteractions_eq]
+  simp only [List.map_append, List.map_map, Function.comp_def,
+    decodedWitnessMemoryInteractions_eq_flatMap, List.map_flatMap]
+
+
+omit [Fact (2 ^ 24 < p)] in
+/-- **The Memory bus's ledger is its records' complete lives**, given the per-location chains.
+
+The Memory counterpart of `stateLedger_perm_handoff`, and the premise is a *different kind* of thing
+— worth being explicit about rather than letting the symmetry of the statements hide it.
+
+State's chain condition is `pcChainProp`: a fact about adjacent rows that the trace layer already
+states, and one the machine's own step relation gives. Memory's `hregroup` is a **regrouping**: the
+emitted ledger is ordered by row and table, while the chains are per location, and which access
+belongs to which chain is determined by the addresses the messages carry. That is a fact about the
+particular trace, not about any chip and not about the ISA, so it is supplied here rather than
+derived.
+
+`multiChainLedger_perm_handoff` is what makes the per-location structure cost nothing extra:
+`handoff` distributes over concatenation, so independent chains compose without interacting.
+
+Feeding `AIRCompleteness.balancedOn_of_handoff` is immediate — `memoryLedger` is by definition
+`fullLedger.filter (kind = Memory)`, which is exactly the shape that theorem asks for. -/
+theorem memoryLedger_perm_handoff (trace : SupportedCoreTraceWitness p)
+    (chains : List (LookupKey × List (LookupKey × LookupKey) × LookupKey))
+    (hchains : ∀ chain ∈ chains, IsHandoffChain chain.1 chain.2.1 chain.2.2)
+    (hregroup : (active trace.memoryLedger).Perm (chains.flatMap chainLedger)) :
+    (active trace.memoryLedger).Perm (handoff (chains.flatMap chainTokens)) :=
+  hregroup.trans (multiChainLedger_perm_handoff chains hchains)
+
+/-- The State bus stated the same way, for comparison at the call site: one chain rather than a
+family, and its regrouping is `List.Perm.refl` because `active_stateLedger_eq` already delivers the
+chain form. -/
+theorem stateLedger_perm_handoff_singleChain (trace : SupportedCoreTraceWitness p)
+    (hbinary : ∀ d ∈ decodedInstructionRows (p := p) trace.witness.tables,
+      (d.toChipRow trace.witness.data).is_real = 0 ∨
+        (d.toChipRow trace.witness.data).is_real = 1)
+    (hbump : ∀ row ∈ (stateBumpTable trace.witness).table,
+      (stateBumpRow (stateBumpTable trace.witness) row).is_real = 0 ∨
+        (stateBumpRow (stateBumpTable trace.witness) row).is_real = 1)
+    (hchain : IsHandoffChain (stateInitToken trace)
+      (stateInstrLinks trace ++ stateBumpLinks trace) (stateFinalToken trace)) :
+    (active trace.stateLedger).Perm
+      (handoff (chainTokens (stateInitToken trace,
+        stateInstrLinks trace ++ stateBumpLinks trace, stateFinalToken trace))) :=
+  stateLedger_perm_handoff trace hbinary hbump hchain
 
 
 end Trace

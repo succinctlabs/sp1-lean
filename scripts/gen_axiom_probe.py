@@ -243,7 +243,8 @@ TARGETS = [
      r"tableStateLedger_eq_of_component|stateLedger_eq_flatMap|"
      r"busLedger_eq_channelLedger|stateLedger_eq_channelLedger|"
      r"memoryLedger_eq_channelLedger|active_stateLedger_eq|"
-     r"stateLedger_perm_handoff)\b"),
+     r"stateLedger_perm_handoff|memoryLedger_eq|memoryLedger_perm_handoff|"
+     r"stateLedger_perm_handoff_singleChain)\b"),
     ("SP1Clean/Soundness/EnsembleChannels.lean",
      r"theorem\s+(channel_eq_of_kindOf_eq|interactions_channel_eq_of_kindOf)\b"),
     # A0: the ledger decomposition a per-chip sweep peels with.
@@ -256,7 +257,8 @@ TARGETS = [
      r"multiplicitySum_closingAccesses_of_not_select|multiplicitySum_handoff|"
      r"multiplicitySum_of_perm_handoff|isConsistentBalanced_of_perm_handoff|"
      r"multiplicitySum_filterKind|chainLedger_perm_handoff|"
-     r"multiplicitySum_chainLedger|active_append|active_flatMap_gatedPair)\b"),
+     r"multiplicitySum_chainLedger|active_append|active_flatMap_gatedPair|"
+     r"handoff_append|multiChainLedger_perm_handoff)\b"),
     ("SP1Clean/Proofs/Completeness/Closure.lean",
      r"theorem\s+(closingAccesses_balances|closingAccesses_not_preprocessed|"
      r"closingAccesses_state|closingAccesses_memory|"
