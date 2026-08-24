@@ -546,6 +546,7 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Soundness.memoryLedger_eq
 #print axioms SP1Clean.Soundness.memoryLedger_perm_handoff
 #print axioms SP1Clean.Soundness.stateLedger_perm_handoff_singleChain
+#print axioms SP1Clean.Soundness.hnonpos_of_consumersOnlyPull
 #print axioms SP1Clean.Soundness.channel_eq_of_kindOf_eq
 #print axioms SP1Clean.Soundness.interactions_channel_eq_of_kindOf
 #print axioms SP1Clean.tablesCleanAccesses_cons
@@ -553,6 +554,7 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.tableCleanAccesses_filterKind
 #print axioms SP1Clean.LookupAccessList.active_append
 #print axioms SP1Clean.LookupAccessList.multiplicitySum_filterKind
+#print axioms SP1Clean.LookupAccessList.multiplicitySum_nonpos
 #print axioms SP1Clean.LookupAccessList.multiplicitySum_handoff
 #print axioms SP1Clean.LookupAccessList.multiplicitySum_of_perm_handoff
 #print axioms SP1Clean.LookupAccessList.isConsistentBalanced_of_perm_handoff
