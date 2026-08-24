@@ -500,6 +500,79 @@ theorem isConsistentBalanced_of_perm_handoff {l : LookupAccessList} {keys : List
     (h : l.Perm (handoff keys)) : isConsistentBalanced l :=
   fun k => multiplicitySum_of_perm_handoff h k
 
+/-! ### A chain of hand-offs is a hand-off
+
+`handoff` says what a *balanced* hand-off bus looks like: each token pushed once and pulled once,
+grouped by token. A real bus does not look like that. It looks like a **chain** — a boundary push of
+the first token, then one row per link, each pulling what it holds and pushing what it produces, and
+a boundary pull of whatever the last link left holding. The tokens are interleaved across
+fifty-three tables in emission order, and each interior token's push and pull come from *different*
+rows.
+
+These three declarations are the bridge, and they are the whole reason the State and Memory buses
+balance. Everything is a plain list statement — no circuit, no field, no channel — because that is
+the level at which the fact is true. -/
+
+/-- What one row of a hand-off bus emits: it consumes the token it holds and produces the next. -/
+def linkAccesses (held next : LookupKey) : LookupAccessList :=
+  [accessAt held (-1), accessAt next 1]
+
+/-- **The chain condition**: each link consumes what its predecessor produced, starting from the
+token the boundary pushed and ending with the one the boundary pulls.
+
+For the State bus this is the PC chain (`Soundness/StateConsistency.lean`'s `pcChainProp`) — each
+row's `next_pc` is the next row's `pc`, and the clock advances by the row's own increment. For the
+Memory bus it is the per-location record chain. -/
+def IsHandoffChain : LookupKey → List (LookupKey × LookupKey) → LookupKey → Prop
+  | held, [], last => held = last
+  | held, link :: rest, last => link.1 = held ∧ IsHandoffChain link.2 rest last
+
+/-- **A chain's ledger is a hand-off's**, up to the reordering a real trace imposes.
+
+The induction is the argument: peel one link, and the token it consumed is exactly the one the
+boundary push produced — so that token's life closes, and what remains is a shorter chain whose
+boundary push is the token this link produced. The `perm_middle` step is the interleaving: the
+boundary pull sits at the front of the emitted ledger but belongs at the end of the chain. -/
+theorem chainLedger_perm_handoff :
+    ∀ (first : LookupKey) (links : List (LookupKey × LookupKey)) (last : LookupKey),
+      IsHandoffChain first links last →
+      ([accessAt first 1, accessAt last (-1)] ++
+        links.flatMap fun link => linkAccesses link.1 link.2).Perm
+        (handoff (first :: links.map Prod.snd)) := by
+  intro first links
+  induction links generalizing first with
+  | nil =>
+      intro last hchain
+      cases hchain
+      simp only [List.flatMap_nil, List.append_nil, List.map_nil, handoff_cons, handoff_nil]
+      exact List.Perm.refl _
+  | cons link rest ih =>
+      intro last hchain
+      obtain ⟨hhead, htail⟩ := hchain
+      subst hhead
+      have hstep := ih link.2 last htail
+      have hL : ([accessAt link.1 1, accessAt last (-1)] ++
+            ((link :: rest).flatMap fun l => linkAccesses l.1 l.2))
+          = accessAt link.1 1 :: accessAt last (-1) ::
+              ([accessAt link.1 (-1), accessAt link.2 1] ++
+                (rest.flatMap fun l => linkAccesses l.1 l.2)) := by
+        simp only [List.flatMap_cons, linkAccesses, List.cons_append, List.nil_append]
+      have hR : handoff (link.1 :: (link :: rest).map Prod.snd)
+          = accessAt link.1 1 :: accessAt link.1 (-1) ::
+              handoff (link.2 :: rest.map Prod.snd) := by
+        simp only [List.map_cons, handoff_cons]
+      rw [hL, hR]
+      refine List.Perm.cons _ (List.Perm.trans List.perm_middle.symm ?_)
+      exact List.Perm.cons _ hstep
+
+/-- **A chain's ledger balances at every key** — the form a bus-local obligation consumes. -/
+theorem multiplicitySum_chainLedger {first last : LookupKey}
+    {links : List (LookupKey × LookupKey)} (hchain : IsHandoffChain first links last)
+    (k : LookupKey) :
+    multiplicitySum ([accessAt first 1, accessAt last (-1)] ++
+      links.flatMap fun link => linkAccesses link.1 link.2) k = 0 :=
+  multiplicitySum_of_perm_handoff (chainLedger_perm_handoff first links last hchain) k
+
 /-! ## The closing ledger, and why it balances
 
 This is the arithmetic heart of the closure, stated over bare `LookupAccessList`s so it can be read

@@ -252,7 +252,8 @@ TARGETS = [
      r"multiplicitySum_closingAccesses|mem_closingKeys_of_multiplicitySum_ne_zero|"
      r"multiplicitySum_closingAccesses_of_not_select|multiplicitySum_handoff|"
      r"multiplicitySum_of_perm_handoff|isConsistentBalanced_of_perm_handoff|"
-     r"multiplicitySum_filterKind)\b"),
+     r"multiplicitySum_filterKind|chainLedger_perm_handoff|"
+     r"multiplicitySum_chainLedger)\b"),
     ("SP1Clean/Proofs/Completeness/Closure.lean",
      r"theorem\s+(closingAccesses_balances|closingAccesses_not_preprocessed|"
      r"closingAccesses_state|closingAccesses_memory|"
