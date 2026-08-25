@@ -79,7 +79,7 @@ def ofChronological (events : List RoutedEvent) : EventBuckets :=
   unfold ofChronological
   cases projected : routed.forId? id <;> simp [List.filterMap, projected]
 
-@[simp] theorem ofChronological_cons_self (id : InstructionChipId) (event : id.Event)
+theorem ofChronological_cons_self (id : InstructionChipId) (event : id.Event)
     (events : List RoutedEvent) :
     ofChronological (RoutedEvent.mk id event :: events) id =
       event :: ofChronological events id := by

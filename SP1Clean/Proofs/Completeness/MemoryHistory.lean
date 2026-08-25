@@ -251,7 +251,7 @@ def finalEntry (history : MemoryLocationHistory) : MemRecordEntry where
   clk := history.last.current
   multiplicity := true
 
-@[simp] theorem initialEntry_wellFormed (history : MemoryLocationHistory) :
+theorem initialEntry_wellFormed (history : MemoryLocationHistory) :
     history.initialEntry.WellFormedInit := rfl
 
 end MemoryLocationHistory

@@ -82,10 +82,13 @@ be promoted into an independently supplied timeline.
 `FormalModel/Execution.lean` owns the one `SupportedCoreStatement` used by both directions, while
 `FormalModel/SupportedShard.lean` owns the exact semantic relation below `Soundness/`.
 `Model/Semantics/GuestProgram.lean` similarly owns the one `ConfiguredDecode` predicate used by
-both committed Program rows and supported transitions. `SupportedDecodedTransition` retains the
-decoded instruction and selected `InstructionChipId` as evidence, not as another stored trace. The deterministic compiler
-retains each `LocatedTransition` beside its decoded instruction and generated event; this is a
-certified view of the operational trace, not a second execution semantics.
+both committed Program rows and supported transitions. `Model/Semantics/TransitionView.lean` now
+owns the sole `SP1TransitionView`: pc, fetched word, decoded instruction, route key, selected
+`InstructionChipId`, and the attempted canonical access plan. `SupportedSP1Transition` and the
+deterministic compiler both retain that literal projection. Access-plan success remains optional in
+the view because complete eight-byte RAM-cell materialization is a compiler-domain fact, not part
+of ordinary Sail support. This is a certified view of the operational trace, not a second execution
+semantics.
 
 ## 3. Registries and table identity
 
@@ -141,14 +144,17 @@ demand.
 
 The construction is split into narrow layers:
 
-1. `InstructionEvent.lean` compiles all 25 routed instruction families from the official decoded
-   Sail transition.  Events are dependent on `InstructionChipId`, so a row cannot be placed in the
-   wrong table.
+1. `TransitionView.lean` projects the official transition once; `InstructionEvent.lean` consumes
+   that same view for all 25 routed instruction families. Events are dependent on
+   `InstructionChipId`, so a row cannot be placed in the wrong table.
 2. `AccessPlan.lean` extracts one field-free `RAM,C,B,A` access plan.  `AccessSchedule.lean` stamps
    it against one frontier and inserts register `MemoryBump` rows at 24-bit-window crossings.
 3. `ExecutionCompiler.lean` folds the chronological `locatedTransitions`, retaining the source
    transition beside its compiled event and access schedule.  The table partition is a derived
-   `EventBuckets.ofChronological` view.
+   `EventBuckets.ofChronological` view. `compileLocatedTransitions?_exists_of_views` proves that
+   this recursion introduces no further partiality, while
+   `compileExecution?_exists_of_instructionEventsReady` derives every outer
+   fetch/decode/image/route projection from the shared semantic relation.
 4. `MemoryHistory.lean` and `StateHistory.lean` derive the two hand-off histories.
 5. `NativeTraceCompiler.lean` builds the 25 instruction tables, Memory init/final, MemoryBump,
    StateBump, and the one public verifier boundary.  There is zero native instruction padding.
@@ -199,13 +205,14 @@ soundness/completeness API, and final AIR map are implemented. What remains on t
 proving `NativeTraceTotalOnSupportedCore`: every residual `NativeTraceReady` group plus the emitted
 footprint on `SupportedCoreOrdinaryShardExecutionRelation`:
 
-- compiler success and registry-wide validity of each generated per-chip event;
+- access-plan success (including complete source and target RAM cells for memory instructions),
+  row-shape compiler success, and registry-wide validity of each generated per-chip event;
 - State chronology/bump readiness and the built-instruction-row projection;
 - canonical Memory addresses, record chronology, physical-ledger agreement, and initial-state
   genesis content;
 - Byte consumer polarity and Byte/Program demand servability for the literal generated ledger;
 - Program-row physical projection (decoder stability is already the shared `ConfiguredDecode`
-  carried by `SupportedDecodedTransition` and `decodedInROM`); and
+  attached to `SP1TransitionView` by `SupportedSP1Transition` and carried by `decodedInROM`); and
 - the actual emitted interaction count being below the field characteristic.
 
 Some of these are deterministic representation lemmas and should leave the readiness bundle as
@@ -231,6 +238,21 @@ This handoff concerns the 53-table native proof architecture. It does not close 
 34-table/6-table Rust AIR refinement bundle. `CoreAIRRefinementObligations` still has to derive the
 native provider/boundary facts from the six Core system tables before unqualified `sp1_air_sound` is
 available.
+
+The first local semantic fan-out for that bundle now lives in
+`Composition/CoreSystemSemantics.lean`: both bump transports expose their exact native decoded
+inputs. `Channels.SyscallMsg` is the single typed nine-field tuple shared by `SyscallCoreView` and
+the narrow `SyscallInstrsSyscallView`; exact-list membership theorems prove the former receives and
+the latter sends that same carrier at their generated multiplicities. `MemoryLocalView` names all
+twenty columns and its typed initial/final Memory records, and another membership theorem identifies
+the exact generated Memory endpoints. The generated oracle lists remain the sole complete ledgers —
+the semantic layer no longer hand-copies their four- and fourteen-interaction lists.
+
+The SyscallCore and MemoryLocal assertion iff theorems still characterize their complete local
+contracts, and `CoreAIR.System.localValid_of_relationFor` fans those facts out from exact execution
+validity without exposing the relation's conjunction layout. These are local facts only. Global
+meaning, raw Syscall transcript balance, the full SyscallInstrs row law, and the missing cross-table
+range/order consequences remain obligations rather than being inferred from typed names.
 
 It also does not prove cryptographic verifier completeness or soundness. ArkLib must authenticate
 the extracted AIR witness and retain the probabilistic error bound. Do not turn either the compiler

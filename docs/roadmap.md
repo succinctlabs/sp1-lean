@@ -21,6 +21,8 @@ Completed:
   transition;
 - neutral `InstructionChipId`/`InstructionRouting`/`ProviderTableId` registries shared by native
   ensemble construction, completeness assembly, decoding, and transport;
+- one Model-layer `SP1TransitionView` shared literally by the ordinary semantic relation,
+  soundness construction, chronological compiler, and Program agreement proof;
 - exact list-level 34-table execution and 6-table memory-boundary relations;
 - constructive exact-row assembly of all 53 native tables plus the verifier row, with local
   constraints proved from valid clusters, a caller-supplied `CanonicalPreprocessedInventory`, and
@@ -150,6 +152,20 @@ balance, and `SemanticBoundaryBinding`. From the two, the library derives
 provider family is six Byte-op tables, all 17 Range widths `0..16`, Program, MemoryInit,
 MemoryFinalize, MemoryBump, and StateBump. The complete Range family closes honest shift-row balance;
 the former four-width subset omitted live shift lookup keys.
+
+**Local system-table semantics update (2026-08-25).**
+`Composition/CoreSystemSemantics.lean` now exposes the exact native inputs of MemoryBump and
+StateBump and audited views for SyscallCore, SyscallInstrs, and MemoryLocal. `Channels.SyscallMsg` is
+the one nine-field carrier used by the exact SyscallCore receive and SyscallInstrs send; their
+generated table byte remains the send multiplicity. MemoryLocal names typed initial/final Memory
+messages. The exact-list membership theorems expose those three endpoints without copying either
+generated interaction list into a second hand-written ledger. SyscallCore and MemoryLocal retain iff
+theorems for their complete local assertions, and exact-relation corollaries fan those facts out to
+every physical row through the generic `CoreAIR.System.localValid_of_relationFor` eliminator.
+
+This is local progress on five of the six Core system tables, not closure of their trace semantics.
+Syscall transcript consistency, Memory range/order consequences, both bump ordering arguments, and
+Global's public-boundary/cumulative meaning remain explicit obligations.
 
 Byte/Range/Program multiplicities are now recounted from the actual Clean interaction ledger of the
 verifier, 25 transported instruction tables, MemoryInit/MemoryFinalize, and both bumps instead of
@@ -293,7 +309,13 @@ W4 built `ToClean/Air/TableBuild.lean` and local completeness tables for all 25 
 the 28 provider/boundary tables, and the verifier row.  W5 now adds the semantic construction:
 
 - `InstructionEvent.lean` implements all 25 instruction-family projections;
+- `TransitionView.lean` hoists fetch/decode/route and the attempted access plan into the one
+  proof-free view consumed by both directions; access failure stays explicit instead of narrowing
+  the semantic relation;
 - `ExecutionCompiler.lean` folds the one `Machine.EventExecutionTrace` chronologically;
+- its structural totality theorem proves the fold adds no failure after one-row readiness, and the
+  semantic specialization discharges outer fetch/decode/image/route projection directly from
+  `SupportedOrdinaryShardExecutionValid`;
 - the shared field-free scheduler inserts register `MemoryBump` rows at timestamp-window crossings,
   while `stateBumpEvents` derives State refreshes;
 - `MemoryHistory.lean` constructs the canonical initial/final record per touched location;
@@ -318,7 +340,8 @@ retains each `LocatedTransition` beside its generated routed event and access sc
 
 What P3 still means:
 
-- prove `Execution.NativeCompilerReady`—especially every generated event's rich per-chip `Valid`
+- prove access-plan success (especially complete source/target eight-byte RAM cells), then
+  `Execution.NativeCompilerReady`—including every generated event's rich per-chip `Valid`
   contract—from every supported official Sail transition, rather than restricting the source;
 - discharge the remaining State/Memory chronology and physical-row agreement fields from the
   deterministic compiler, including canonical addresses and initial Memory content;

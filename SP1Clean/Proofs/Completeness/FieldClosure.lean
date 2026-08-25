@@ -72,7 +72,7 @@ theorem aggregateProviders_messages_nodup
 
 /-- The canonical closure footprint is the number of pulls plus the number of distinct demanded
 messages. -/
-@[simp] theorem unitPulls_append_aggregateProviders_length
+theorem unitPulls_append_aggregateProviders_length
     [DecidableEq Message]
     (pull : Message → Interaction (ZMod p))
     (provider : Message → ℕ → Interaction (ZMod p))
