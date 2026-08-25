@@ -229,7 +229,7 @@ private theorem subcols_program_interactions_faithful_syntactic
       ProvablePair.instance (Gadgets.Equality.circuit field) programChannel.toRaw n inp
       List.not_mem_nil List.not_mem_nil
   -- SC Phase 2a: `programChannel` is a `Channel` — `circuit_norm` recovers the program pull in the raw
-  -- `ChannelInteraction` form, so unfold the kernel's `pulledIf` to match it (cf. `StateConsistency`).
+  -- `ChannelInteraction` form, so unfold the kernel's `pulledIf` to match it.
   have hk := fun (g : Expression (ZMod p)) (m : SP1Clean.Channels.ProgramMsg (Expression (ZMod p))) =>
     toAccess_pullIf_program env g m
   simp only [SubChip.main, Readers.CPUState.circuit, Readers.CPUState.main,

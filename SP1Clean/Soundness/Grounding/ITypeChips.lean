@@ -657,7 +657,7 @@ variable [Fact (2 ^ 25 < p)]
 omit [Fact (2 ^ 25 < p)] in
 /-- The Addi descriptor in the supported Core registry. -/
 def addiChipDescriptor : SupportedChip p :=
-  ⟨AddiChip.kind, AddiChip.circuit, rfl, [.ADDI], .nonX0⟩
+  ⟨.addi, AddiChip.kind, AddiChip.circuit, rfl⟩
 
 omit [Fact (2 ^ 25 < p)] in
 noncomputable def addiViewOf (env : Environment (ZMod p)) : Trace.RowView (ZMod p) :=
@@ -669,6 +669,7 @@ theorem addiViewOf_decodeRow (data : ProverData (ZMod p)) (physical : Array (ZMo
     ((addiChipDescriptor (p := p)).decodeRow data physical).view =
       addiViewOf (Environment.fromArray physical data) := rfl
 
+omit [Fact (2 ^ 25 < p)] in
 theorem addiChipDescriptor_table :
     (addiChipDescriptor (p := p)).table =
       (⟨AddiChip.circuit (p := p)⟩ : Component (ZMod p)) := rfl

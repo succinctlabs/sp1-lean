@@ -292,8 +292,8 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
           exact a2eq
         · show env.get (i₀ + 3) = srwmsb * 65535
           exact a3eq
-        · show (ShiftRightMath.HWord.toBitVec32 #v[env.get i₀, env.get (i₀ + 1)]).toNat
-              = (ShiftRightMath.HWord.toBitVec32 #v[input_adapter_op_b_memory_prev_value[0],
+        · show (HWord.toBitVec32 #v[env.get i₀, env.get (i₀ + 1)]).toNat
+              = (HWord.toBitVec32 #v[input_adapter_op_b_memory_prev_value[0],
                   input_adapter_op_b_memory_prev_value[1]]).toNat
                 / 2 ^ (input_adapter_op_c_memory_prev_value[0].val % 32)
           rw [ha0, ha1, eq_lr0, eq_lr1, h_ll2_0, zero_mul, add_zero, h_c0mod32]
@@ -339,8 +339,8 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
           exact a2eq
         · show env.get (i₀ + 3) = srwmsb * 65535
           exact a3eq
-        · show (ShiftRightMath.HWord.toBitVec32 #v[env.get i₀, env.get (i₀ + 1)]).toNat
-              = (ShiftRightMath.HWord.toBitVec32 #v[input_adapter_op_b_memory_prev_value[0],
+        · show (HWord.toBitVec32 #v[env.get i₀, env.get (i₀ + 1)]).toNat
+              = (HWord.toBitVec32 #v[input_adapter_op_b_memory_prev_value[0],
                   input_adapter_op_b_memory_prev_value[1]]).toNat
                 / 2 ^ (input_adapter_op_c_memory_prev_value[0].val % 32)
           rw [ha0, ha1, eq_lr1, h_ll2_0, zero_mul, add_zero, h_c0mod32]

@@ -57,7 +57,7 @@ variable [Fact (2 ^ 25 < p)]
 omit [Fact (2 ^ 25 < p)] in
 /-- The SUBW instruction descriptor in the supported Core registry. -/
 def subwChipDescriptor : SupportedChip p :=
-  ⟨SubwChip.kind, SubwChip.circuit, rfl, [.SUBW], .nonX0⟩
+  ⟨.subw, SubwChip.kind, SubwChip.circuit, rfl⟩
 
 omit [Fact (2 ^ 25 < p)] in
 /-- The SUBW semantic row view denoted by a physical circuit environment. -/
@@ -69,6 +69,7 @@ theorem subwViewOf_decodeRow (data : ProverData (ZMod p)) (physical : Array (ZMo
     ((subwChipDescriptor (p := p)).decodeRow data physical).view =
       subwViewOf (Environment.fromArray physical data) := rfl
 
+omit [Fact (2 ^ 25 < p)] in
 theorem subwChipDescriptor_table :
     (subwChipDescriptor (p := p)).table =
       (⟨SubwChip.circuit (p := p)⟩ : Component (ZMod p)) := rfl
@@ -179,7 +180,7 @@ local instance mulFieldBound : Fact (2 ^ 24 < p) :=
 
 /-- The five-opcode multiplication descriptor in the supported Core registry. -/
 def mulChipDescriptor : SupportedChip p :=
-  ⟨MulChip.kind, MulChip.circuit, rfl, [.MUL, .MULH, .MULHU, .MULHSU, .MULW], .nonX0⟩
+  ⟨.mul, MulChip.kind, MulChip.circuit, rfl⟩
 
 noncomputable def mulViewOf (env : Environment (ZMod p)) : Trace.RowView (ZMod p) :=
   MulChip.rowView ((⟨MulChip.circuit (p := p)⟩ : Component (ZMod p)).rowInput env)
@@ -295,8 +296,7 @@ local instance divRemFieldBound : Fact (2 ^ 24 < p) :=
 
 /-- The eight-opcode divide/remainder descriptor in the supported Core registry. -/
 def divRemChipDescriptor : SupportedChip p :=
-  ⟨DivRemChip.kind, DivRemChip.circuit, rfl,
-    [.DIV, .DIVU, .REM, .REMU, .DIVW, .DIVUW, .REMW, .REMUW], .nonX0⟩
+  ⟨.divRem, DivRemChip.kind, DivRemChip.circuit, rfl⟩
 
 noncomputable def divRemViewOf (env : Environment (ZMod p)) : Trace.RowView (ZMod p) :=
   DivRemChip.rowView

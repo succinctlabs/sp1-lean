@@ -3,7 +3,7 @@ import Mathlib.Data.ZMod.Basic
 import SP1Clean.Model.SP1Constraint
 import SP1Clean.Model.InteractionProjection
 import ToClean.Circuit.InteractionRecovery
-import SP1Clean.Faithful.ExtractedInteractionModel
+import SP1Clean.Extracted.InteractionModel
 import SP1Clean.Native.Readers.ALUTypeReader
 import SP1Clean.Extracted.ALUTypeReader
 
@@ -119,7 +119,7 @@ theorem alutypereader_program_interactions_faithful_syntactic
   simp only [Readers.ALUTypeReader.main, circuit_norm, hrac, heq,
     SP1Clean.Channels.memoryChannel_eq_programChannel_false, if_false]
   -- SC Phase 2a: `programChannel` is a `Channel` — unfold the kernel's `pulledIf` to match the raw
-  -- `ChannelInteraction` form `circuit_norm` recovers (cf. `StateConsistency`), then rewrite.
+  -- `ChannelInteraction` form `circuit_norm` recovers, then rewrite.
   have hk := fun (g : Expression (ZMod p)) (m : SP1Clean.Channels.ProgramMsg (Expression (ZMod p))) =>
     toAccess_pullIf_program env g m
   simp only [hk]

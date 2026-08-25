@@ -2,19 +2,21 @@ import SP1Clean.Extracted.ALUTypeReader
 import SP1Clean.Extracted.JTypeReader
 import SP1Clean.Extracted.ITypeReader
 import SP1Clean.Extracted.CPUState
+import SP1Clean.Model.ProgramChip
 
 /-! # Row-view adapter infrastructure (the chip-agnostic trace row)
 
 The chip-agnostic per-row view the multi-chip soundness capstone is built on. A heterogeneous trace
-mixing rows of different chips materialises one *homogeneous* `List RowView`, over which the per-bus
-projections in `Soundness/*Consistency.lean` are defined once and shared across chips.
+mixing rows of different chips materialises one *homogeneous* `List RowView`, over which the State and
+Program access projections are defined once and shared across chips.
 
 `AdapterView` is the reader-agnostic register-adapter shape: the superset every reader
 (`RTypeReader`/`ALUTypeReader`/`JTypeReader`/`ITypeReader`) projects into via its `toAdapterView`,
 so the State/Program/Memory/Byte bus machinery never needs to know a row's reader type. `RowView`
 bundles that adapter with the CPUState, the committed `next_pc`, the `is_real` selector, the rd
 write value, and the Program-bus opcode. Each chip maps its `(inputs, cols)` to a `RowView` in its
-`ChipKind.view` (`Soundness/ChipRow.lean`). -/
+`ChipKind.view` (`Soundness/ChipRow.lean`). The live normalized access vocabulary is kept beside the
+view below: `StateAccess`/`stateAccess` and `ProgramAccess`/`programAccess`/`ProgramAccess.toRow`. -/
 
 namespace SP1Clean.Trace
 
@@ -140,15 +142,14 @@ end CommitEffect
 and the reader-agnostic `AdapterView` blocks, the `is_real` selector, the rd write-back value (the
 ALU result the Memory bus carries for the `op_a` write), and the Program-bus opcode. Every chip maps
 to this via `ChipRow.view` (R-type readers through `RTypeReader.toAdapterView`, ALU readers through
-`ALUTypeReader.toAdapterView`), so the trace-level bus machinery in `Soundness/*Consistency.lean` is
-defined once over `RowView` and shared across chips. -/
+`ALUTypeReader.toAdapterView`), so the machine grounding and execution layers share one normalized
+view across chips. -/
 structure RowView (F : Type) where
   state : Extracted.CPUState F
   /-- The committed `next_pc` (3 u16 limbs) the chip passes to `CPUState::eval` — the chip-agnostic
   trace shadow of SP1's dedicated `next_pc` column block (e.g. the Branch oracle row). For a
   straight-line chip it is `#v[pc[0]+4, pc[1], pc[2]]`; for a control-flow chip it is the
-  data-dependent branch/jump target. Read abstractly by the State-bus PC chain
-  (`Soundness/StateConsistency.lean`). -/
+  data-dependent branch/jump target. Read abstractly through `Soundness.stateAccess`. -/
   next_pc : Vector F 3
   adapter : AdapterView F
   is_real : F
@@ -162,3 +163,74 @@ structure RowView (F : Type) where
   commit : CommitEffect F
 
 end SP1Clean.Trace
+
+namespace SP1Clean.Soundness
+
+open SP1Clean
+open SP1Clean.ProgramChip (ProgramRow)
+
+variable {p : ℕ}
+
+/-! ## Live State and Program access views
+
+These are semantic projections of `Trace.RowView`, not a second interaction ledger. The machine
+grounding and Sail bridge layers use them to read the current/next PC and the committed instruction
+row uniformly across all instruction chips. -/
+
+/-- Per-row State access: clock components, current and committed next PC, clock advance, and the
+activity gate. All currently supported instruction chips advance the SP1 clock by eight ticks. -/
+structure StateAccess (F : Type) where
+  clk_high : F
+  clk_low : F
+  pc : Vector F 3
+  next_pc : Vector F 3
+  clk_inc : F
+  is_real : F
+
+/-- Project a chip-independent row view to the State access consumed by the execution layer. -/
+def stateAccess (r : Trace.RowView (ZMod p)) : StateAccess (ZMod p) :=
+  { clk_high := r.state.clk_high
+    clk_low := r.state.clk_0_16 + r.state.clk_16_24 * 65536
+    pc := r.state.pc
+    next_pc := r.next_pc
+    clk_inc := 8
+    is_real := r.is_real }
+
+/-- Per-row Program access: the committed instruction-fetch fields plus the activity gate. -/
+structure ProgramAccess (F : Type) where
+  pc : Vector F 3
+  opcode : F
+  op_a : F
+  op_b : Word F
+  imm_b : F
+  op_c : Word F
+  op_a_0 : F
+  imm_c : F
+  is_real : F
+
+/-- Project a chip-independent row view to the Program access consumed by decode grounding. -/
+def programAccess (r : Trace.RowView (ZMod p)) : ProgramAccess (ZMod p) :=
+  { pc := r.state.pc
+    opcode := r.opcode
+    op_a := r.adapter.op_a
+    op_b := r.adapter.op_b
+    imm_b := r.adapter.imm_b
+    op_c := r.adapter.op_c
+    op_a_0 := r.adapter.op_a_0
+    imm_c := r.adapter.imm_c
+    is_real := r.is_real }
+
+/-- Drop the activity gate to obtain the canonical Program-table row. -/
+def ProgramAccess.toRow (pa : ProgramAccess (ZMod p)) : ProgramRow (ZMod p) :=
+  { pc0 := pa.pc[0]
+    pc1 := pa.pc[1]
+    pc2 := pa.pc[2]
+    opcode := pa.opcode
+    op_a := pa.op_a
+    op_b := pa.op_b
+    imm_b := pa.imm_b
+    op_c := pa.op_c
+    op_a_0 := pa.op_a_0
+    imm_c := pa.imm_c }
+
+end SP1Clean.Soundness

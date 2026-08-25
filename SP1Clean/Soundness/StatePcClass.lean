@@ -323,10 +323,10 @@ theorem statePcClassShape_of_circuit (kind : ChipKind p)
       kind.provableInputs kind.provableCols)
     (spec_eq : @GeneralFormalCircuit.Spec (ZMod p) kind.Inputs kind.Cols inferInstance
       kind.provableInputs kind.provableCols circuit = kind.chipSpec)
-    (opcodes : List Opcode) (rdGuard : RdGuard)
+    (id : InstructionChipId)
     (shape : @CircuitPushedPcBound p _ kind.Inputs kind.Cols kind.provableInputs
       kind.provableCols circuit kind.view) :
-    StatePcClassShape ⟨kind, circuit, spec_eq, opcodes, rdGuard⟩ := by
+    StatePcClassShape ⟨id, kind, circuit, spec_eq⟩ := by
   letI := kind.provableInputs
   letI := kind.provableCols
   intro data physical guarantees real
@@ -335,48 +335,48 @@ theorem statePcClassShape_of_circuit (kind : ChipKind p)
 /-- A straight-line chip commits `next_pc = #v[pc[0] + 4, pc[1], pc[2]]`, so both upper pc limbs of
 its push equal those of its pull definitionally. -/
 theorem addChip_statePcClassShape : StatePcClassShape
-    (⟨AddChip.kind, AddChip.circuit, rfl, [.ADD], .nonX0⟩ : SupportedChip p) :=
+    (⟨.add, AddChip.kind, AddChip.circuit, rfl⟩ : SupportedChip p) :=
   statePcClassShape_preserve_of_view _ fun _ _ => ⟨rfl, rfl⟩
 
 theorem addiChip_statePcClassShape : StatePcClassShape
-    (⟨AddiChip.kind, AddiChip.circuit, rfl, [.ADDI], .nonX0⟩ : SupportedChip p) :=
+    (⟨.addi, AddiChip.kind, AddiChip.circuit, rfl⟩ : SupportedChip p) :=
   statePcClassShape_preserve_of_view _ fun _ _ => ⟨rfl, rfl⟩
 
 theorem addwChip_statePcClassShape : StatePcClassShape
-    (⟨AddwChip.kind, AddwChip.circuit, rfl, [.ADDW], .nonX0⟩ : SupportedChip p) :=
+    (⟨.addw, AddwChip.kind, AddwChip.circuit, rfl⟩ : SupportedChip p) :=
   statePcClassShape_preserve_of_view _ fun _ _ => ⟨rfl, rfl⟩
 
 theorem subChip_statePcClassShape : StatePcClassShape
-    (⟨SubChip.kind, SubChip.circuit, rfl, [.SUB], .nonX0⟩ : SupportedChip p) :=
+    (⟨.sub, SubChip.kind, SubChip.circuit, rfl⟩ : SupportedChip p) :=
   statePcClassShape_preserve_of_view _ fun _ _ => ⟨rfl, rfl⟩
 
 theorem subwChip_statePcClassShape : StatePcClassShape
-    (⟨SubwChip.kind, SubwChip.circuit, rfl, [.SUBW], .nonX0⟩ : SupportedChip p) :=
+    (⟨.subw, SubwChip.kind, SubwChip.circuit, rfl⟩ : SupportedChip p) :=
   statePcClassShape_preserve_of_view _ fun _ _ => ⟨rfl, rfl⟩
 
 theorem bitwiseChip_statePcClassShape : StatePcClassShape
-    (⟨BitwiseChip.kind, BitwiseChip.circuit, rfl, [.XOR, .OR, .AND], .nonX0⟩ :
+    (⟨.bitwise, BitwiseChip.kind, BitwiseChip.circuit, rfl⟩ :
       SupportedChip p) :=
   statePcClassShape_preserve_of_view _ fun _ _ => ⟨rfl, rfl⟩
 
 theorem ltChip_statePcClassShape : StatePcClassShape
-    (⟨LtChip.kind, LtChip.circuit, rfl, [.SLT, .SLTU], .nonX0⟩ : SupportedChip p) :=
+    (⟨.lt, LtChip.kind, LtChip.circuit, rfl⟩ : SupportedChip p) :=
   statePcClassShape_preserve_of_view _ fun _ _ => ⟨rfl, rfl⟩
 
 theorem shiftLeftChip_statePcClassShape : StatePcClassShape
-    (⟨ShiftLeftChip.kind, ShiftLeftChip.circuit, rfl, [.SLL, .SLLW], .nonX0⟩ :
+    (⟨.shiftLeft, ShiftLeftChip.kind, ShiftLeftChip.circuit, rfl⟩ :
       SupportedChip p) :=
   statePcClassShape_preserve_of_view _ fun _ _ => ⟨rfl, rfl⟩
 
 theorem shiftRightChip_statePcClassShape : StatePcClassShape
-    (⟨ShiftRightChip.kind, ShiftRightChip.circuit, rfl, [.SRL, .SRA, .SRLW, .SRAW], .nonX0⟩ :
+    (⟨.shiftRight, ShiftRightChip.kind, ShiftRightChip.circuit, rfl⟩ :
       SupportedChip p) :=
   statePcClassShape_preserve_of_view _ fun _ _ => ⟨rfl, rfl⟩
 
 /-- JAL pushes its committed jump target; the retained target `AddOperation` range-checks its upper
 limbs. -/
 theorem jalChip_statePcClassShape : StatePcClassShape
-    (⟨JalChip.kind, JalChip.circuit, rfl, [.JAL], .any⟩ : SupportedChip p) := by
+    (⟨.jal, JalChip.kind, JalChip.circuit, rfl⟩ : SupportedChip p) := by
   letI := (JalChip.kind (p := p)).provableInputs
   letI := (JalChip.kind (p := p)).provableCols
   apply statePcClassShape_of_circuit
@@ -386,7 +386,7 @@ theorem jalChip_statePcClassShape : StatePcClassShape
 /-- JALR pushes its committed LSB-cleared jump target; limbs 1 and 2 are the retained target
 `AddOperation` result limbs, range-checked there. -/
 theorem jalrChip_statePcClassShape : StatePcClassShape
-    (⟨JalrChip.kind, JalrChip.circuit, rfl, [.JALR], .any⟩ : SupportedChip p) := by
+    (⟨.jalr, JalrChip.kind, JalrChip.circuit, rfl⟩ : SupportedChip p) := by
   letI := (JalrChip.kind (p := p)).provableInputs
   letI := (JalrChip.kind (p := p)).provableCols
   apply statePcClassShape_of_circuit
@@ -396,8 +396,7 @@ theorem jalrChip_statePcClassShape : StatePcClassShape
 /-- BRANCH pushes its committed taken/fall-through target, whose upper limbs its own `main`
 range-checks; no case split on the branching decision is needed. -/
 theorem branchChip_statePcClassShape : StatePcClassShape
-    (⟨BranchChip.kind, BranchChip.circuit, rfl,
-      [.BEQ, .BNE, .BLT, .BGE, .BLTU, .BGEU], .any⟩ : SupportedChip p) := by
+    (⟨.branch, BranchChip.kind, BranchChip.circuit, rfl⟩ : SupportedChip p) := by
   letI := (BranchChip.kind (p := p)).provableInputs
   letI := (BranchChip.kind (p := p)).provableCols
   apply statePcClassShape_of_circuit
@@ -405,63 +404,57 @@ theorem branchChip_statePcClassShape : StatePcClassShape
   exact branchChip_shallowNextPcContract
 
 theorem uTypeChip_statePcClassShape : StatePcClassShape
-    (⟨UTypeChip.kind, UTypeChip.circuit, rfl, [.AUIPC, .LUI], .any⟩ : SupportedChip p) :=
+    (⟨.uType, UTypeChip.kind, UTypeChip.circuit, rfl⟩ : SupportedChip p) :=
   statePcClassShape_preserve_of_view _ fun _ _ => ⟨rfl, rfl⟩
 
 theorem loadByteChip_statePcClassShape : StatePcClassShape
-    (⟨LoadByteChip.kind, LoadByteChip.circuit, rfl, [.LB, .LBU], .nonX0⟩ : SupportedChip p) :=
+    (⟨.loadByte, LoadByteChip.kind, LoadByteChip.circuit, rfl⟩ : SupportedChip p) :=
   statePcClassShape_preserve_of_view _ fun _ _ => ⟨rfl, rfl⟩
 
 theorem loadHalfChip_statePcClassShape : StatePcClassShape
-    (⟨LoadHalfChip.kind, LoadHalfChip.circuit, rfl, [.LH, .LHU], .nonX0⟩ : SupportedChip p) :=
+    (⟨.loadHalf, LoadHalfChip.kind, LoadHalfChip.circuit, rfl⟩ : SupportedChip p) :=
   statePcClassShape_preserve_of_view _ fun _ _ => ⟨rfl, rfl⟩
 
 theorem loadWordChip_statePcClassShape : StatePcClassShape
-    (⟨LoadWordChip.kind, LoadWordChip.circuit, rfl, [.LW, .LWU], .nonX0⟩ : SupportedChip p) :=
+    (⟨.loadWord, LoadWordChip.kind, LoadWordChip.circuit, rfl⟩ : SupportedChip p) :=
   statePcClassShape_preserve_of_view _ fun _ _ => ⟨rfl, rfl⟩
 
 theorem loadDoubleChip_statePcClassShape : StatePcClassShape
-    (⟨LoadDoubleChip.kind, LoadDoubleChip.circuit, rfl, [.LD], .nonX0⟩ : SupportedChip p) :=
+    (⟨.loadDouble, LoadDoubleChip.kind, LoadDoubleChip.circuit, rfl⟩ : SupportedChip p) :=
   statePcClassShape_preserve_of_view _ fun _ _ => ⟨rfl, rfl⟩
 
 theorem loadX0Chip_statePcClassShape : StatePcClassShape
-    (⟨LoadX0Chip.kind, LoadX0Chip.circuit, rfl,
-      [.LB, .LBU, .LH, .LHU, .LW, .LWU, .LD], .onlyX0⟩ : SupportedChip p) :=
+    (⟨.loadX0, LoadX0Chip.kind, LoadX0Chip.circuit, rfl⟩ : SupportedChip p) :=
   statePcClassShape_preserve_of_view _ fun _ _ => ⟨rfl, rfl⟩
 
 theorem storeByteChip_statePcClassShape : StatePcClassShape
-    (⟨StoreByteChip.kind, StoreByteChip.circuit, rfl, [.SB], .any⟩ : SupportedChip p) :=
+    (⟨.storeByte, StoreByteChip.kind, StoreByteChip.circuit, rfl⟩ : SupportedChip p) :=
   statePcClassShape_preserve_of_view _ fun _ _ => ⟨rfl, rfl⟩
 
 theorem storeHalfChip_statePcClassShape : StatePcClassShape
-    (⟨StoreHalfChip.kind, StoreHalfChip.circuit, rfl, [.SH], .any⟩ : SupportedChip p) :=
+    (⟨.storeHalf, StoreHalfChip.kind, StoreHalfChip.circuit, rfl⟩ : SupportedChip p) :=
   statePcClassShape_preserve_of_view _ fun _ _ => ⟨rfl, rfl⟩
 
 theorem storeWordChip_statePcClassShape : StatePcClassShape
-    (⟨StoreWordChip.kind, StoreWordChip.circuit, rfl, [.SW], .any⟩ : SupportedChip p) :=
+    (⟨.storeWord, StoreWordChip.kind, StoreWordChip.circuit, rfl⟩ : SupportedChip p) :=
   statePcClassShape_preserve_of_view _ fun _ _ => ⟨rfl, rfl⟩
 
 theorem storeDoubleChip_statePcClassShape : StatePcClassShape
-    (⟨StoreDoubleChip.kind, StoreDoubleChip.circuit, rfl, [.SD], .any⟩ : SupportedChip p) :=
+    (⟨.storeDouble, StoreDoubleChip.kind, StoreDoubleChip.circuit, rfl⟩ : SupportedChip p) :=
   statePcClassShape_preserve_of_view _ fun _ _ => ⟨rfl, rfl⟩
 
 theorem mulChip_statePcClassShape : StatePcClassShape
-    (⟨MulChip.kind, MulChip.circuit, rfl, [.MUL, .MULH, .MULHU, .MULHSU, .MULW], .nonX0⟩ :
+    (⟨.mul, MulChip.kind, MulChip.circuit, rfl⟩ :
       SupportedChip p) :=
   statePcClassShape_preserve_of_view _ fun _ _ => ⟨rfl, rfl⟩
 
 theorem divRemChip_statePcClassShape : StatePcClassShape
-    (⟨DivRemChip.kind, DivRemChip.circuit, rfl,
-      [.DIV, .DIVU, .REM, .REMU, .DIVW, .DIVUW, .REMW, .REMUW], .nonX0⟩ :
+    (⟨.divRem, DivRemChip.kind, DivRemChip.circuit, rfl⟩ :
       SupportedChip p) :=
   statePcClassShape_preserve_of_view _ fun _ _ => ⟨rfl, rfl⟩
 
 theorem aluX0Chip_statePcClassShape : StatePcClassShape
-    (⟨AluX0Chip.kind, AluX0Chip.circuit, rfl,
-      [.ADD, .ADDI, .ADDW, .SUB, .SUBW, .XOR, .OR, .AND, .SLT, .SLTU,
-       .SLL, .SLLW, .SRL, .SRA, .SRLW, .SRAW,
-       .MUL, .MULH, .MULHU, .MULHSU, .MULW,
-       .DIV, .DIVU, .REM, .REMU, .DIVW, .DIVUW, .REMW, .REMUW], .onlyX0⟩ :
+    (⟨.aluX0, AluX0Chip.kind, AluX0Chip.circuit, rfl⟩ :
       SupportedChip p) :=
   statePcClassShape_preserve_of_view _ fun _ _ => ⟨rfl, rfl⟩
 

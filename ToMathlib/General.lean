@@ -107,6 +107,23 @@ instance : Fintype (BitVec n) where
 
 section toBatteries
 
+namespace List
+
+/-- Splitting a list at two positions: the prefix, the window between them, and the suffix.
+
+Mathlib has `List.take_append_drop` (the one-cut version) but no two-cut form, and the composite is
+what any "everything outside this window" argument needs — here, an ensemble's table list minus its
+preprocessed provider block. -/
+theorem take_append_take_drop_append_drop {α : Type*} (l : List α) (a b : ℕ) :
+    l = l.take a ++ (l.drop a).take b ++ l.drop (a + b) := by
+  conv_lhs => rw [← List.take_append_drop a l]
+  rw [List.append_assoc]
+  congr 1
+  conv_lhs => rw [← List.take_append_drop b (l.drop a)]
+  rw [List.drop_drop, Nat.add_comm]
+
+end List
+
 namespace LawfulMonadStateOf
 
 variable {σ : Type _} {m : Type _ → Type _} [Monad m]

@@ -1,6 +1,7 @@
 import SP1Clean.Soundness.WitnessDecode
 import SP1Clean.Model.BalanceBridge
 import SP1Clean.Model.InteractionProjection
+import SP1Clean.Model.ProviderTableId
 import SP1Clean.Proofs.Chips.ByteChip.ByteChip
 import SP1Clean.Proofs.Chips.ByteChip.RangeChip
 import SP1Clean.Proofs.Chips.ProgramProviderChip
@@ -221,19 +222,22 @@ theorem sp1StateVerifierMain_stateInteractions (pi : Var SP1PublicIO (ZMod p)) (
 def sp1Tables : List (Component (ZMod p)) :=
   (supportedChips (p := p)).map (·.table)
 
-/-- Stable cardinalities used by positional decoder and provider-partition proofs. -/
-def instructionTableCount : ℕ := 25
+/-- Stable cardinalities used by positional decoder and provider-partition proofs. The two complete
+counts come from the role-specific neutral inventories; the intermediate constants name semantic
+prefixes within the provider segment. -/
+def instructionTableCount : ℕ := InstructionChipId.count
 def byteProviderTableCount : ℕ := 6
 def rangeProviderTableCount : ℕ := 17
 def preprocessedProviderTableCount : ℕ := 24
 def nonBumpProviderTableCount : ℕ := 26
 def stateSilentProviderTableCount : ℕ := 27
-def providerTableCount : ℕ := 28
-def ensembleTableCount : ℕ := 53
+def providerTableCount : ℕ := ProviderTableId.count
+def ensembleTableCount : ℕ := NativeTableId.all.length
 
 /-- Regression guard for the descriptor's Clean-table projection.  `sp1Tables` and `allChipKinds` now
 come from the same entries, so semantic and circuit wiring cannot drift as independent lists. -/
-theorem sp1Tables_length : (sp1Tables (p := p)).length = 25 := rfl
+theorem sp1Tables_length : (sp1Tables (p := p)).length = 25 := by
+  simpa [sp1Tables] using supportedChips_length (p := p)
 
 /-- The complete fixed-width realization of SP1's preprocessed Range table, ordered by width
 `0, …, 16`. -/
@@ -243,6 +247,23 @@ def sp1RangeProviderTables : List (Component (ZMod p)) :=
 theorem sp1RangeProviderTables_length : (sp1RangeProviderTables (p := p)).length = 17 := by
   simp [sp1RangeProviderTables, RangeChip.allWidths]
 
+/-- Layer-local realization of a neutral provider/boundary identity as its verified Clean table.
+Unlike the identity, this map deliberately imports circuits; it remains total and contains no
+instruction-routing cases. -/
+def providerTableFor : ProviderTableId → Component (ZMod p)
+  | .byte .u8Range => ⟨ByteChip.U8Range.circuit⟩
+  | .byte .msb => ⟨ByteChip.MSB.circuit⟩
+  | .byte .andByte => ⟨ByteChip.AndByte.circuit⟩
+  | .byte .orByte => ⟨ByteChip.OrByte.circuit⟩
+  | .byte .xorByte => ⟨ByteChip.XorByte.circuit⟩
+  | .byte .ltu => ⟨ByteChip.Ltu.circuit⟩
+  | .range width => ⟨RangeChip.circuitFor width⟩
+  | .program => ⟨ProgramProviderChip.circuit⟩
+  | .memoryInit => ⟨MemoryProviderChip.circuit⟩
+  | .memoryFinalize => ⟨MemoryFinalizeChip.circuit⟩
+  | .memoryBump => ⟨MemoryBumpChip.circuit⟩
+  | .stateBump => ⟨StateBumpChip.circuit⟩
+
 /-- The 28 in-circuit boundary/provider tables: six `ByteChip` opcode tables, the complete
 17-member fixed-width Range family, the program-ROM provider, the two memory boundary tables
 (init-push + finalize-pull, W11 Phase 4), and — W3, external report Finding 2 — the two SP1 system
@@ -251,16 +272,30 @@ tables MemoryBump (position 51: the register-record timestamp refreshes) and Sta
 restriction). Every pusher proves its pushes' channel `Guarantees` in-circuit, which is what grounds
 the chips' byte/program/memory pulls at the capstone. -/
 def sp1ProviderTables : List (Component (ZMod p)) :=
-  [⟨ByteChip.U8Range.circuit⟩, ⟨ByteChip.MSB.circuit⟩, ⟨ByteChip.AndByte.circuit⟩,
-   ⟨ByteChip.OrByte.circuit⟩, ⟨ByteChip.XorByte.circuit⟩, ⟨ByteChip.Ltu.circuit⟩
-   ] ++ sp1RangeProviderTables ++ [⟨ProgramProviderChip.circuit⟩,
-   ⟨MemoryProviderChip.circuit⟩, ⟨MemoryFinalizeChip.circuit⟩,
-   ⟨MemoryBumpChip.circuit⟩, ⟨StateBumpChip.circuit⟩]
+  ProviderTableId.all.map (providerTableFor (p := p))
+
+/-- The identity-derived provider list reduces to the established physical witness order. This
+keeps existing position-sensitive consumers auditable without maintaining a second registry. -/
+theorem sp1ProviderTables_explicit :
+    sp1ProviderTables (p := p) =
+      [⟨ByteChip.U8Range.circuit⟩, ⟨ByteChip.MSB.circuit⟩, ⟨ByteChip.AndByte.circuit⟩,
+       ⟨ByteChip.OrByte.circuit⟩, ⟨ByteChip.XorByte.circuit⟩, ⟨ByteChip.Ltu.circuit⟩] ++
+        sp1RangeProviderTables ++
+      [⟨ProgramProviderChip.circuit⟩, ⟨MemoryProviderChip.circuit⟩,
+       ⟨MemoryFinalizeChip.circuit⟩, ⟨MemoryBumpChip.circuit⟩,
+       ⟨StateBumpChip.circuit⟩] := by
+  rfl
+
+/-- Pointwise positional coverage, including out-of-bounds provider positions. -/
+@[simp] theorem sp1ProviderTables_getElem? (i : ℕ) :
+    (sp1ProviderTables (p := p))[i]? =
+      (ProviderTableId.all[i]?).map (providerTableFor (p := p)) := by
+  simp [sp1ProviderTables]
 
 /-- Regression guard: the boundary/provider table count (6 byte + 17 range + program + 2 memory +
 2 bump). -/
 theorem sp1ProviderTables_length : (sp1ProviderTables (p := p)).length = 28 := by
-  simp [sp1ProviderTables, sp1RangeProviderTables_length]
+  simp [sp1ProviderTables]
 
 /-- Every boundary/provider circuit except the last — the StateBump table at position 52 — stays
 off the State channel; StateBump is, by design, the sole provider-segment State contributor.
@@ -270,6 +305,7 @@ theorem sp1ProviderTables_stateChannel_not_mem :
     ∀ component ∈ (sp1ProviderTables (p := p)).take stateSilentProviderTableCount,
       Channels.stateChannel.toRaw ∉ component.circuit.channels := by
   intro component componentMem
+  rw [sp1ProviderTables_explicit] at componentMem
   fin_cases componentMem <;>
     simp [GeneralFormalCircuit.channels, ByteChip.U8Range.circuit, ByteChip.MSB.circuit,
       ByteChip.AndByte.circuit, ByteChip.OrByte.circuit, ByteChip.XorByte.circuit,

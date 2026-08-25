@@ -39,23 +39,30 @@ The proof-bearing coverage certificate is tied to the exact upstream 25-table in
 The main library has no `sorry`, `stop`, project `axiom`, `sorryAx`, `skipKernelTC`, or
 `native_decide`.
 
-A converse-shaped **native witness-assembly** theorem is proved too:
-`supported_core_native_complete` constructs a native ensemble witness satisfying
-`SupportedCoreNativeRelation` — all 53 tables plus the
-verifier row, every physical row computed by the circuits' own generators — from a supplied trace
-whose obligations are explicit: `WellFormed`; `ProviderMultiplicitiesFit` (`2 * m ≤ p`, making each
-aggregate provider count the canonical nonnegative centered representative); exact centered-integer
-per-key `BalancedOn` plus the separate interaction-count bound `< p`; public-value equality; and
-`SemanticBoundaryBinding`. This is not yet machine-level semantic completeness: no theorem turns an
-arbitrary supported Sail execution into that trace.
+A constructive **native ensemble completeness** theorem is proved too.
+`supported_core_native_functionalCompleteness` deterministically compiles a supported admissible
+`Machine.EventExecutionTrace` into the same `SupportedCoreNativeRelation` consumed by soundness—all
+53 tables plus the verifier row, with every physical row computed by the circuits' own generators.
+The compiler covers all 25 instruction families, inserts State/Memory refresh rows, constructs
+Memory boundaries, and recounts Byte/Range/Program providers from the emitted Clean interactions.
+Its map is proof-independent; `supported_core_native_complete` is the existential projection and
+`sp1Ensemble_statement_of_supported_execution` is the direct Clean statement.
 
-`SP1CleanTest/Audit/ActiveTraceNonVacuity.lean` nevertheless exercises the implemented assembly path
-with a hand-assembled semantic trace record for `JAL x0, 0`. Its instruction-event count and decoded
-physical instruction-row count are both one; the matching native provider occurrences close all four
-buses, completeness circuit-generates the AIR rows, and soundness yields the official-Sail local
-execution for any supplied `SP1MachineModel` satisfying `UsesOrdinarySchedule`. This is an active
-non-vacuity anchor, not a verified or full trace generator. See the
-verification report, §7.4.
+The source is explicitly `SupportedCoreNativeAdmissibleExecutionRelation`: the exact supported
+ordinary Sail relation, Core row budget, named compiler/semantic readiness facts, and the actual
+interaction footprint `< p`. Constraints and all four channel balances are conclusions. This is
+full completeness for the deterministic native compiler image, but not yet public-language equality
+with the broader exact ordinary relation. Such an equality needs one shared capacity-bounded
+semantic relation on both the soundness and completeness sides; the current exact soundness target
+does not record the Core row cap or the native footprint.
+
+`SP1CleanTest/Audit/NativeCompletenessNonVacuity.lean` jointly witnesses the entire admissible source
+with a boundary-only exact execution and invokes both completeness capstones, so the theorem is not
+vacuous. Separately, `ActiveTraceNonVacuity.lean` exercises the lower generated-trace assembly path
+with a hand-assembled `JAL x0, 0` semantic record: its instruction-event count and decoded physical
+instruction-row count are both one, and soundness reaches the official-Sail local execution for any
+supplied `SP1MachineModel` satisfying `UsesOrdinarySchedule`. That second test is the active-row
+regression, not an inhabitant of every admissibility premise. See the verification report, §7.4.
 
 ## What is not yet proved
 
@@ -68,7 +75,7 @@ The repository also contains a complete list-level model of the pinned upstream 
 - a preprocessed-commitment and exact natural interaction-balance relation.
 
 That exact upstream relation has not yet been connected all the way to Sail, though the two theorem
-families are no longer disconnected. `SP1Clean/Faithful/Transport/` turns each chip's whole-chip
+families are no longer disconnected. `SP1Clean/Composition/` turns each chip's whole-chip
 `ChipFaithful` anchor into a table-level transport — a valid extracted table becomes a native Clean
 table satisfying the whole native circuit's constraints — and proves the twenty-five transported
 tables *are* the ensemble's instruction tables. The separate generic `transportTable_spec` reaches a
@@ -102,8 +109,10 @@ requires coverage of every nonzero Byte/Program consumer key, consumer nonpositi
 count capacity. PCS/program identity, State and Memory balance, and semantic boundary binding remain
 separate explicit contracts. `freshRowsByKey` is only a declarative/small-regression
 canonicalization, not the construction path.
-`ExactBalance.lean` and the access-permutation theorems provide reusable
-exact-payload/native-key transport lemmas. `CoreArtifact.lean` exposes the remaining
+The access-permutation theorems provide the reusable Rust/native table transport. The former
+exact-payload-to-compatibility-key balance layer was retired because no live artifact consumed it:
+the full exact cluster contains consumers absent from the reduced native ensemble, whose provider
+multiplicities are deliberately recounted instead. `CoreArtifact.lean` exposes the remaining
 `ExactNativeGlobalContract` explicitly:
 all-channel interaction-count bounds, exact centered-integer balance for State and Memory, and
 semantic program/boundary binding combine with the explicit provider-recount contract to imply

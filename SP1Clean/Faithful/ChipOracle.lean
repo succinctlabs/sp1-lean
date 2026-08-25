@@ -3,7 +3,7 @@ import SP1Clean.Extracted.CPUState
 import SP1Clean.Extracted.ITypeReaderImmutable
 import SP1Clean.Extracted.RTypeReader
 import SP1Clean.Extracted.JTypeReader
-import SP1Clean.Faithful.ExtractedInteractionModel
+import SP1Clean.Extracted.InteractionModel
 import SP1Clean.Model.InteractionProjection
 import SP1Clean.Native.Readers.ALUTypeReader
 import SP1Clean.Native.Readers.ALUTypeReaderImmutable

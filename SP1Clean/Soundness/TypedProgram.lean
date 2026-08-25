@@ -258,10 +258,10 @@ theorem programEmissionShape_of_circuit (kind : ChipKind p)
       kind.provableInputs kind.provableCols)
     (spec_eq : @GeneralFormalCircuit.Spec (ZMod p) kind.Inputs kind.Cols inferInstance
       kind.provableInputs kind.provableCols circuit = kind.chipSpec)
-    (opcodes : List Opcode) (rdGuard : RdGuard)
+    (id : InstructionChipId)
     (shape : @CircuitProgramEmissionShape p _ kind.Inputs kind.Cols kind.provableInputs
       kind.provableCols circuit kind.view) :
-    ProgramEmissionShape ⟨kind, circuit, spec_eq, opcodes, rdGuard⟩ := by
+    ProgramEmissionShape ⟨id, kind, circuit, spec_eq⟩ := by
   exact shape
 
 /-- Lift a descriptor's Program contract to the typed interaction decoder. -/

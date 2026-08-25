@@ -1,4 +1,4 @@
-import SP1Clean.Model.Opcode
+import SP1Clean.Model.InstructionRouting
 import SP1Clean.Model.ProgramChip
 import SP1Clean.Model.Semantics.GuestProgram
 import SP1Clean.Model.SailDecode
@@ -107,6 +107,90 @@ def mulOpToOpcode (m : mul_op) : Opcode :=
   | .High, .Unsigned, .Unsigned => .MULHU
   | .High, .Signed, .Unsigned => .MULHSU
   | .High, .Unsigned, .Signed => .MULHSU
+
+/-- The proof-free dispatch information visible in a decoded Sail instruction: its SP1 opcode and
+whether the register occupying the Program row's `op_a` slot is `x0`. -/
+structure InstructionRouteKey where
+  opcode : Opcode
+  opAIsX0 : Bool
+deriving DecidableEq, Repr
+
+/-- Whether a Sail register index is `x0`, without passing through a field representation. -/
+def regidxIsX0 : regidx → Bool
+  | .Regidx index => decide (index = 0)
+
+/-- Project every Sail instruction supported by `instrToProgramRow` to its pure dispatch key.
+Unsupported instruction constructors return `none`; no field or projection proof is involved. -/
+def instructionRouteKey : instruction → Option InstructionRouteKey
+  | .RTYPE (_, _, rd, op) => some ⟨ropToOpcode op, regidxIsX0 rd⟩
+  | .ITYPE (_, _, rd, op) => some ⟨iopToOpcode op, regidxIsX0 rd⟩
+  | .UTYPE (_, rd, op) => some ⟨uopToOpcode op, regidxIsX0 rd⟩
+  | .JAL (_, rd) => some ⟨.JAL, regidxIsX0 rd⟩
+  | .JALR (_, _, rd) => some ⟨.JALR, regidxIsX0 rd⟩
+  | .BTYPE (_, _, rs1, op) => some ⟨bopToOpcode op, regidxIsX0 rs1⟩
+  | .LOAD (_, _, rd, isU, width) => some ⟨loadOpcode width isU, regidxIsX0 rd⟩
+  | .STORE (_, rs2, _, width) => some ⟨storeOpcode width, regidxIsX0 rs2⟩
+  | .SHIFTIOP (_, _, rd, op) => some ⟨sopToOpcode op, regidxIsX0 rd⟩
+  | .SHIFTIWOP (_, _, rd, op) => some ⟨sopwToOpcode op, regidxIsX0 rd⟩
+  | .ADDIW (_, _, rd) => some ⟨.ADDW, regidxIsX0 rd⟩
+  | .RTYPEW (_, _, rd, op) => some ⟨ropwToOpcode op, regidxIsX0 rd⟩
+  | .MUL (_, _, rd, op) => some ⟨mulOpToOpcode op, regidxIsX0 rd⟩
+  | .MULW (_, _, rd) => some ⟨.MULW, regidxIsX0 rd⟩
+  | .DIV (_, _, rd, isU) => some ⟨if isU then .DIVU else .DIV, regidxIsX0 rd⟩
+  | .DIVW (_, _, rd, isU) => some ⟨if isU then .DIVUW else .DIVW, regidxIsX0 rd⟩
+  | .REM (_, _, rd, isU) => some ⟨if isU then .REMU else .REM, regidxIsX0 rd⟩
+  | .REMW (_, _, rd, isU) => some ⟨if isU then .REMUW else .REMW, regidxIsX0 rd⟩
+  | _ => none
+
+/-- Select the native instruction-table identity for a supported Sail instruction through the
+canonical pure routing table. -/
+def instructionRouteId (i : instruction) : Option SP1Clean.InstructionChipId :=
+  (instructionRouteKey i).bind fun key => SP1Clean.routeId key.opcode key.opAIsX0
+
+/-- Every key produced by the Sail-instruction projection is in the non-system opcode fragment.
+This is the proof-free reason its canonical `routeId` lookup must succeed. -/
+theorem instructionRouteKey_opcode_covered {i : instruction} {key : InstructionRouteKey}
+    (keyEq : instructionRouteKey i = some key) :
+    key.opcode ≠ Opcode.ECALL ∧ key.opcode ≠ Opcode.EBREAK ∧ key.opcode ≠ Opcode.UNIMP := by
+  cases i <;> simp only [instructionRouteKey] at keyEq
+  all_goals first | contradiction | (rw [Option.some.injEq] at keyEq; subst key)
+  case UTYPE x =>
+    rcases x with ⟨imm, rd, op⟩
+    cases op <;> simp [uopToOpcode]
+  case BTYPE x =>
+    rcases x with ⟨imm, rs2, rs1, op⟩
+    cases op <;> simp [bopToOpcode]
+  case ITYPE x =>
+    rcases x with ⟨imm, rs1, rd, op⟩
+    cases op <;> simp [iopToOpcode]
+  case SHIFTIOP x =>
+    rcases x with ⟨shamt, rs1, rd, op⟩
+    cases op <;> simp [sopToOpcode]
+  case RTYPE x =>
+    rcases x with ⟨rs2, rs1, rd, op⟩
+    cases op <;> simp [ropToOpcode]
+  case LOAD x =>
+    rcases x with ⟨imm, rs1, rd, isU, width⟩
+    by_cases h1 : width = 1 <;> by_cases h2 : width = 2 <;> by_cases h4 : width = 4 <;>
+      cases isU <;> simp [loadOpcode, h1, h2, h4]
+  case STORE x =>
+    rcases x with ⟨imm, rs2, rs1, width⟩
+    by_cases h1 : width = 1 <;> by_cases h2 : width = 2 <;> by_cases h4 : width = 4 <;>
+      simp [storeOpcode, h1, h2, h4]
+  case RTYPEW x =>
+    rcases x with ⟨rs2, rs1, rd, op⟩
+    cases op <;> simp [ropwToOpcode]
+  case SHIFTIWOP x =>
+    rcases x with ⟨shamt, rs1, rd, op⟩
+    cases op <;> simp [sopwToOpcode]
+  case MUL x =>
+    rcases x with ⟨rs2, rs1, rd, op⟩
+    rcases op with ⟨part, signed1, signed2⟩
+    cases part <;> cases signed1 <;> cases signed2 <;> simp [mulOpToOpcode]
+  case DIV x | REM x | DIVW x | REMW x =>
+    rcases x with ⟨rs2, rs1, rd, isU⟩
+    cases isU <;> simp
+  all_goals simp
 
 /-- Project a decoded LeanRV64D `instruction` (at a given pc) to the committed Program-bus row.
 R-type: `RTYPE (rs2, rs1, rd, op)` (the LeanRV64D tuple order, matching
@@ -290,6 +374,60 @@ def instrToProgramRow (pc : Vector (ZMod p) 3) : instruction → Option (Program
              op_a_0 := if regidxVal (p := p) rd = 0 then 1 else 0,
              imm_c := 0 }
   | _ => none
+
+private theorem regidxVal_eq_zero_iff_regidxIsX0 (r : regidx) :
+    regidxVal (p := p) r = 0 ↔ regidxIsX0 r = true := by
+  obtain ⟨index⟩ := r
+  simp only [regidxVal, regidxIsX0, decide_eq_true_eq]
+  constructor
+  · intro castEq
+    apply BitVec.eq_of_toNat_eq
+    have hp : 2 ^ 17 < p := Fact.out
+    have indexLt : index.toNat < 32 := by simpa using index.isLt
+    have valEq := congrArg ZMod.val castEq
+    rw [ZMod.val_natCast_of_lt (by omega), ZMod.val_zero] at valEq
+    simpa using valEq
+  · rintro rfl
+    simp
+
+private theorem regidxRouteFlag_eq (r : regidx) :
+    (if regidxVal (p := p) r = 0 then (1 : ZMod p) else 0) =
+      if regidxIsX0 r then 1 else 0 := by
+  by_cases fieldZero : regidxVal (p := p) r = 0
+  · have pureZero := (regidxVal_eq_zero_iff_regidxIsX0 (p := p) r).mp fieldZero
+    simp [fieldZero, pureZero]
+  · cases pureZero : regidxIsX0 r with
+    | false => simp [fieldZero]
+    | true => exact (fieldZero ((regidxVal_eq_zero_iff_regidxIsX0 (p := p) r).mpr pureZero)).elim
+
+/-- A successful Program-row projection agrees with the proof-free routing projection: the key
+exists, its opcode and `op_a == x0` bit are exactly the committed columns, and its selected chip is
+obtained from the canonical `routeId` table. -/
+theorem instrToProgramRow_route_agreement {pc : Vector (ZMod p) 3} {i : instruction}
+    {row : ProgramRow (ZMod p)} (projection : instrToProgramRow pc i = some row) :
+    ∃ key,
+      instructionRouteKey i = some key ∧
+      row.opcode = (key.opcode.toNat : ZMod p) ∧
+      row.op_a_0 = (if key.opAIsX0 then 1 else 0) ∧
+      instructionRouteId i = SP1Clean.routeId key.opcode key.opAIsX0 := by
+  cases i <;> simp only [instrToProgramRow] at projection
+  all_goals first | contradiction | (rw [Option.some.injEq] at projection; subst row)
+  all_goals
+    refine ⟨_, rfl, rfl, ?_, rfl⟩
+    exact regidxRouteFlag_eq _
+
+/-- A successful Program-row projection retains both levels of canonical routing evidence: the
+proof-free instruction key and the selected identity in the 25-table registry. -/
+theorem instrToProgramRow_route_exists {pc : Vector (ZMod p) 3} {i : instruction}
+    {row : ProgramRow (ZMod p)} (projection : instrToProgramRow pc i = some row) :
+    ∃ key chipId,
+      instructionRouteKey i = some key ∧ instructionRouteId i = some chipId := by
+  obtain ⟨key, keyEq, -, -, -⟩ := instrToProgramRow_route_agreement projection
+  obtain ⟨chipId, routeEq⟩ :=
+    SP1Clean.routeId_exists (instructionRouteKey_opcode_covered keyEq)
+  refine ⟨key, chipId, keyEq, ?_⟩
+  simp only [instructionRouteId, keyEq, Option.bind_some]
+  exact routeEq
 
 omit [Fact (2 ^ 17 < p)] in
 /-- Every successfully decoded Program row carries the canonical `op_a_0` indicator.  This is the
@@ -551,6 +689,23 @@ theorem instrToProgramRow'_some {pc : Vector (ZMod p) 3} {i : instruction}
       | exact h
       | (split at h <;> first | exact h | exact absurd h (by simp))
 
+/-- The guarded decoder projection has the same pure routing agreement as its unguarded source. -/
+theorem instrToProgramRow'_route_agreement {pc : Vector (ZMod p) 3} {i : instruction}
+    {row : ProgramRow (ZMod p)} (projection : instrToProgramRow' pc i = some row) :
+    ∃ key,
+      instructionRouteKey i = some key ∧
+      row.opcode = (key.opcode.toNat : ZMod p) ∧
+      row.op_a_0 = (if key.opAIsX0 then 1 else 0) ∧
+      instructionRouteId i = SP1Clean.routeId key.opcode key.opAIsX0 :=
+  instrToProgramRow_route_agreement (instrToProgramRow'_some projection)
+
+/-- Guarded Program projections retain the same key and selected route identity. -/
+theorem instrToProgramRow'_route_exists {pc : Vector (ZMod p) 3} {i : instruction}
+    {row : ProgramRow (ZMod p)} (projection : instrToProgramRow' pc i = some row) :
+    ∃ key chipId,
+      instructionRouteKey i = some key ∧ instructionRouteId i = some chipId :=
+  instrToProgramRow_route_exists (instrToProgramRow'_some projection)
+
 omit [Fact (2 ^ 17 < p)] in
 /-- Guard extraction at the MUL arm: a primed projection of a `.MUL` forces canonicity. -/
 theorem instrToProgramRow'_mul_canonical {pc : Vector (ZMod p) 3} {rs2 rs1 rd : regidx}
@@ -584,9 +739,8 @@ theorem instrToProgramRow'_load_valid {pc : Vector (ZMod p) 3}
 
 /-- **The trusted program table = decode of the guest ROM.** The `inROM` membership predicate for a
 `GuestProgram`: a row is valid iff it is the decode of the instruction word the guest ROM holds at
-the row's pc. Instantiating `ProgramConsistency`'s `inROM` with this connects the encoded
-`GuestProgram.rom` to the decoded committed columns. (Discharged from bus balance via a
-`ProgramProvider (decodedInROM prog)` — tracked separately.)
+the row's pc. The typed Program grounding connects this predicate to the decoded committed columns
+using the provider table, program commitment, and balanced Clean interactions.
 
 **Shape (C1/Move-2):** the decoded instruction `I` is hoisted **out** of the state quantifier (∃I∀s,
 not ∀s∃i) over the **guarded** projection `instrToProgramRow'`. Fixing `I` across all configured

@@ -134,10 +134,10 @@ theorem stateEmissionShape_of_circuit (kind : ChipKind p)
       kind.provableInputs kind.provableCols)
     (spec_eq : @GeneralFormalCircuit.Spec (ZMod p) kind.Inputs kind.Cols inferInstance
       kind.provableInputs kind.provableCols circuit = kind.chipSpec)
-    (opcodes : List Opcode) (rdGuard : RdGuard)
+    (id : InstructionChipId)
     (shape : @CircuitStateEmissionShape p _ kind.Inputs kind.Cols kind.provableInputs
       kind.provableCols circuit kind.view) :
-    StateEmissionShape ⟨kind, circuit, spec_eq, opcodes, rdGuard⟩ := by
+    StateEmissionShape ⟨id, kind, circuit, spec_eq⟩ := by
   exact shape
 
 omit [Fact (2 ^ 24 < p)] in
@@ -183,10 +183,10 @@ theorem stateEmissionShape_of_circuitExposure (kind : ChipKind p)
       kind.provableInputs kind.provableCols)
     (spec_eq : @GeneralFormalCircuit.Spec (ZMod p) kind.Inputs kind.Cols inferInstance
       kind.provableInputs kind.provableCols circuit = kind.chipSpec)
-    (opcodes : List Opcode) (rdGuard : RdGuard)
+    (id : InstructionChipId)
     (contract : @CircuitStateExposureContract p _ kind.Inputs kind.Cols kind.provableInputs
       kind.provableCols circuit kind.view) :
-    StateEmissionShape ⟨kind, circuit, spec_eq, opcodes, rdGuard⟩ := by
+    StateEmissionShape ⟨id, kind, circuit, spec_eq⟩ := by
   apply stateEmissionShape_of_circuit
   exact @circuitStateEmissionShape_of_exposure p _ kind.Inputs kind.Cols
     kind.provableInputs kind.provableCols circuit kind.view contract
@@ -419,7 +419,7 @@ theorem DecodedInstructionRow.stateInteractions_signed_binary
 
 /- Add is the first concrete check of the shared State-emission contract. -/
 theorem addChip_stateEmissionShape : StateEmissionShape
-    (⟨AddChip.kind, AddChip.circuit, rfl, [.ADD], .nonX0⟩ : SupportedChip p) := by
+    (⟨.add, AddChip.kind, AddChip.circuit, rfl⟩ : SupportedChip p) := by
   stateExposureStandard (AddChip.circuit (p := p)), AddChip.rowView
   all_goals
     intros
@@ -427,7 +427,7 @@ theorem addChip_stateEmissionShape : StateEmissionShape
       cpuStatePullMessage, cpuStatePushMessage, AddChip.rowView, circuit_norm]
 
 theorem addiChip_stateEmissionShape : StateEmissionShape
-    (⟨AddiChip.kind, AddiChip.circuit, rfl, [.ADDI], .nonX0⟩ : SupportedChip p) := by
+    (⟨.addi, AddiChip.kind, AddiChip.circuit, rfl⟩ : SupportedChip p) := by
   stateExposureStandard (AddiChip.circuit (p := p)), AddiChip.rowView
   all_goals
     intros
@@ -435,7 +435,7 @@ theorem addiChip_stateEmissionShape : StateEmissionShape
       cpuStatePullMessage, cpuStatePushMessage, AddiChip.rowView, circuit_norm]
 
 theorem addwChip_stateEmissionShape : StateEmissionShape
-    (⟨AddwChip.kind, AddwChip.circuit, rfl, [.ADDW], .nonX0⟩ : SupportedChip p) := by
+    (⟨.addw, AddwChip.kind, AddwChip.circuit, rfl⟩ : SupportedChip p) := by
   stateExposureStandard (AddwChip.circuit (p := p)), AddwChip.rowView
   all_goals
     intros
@@ -443,7 +443,7 @@ theorem addwChip_stateEmissionShape : StateEmissionShape
       cpuStatePullMessage, cpuStatePushMessage, AddwChip.rowView, circuit_norm]
 
 theorem subChip_stateEmissionShape : StateEmissionShape
-    (⟨SubChip.kind, SubChip.circuit, rfl, [.SUB], .nonX0⟩ : SupportedChip p) := by
+    (⟨.sub, SubChip.kind, SubChip.circuit, rfl⟩ : SupportedChip p) := by
   stateExposureStandard (SubChip.circuit (p := p)), SubChip.rowView
   all_goals
     intros
@@ -451,7 +451,7 @@ theorem subChip_stateEmissionShape : StateEmissionShape
       cpuStatePullMessage, cpuStatePushMessage, SubChip.rowView, circuit_norm]
 
 theorem subwChip_stateEmissionShape : StateEmissionShape
-    (⟨SubwChip.kind, SubwChip.circuit, rfl, [.SUBW], .nonX0⟩ : SupportedChip p) := by
+    (⟨.subw, SubwChip.kind, SubwChip.circuit, rfl⟩ : SupportedChip p) := by
   stateExposureStandard (SubwChip.circuit (p := p)), SubwChip.rowView
   all_goals
     intros
@@ -459,7 +459,7 @@ theorem subwChip_stateEmissionShape : StateEmissionShape
       cpuStatePullMessage, cpuStatePushMessage, SubwChip.rowView, circuit_norm]
 
 theorem bitwiseChip_stateEmissionShape : StateEmissionShape
-    (⟨BitwiseChip.kind, BitwiseChip.circuit, rfl, [.XOR, .OR, .AND], .nonX0⟩ :
+    (⟨.bitwise, BitwiseChip.kind, BitwiseChip.circuit, rfl⟩ :
       SupportedChip p) := by
   stateExposureStandard (BitwiseChip.circuit (p := p)), BitwiseChip.rowView
   · intros
@@ -472,7 +472,7 @@ theorem bitwiseChip_stateEmissionShape : StateEmissionShape
       cpuStatePullMessage, cpuStatePushMessage, BitwiseChip.rowView, circuit_norm]
 
 theorem ltChip_stateEmissionShape : StateEmissionShape
-    (⟨LtChip.kind, LtChip.circuit, rfl, [.SLT, .SLTU], .nonX0⟩ : SupportedChip p) := by
+    (⟨.lt, LtChip.kind, LtChip.circuit, rfl⟩ : SupportedChip p) := by
   stateExposureStandard (LtChip.circuit (p := p)), LtChip.rowView
   · intros
     simp [LtChip.circuit, expose, LtChip.exposedStateInteractions,
@@ -483,7 +483,7 @@ theorem ltChip_stateEmissionShape : StateEmissionShape
       cpuStatePullMessage, cpuStatePushMessage, LtChip.rowView, circuit_norm]
 
 theorem shiftLeftChip_stateEmissionShape : StateEmissionShape
-    (⟨ShiftLeftChip.kind, ShiftLeftChip.circuit, rfl, [.SLL, .SLLW], .nonX0⟩ :
+    (⟨.shiftLeft, ShiftLeftChip.kind, ShiftLeftChip.circuit, rfl⟩ :
       SupportedChip p) := by
   stateExposureStandard (ShiftLeftChip.circuit (p := p)), ShiftLeftChip.rowView
   all_goals
@@ -494,7 +494,7 @@ theorem shiftLeftChip_stateEmissionShape : StateEmissionShape
       ShiftLeftChip.rowView, circuit_norm]
 
 theorem shiftRightChip_stateEmissionShape : StateEmissionShape
-    (⟨ShiftRightChip.kind, ShiftRightChip.circuit, rfl, [.SRL, .SRA, .SRLW, .SRAW], .nonX0⟩ :
+    (⟨.shiftRight, ShiftRightChip.kind, ShiftRightChip.circuit, rfl⟩ :
       SupportedChip p) := by
   stateExposureStandard (ShiftRightChip.circuit (p := p)), ShiftRightChip.rowView
   all_goals
@@ -505,7 +505,7 @@ theorem shiftRightChip_stateEmissionShape : StateEmissionShape
       ShiftRightChip.rowView, circuit_norm]
 
 theorem jalChip_stateEmissionShape : StateEmissionShape
-    (⟨JalChip.kind, JalChip.circuit, rfl, [.JAL], .any⟩ : SupportedChip p) := by
+    (⟨.jal, JalChip.kind, JalChip.circuit, rfl⟩ : SupportedChip p) := by
   stateExposureStart (JalChip.circuit (p := p)), JalChip.rowView
   refine ⟨fun input _ => input.is_real, fun input _ => cpuStatePullMessage input.state,
     fun input offset => cpuStateNextMessage input.state
@@ -520,7 +520,7 @@ theorem jalChip_stateEmissionShape : StateEmissionShape
       JalChip.rowView, circuit_norm]
 
 theorem jalrChip_stateEmissionShape : StateEmissionShape
-    (⟨JalrChip.kind, JalrChip.circuit, rfl, [.JALR], .any⟩ : SupportedChip p) := by
+    (⟨.jalr, JalrChip.kind, JalrChip.circuit, rfl⟩ : SupportedChip p) := by
   stateExposureStart (JalrChip.circuit (p := p)), JalrChip.rowView
   refine ⟨fun input _ => input.is_real, fun input _ => cpuStatePullMessage input.state,
     fun input offset => cpuStateNextMessage input.state
@@ -536,8 +536,7 @@ theorem jalrChip_stateEmissionShape : StateEmissionShape
       JalrChip.rowView, circuit_norm]
 
 theorem branchChip_stateEmissionShape : StateEmissionShape
-    (⟨BranchChip.kind, BranchChip.circuit, rfl,
-      [.BEQ, .BNE, .BLT, .BGE, .BLTU, .BGEU], .any⟩ : SupportedChip p) := by
+    (⟨.branch, BranchChip.kind, BranchChip.circuit, rfl⟩ : SupportedChip p) := by
   stateExposureStart (BranchChip.circuit (p := p)), BranchChip.rowView
   refine ⟨fun input _ => input.is_real, fun input _ => cpuStatePullMessage input.state,
     fun input offset => cpuStateNextMessage input.state
@@ -553,7 +552,7 @@ theorem branchChip_stateEmissionShape : StateEmissionShape
       circuit_norm]
 
 theorem uTypeChip_stateEmissionShape : StateEmissionShape
-    (⟨UTypeChip.kind, UTypeChip.circuit, rfl, [.AUIPC, .LUI], .any⟩ : SupportedChip p) := by
+    (⟨.uType, UTypeChip.kind, UTypeChip.circuit, rfl⟩ : SupportedChip p) := by
   stateExposureStandard (UTypeChip.circuit (p := p)), UTypeChip.rowView
   · intros
     simp [UTypeChip.circuit, expose, UTypeChip.exposedStateInteractions,
@@ -564,7 +563,7 @@ theorem uTypeChip_stateEmissionShape : StateEmissionShape
       cpuStatePullMessage, cpuStatePushMessage, UTypeChip.rowView, circuit_norm]
 
 theorem loadDoubleChip_stateEmissionShape : StateEmissionShape
-    (⟨LoadDoubleChip.kind, LoadDoubleChip.circuit, rfl, [.LD], .nonX0⟩ : SupportedChip p) := by
+    (⟨.loadDouble, LoadDoubleChip.kind, LoadDoubleChip.circuit, rfl⟩ : SupportedChip p) := by
   stateExposureStandard (LoadDoubleChip.circuit (p := p)), LoadDoubleChip.rowView
   all_goals
     intros
@@ -572,7 +571,7 @@ theorem loadDoubleChip_stateEmissionShape : StateEmissionShape
       cpuStatePullMessage, cpuStatePushMessage, LoadDoubleChip.rowView, circuit_norm]
 
 theorem loadByteChip_stateEmissionShape : StateEmissionShape
-    (⟨LoadByteChip.kind, LoadByteChip.circuit, rfl, [.LB, .LBU], .nonX0⟩ :
+    (⟨.loadByte, LoadByteChip.kind, LoadByteChip.circuit, rfl⟩ :
       SupportedChip p) := by
   stateExposureStart (LoadByteChip.circuit (p := p)), LoadByteChip.rowView
   refine ⟨fun input _ => input.is_lb + input.is_lbu,
@@ -585,7 +584,7 @@ theorem loadByteChip_stateEmissionShape : StateEmissionShape
       circuit_norm]
 
 theorem loadHalfChip_stateEmissionShape : StateEmissionShape
-    (⟨LoadHalfChip.kind, LoadHalfChip.circuit, rfl, [.LH, .LHU], .nonX0⟩ :
+    (⟨.loadHalf, LoadHalfChip.kind, LoadHalfChip.circuit, rfl⟩ :
       SupportedChip p) := by
   stateExposureStart (LoadHalfChip.circuit (p := p)), LoadHalfChip.rowView
   refine ⟨fun input _ => input.is_lh + input.is_lhu,
@@ -598,7 +597,7 @@ theorem loadHalfChip_stateEmissionShape : StateEmissionShape
       circuit_norm]
 
 theorem loadWordChip_stateEmissionShape : StateEmissionShape
-    (⟨LoadWordChip.kind, LoadWordChip.circuit, rfl, [.LW, .LWU], .nonX0⟩ :
+    (⟨.loadWord, LoadWordChip.kind, LoadWordChip.circuit, rfl⟩ :
       SupportedChip p) := by
   stateExposureStart (LoadWordChip.circuit (p := p)), LoadWordChip.rowView
   refine ⟨fun input _ => input.is_lw + input.is_lwu,
@@ -611,8 +610,7 @@ theorem loadWordChip_stateEmissionShape : StateEmissionShape
       circuit_norm]
 
 theorem loadX0Chip_stateEmissionShape : StateEmissionShape
-    (⟨LoadX0Chip.kind, LoadX0Chip.circuit, rfl,
-      [.LB, .LBU, .LH, .LHU, .LW, .LWU, .LD], .onlyX0⟩ : SupportedChip p) := by
+    (⟨.loadX0, LoadX0Chip.kind, LoadX0Chip.circuit, rfl⟩ : SupportedChip p) := by
   stateExposureStart (LoadX0Chip.circuit (p := p)), LoadX0Chip.rowView
   refine ⟨fun input _ => input.is_lb + input.is_lbu + input.is_lh + input.is_lhu
       + input.is_lw + input.is_lwu + input.is_ld,
@@ -626,7 +624,7 @@ theorem loadX0Chip_stateEmissionShape : StateEmissionShape
       circuit_norm]
 
 theorem storeByteChip_stateEmissionShape : StateEmissionShape
-    (⟨StoreByteChip.kind, StoreByteChip.circuit, rfl, [.SB], .any⟩ : SupportedChip p) := by
+    (⟨.storeByte, StoreByteChip.kind, StoreByteChip.circuit, rfl⟩ : SupportedChip p) := by
   stateExposureStandard (StoreByteChip.circuit (p := p)), StoreByteChip.rowView
   all_goals
     intros
@@ -635,7 +633,7 @@ theorem storeByteChip_stateEmissionShape : StateEmissionShape
       cpuStatePullMessage, cpuStatePushMessage, StoreByteChip.rowView, circuit_norm]
 
 theorem storeHalfChip_stateEmissionShape : StateEmissionShape
-    (⟨StoreHalfChip.kind, StoreHalfChip.circuit, rfl, [.SH], .any⟩ : SupportedChip p) := by
+    (⟨.storeHalf, StoreHalfChip.kind, StoreHalfChip.circuit, rfl⟩ : SupportedChip p) := by
   stateExposureStandard (StoreHalfChip.circuit (p := p)), StoreHalfChip.rowView
   all_goals
     intros
@@ -643,7 +641,7 @@ theorem storeHalfChip_stateEmissionShape : StateEmissionShape
       cpuStatePullMessage, cpuStatePushMessage, StoreHalfChip.rowView, circuit_norm]
 
 theorem storeWordChip_stateEmissionShape : StateEmissionShape
-    (⟨StoreWordChip.kind, StoreWordChip.circuit, rfl, [.SW], .any⟩ : SupportedChip p) := by
+    (⟨.storeWord, StoreWordChip.kind, StoreWordChip.circuit, rfl⟩ : SupportedChip p) := by
   stateExposureStandard (StoreWordChip.circuit (p := p)), StoreWordChip.rowView
   all_goals
     intros
@@ -651,7 +649,7 @@ theorem storeWordChip_stateEmissionShape : StateEmissionShape
       cpuStatePullMessage, cpuStatePushMessage, StoreWordChip.rowView, circuit_norm]
 
 theorem storeDoubleChip_stateEmissionShape : StateEmissionShape
-    (⟨StoreDoubleChip.kind, StoreDoubleChip.circuit, rfl, [.SD], .any⟩ : SupportedChip p) := by
+    (⟨.storeDouble, StoreDoubleChip.kind, StoreDoubleChip.circuit, rfl⟩ : SupportedChip p) := by
   stateExposureStandard (StoreDoubleChip.circuit (p := p)), StoreDoubleChip.rowView
   all_goals
     intros
@@ -659,7 +657,7 @@ theorem storeDoubleChip_stateEmissionShape : StateEmissionShape
       cpuStatePullMessage, cpuStatePushMessage, StoreDoubleChip.rowView, circuit_norm]
 
 theorem mulChip_stateEmissionShape : StateEmissionShape
-    (⟨MulChip.kind, MulChip.circuit, rfl, [.MUL, .MULH, .MULHU, .MULHSU, .MULW], .nonX0⟩ :
+    (⟨.mul, MulChip.kind, MulChip.circuit, rfl⟩ :
       SupportedChip p) := by
   stateExposureStandard (MulChip.circuit (p := p)), MulChip.rowView
   all_goals
@@ -670,8 +668,7 @@ theorem mulChip_stateEmissionShape : StateEmissionShape
       cpuStatePullMessage, cpuStatePushMessage, MulChip.rowView, circuit_norm]
 
 theorem divRemChip_stateEmissionShape : StateEmissionShape
-    (⟨DivRemChip.kind, DivRemChip.circuit, rfl,
-      [.DIV, .DIVU, .REM, .REMU, .DIVW, .DIVUW, .REMW, .REMUW], .nonX0⟩ :
+    (⟨.divRem, DivRemChip.kind, DivRemChip.circuit, rfl⟩ :
       SupportedChip p) := by
   stateExposureStandard (DivRemChip.circuit (p := p)), DivRemChip.rowView
   all_goals
@@ -683,11 +680,7 @@ theorem divRemChip_stateEmissionShape : StateEmissionShape
       DivRemChip.rowView, circuit_norm]
 
 theorem aluX0Chip_stateEmissionShape : StateEmissionShape
-    (⟨AluX0Chip.kind, AluX0Chip.circuit, rfl,
-      [.ADD, .ADDI, .ADDW, .SUB, .SUBW, .XOR, .OR, .AND, .SLT, .SLTU,
-       .SLL, .SLLW, .SRL, .SRA, .SRLW, .SRAW,
-       .MUL, .MULH, .MULHU, .MULHSU, .MULW,
-       .DIV, .DIVU, .REM, .REMU, .DIVW, .DIVUW, .REMW, .REMUW], .onlyX0⟩ :
+    (⟨.aluX0, AluX0Chip.kind, AluX0Chip.circuit, rfl⟩ :
       SupportedChip p) := by
   stateExposureStandard (AluX0Chip.circuit (p := p)), AluX0Chip.rowView
   all_goals

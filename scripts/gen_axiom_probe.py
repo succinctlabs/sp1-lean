@@ -3,9 +3,10 @@
 
 Scans the SP1Clean tree for the released theorem set (chip soundness/completeness, Sail
 bridges + `kind` registrations, faithfulness anchors, witness-conformance anchors, the
-timed-grounding capstone layer, and the coverage guards), resolving each declaration's fully
-qualified name by tracking `namespace`/`end` blocks. The probe is self-checking: a wrong
-FQN fails to elaborate, so a green probe run certifies the census covers real declarations.
+timed-grounding capstone layer, deterministic completeness agreement/non-vacuity headlines, and
+the coverage guards), resolving each declaration's fully qualified name by tracking
+`namespace`/`end` blocks. The probe is self-checking: a wrong FQN fails to elaborate, so a green
+probe run certifies the census covers real declarations.
 
 Two probe files are emitted, one per library, so each elaborates against exactly the
 oleans its build target produces (the CI `audit` job builds only `SP1Clean`; the `test`
@@ -27,71 +28,105 @@ ROOT = Path(__file__).resolve().parent.parent
 OUT_MAIN = ROOT / "scripts" / "axiom_probe.lean"
 OUT_TEST = ROOT / "scripts" / "axiom_probe_test.lean"
 
-# Exact-transport headlines are deliberately one target per declaration.  Do not fold these into
+# Release/audit headlines are deliberately one target per declaration.  Do not fold these into
 # an alternation: target validation is per tuple, so a grouped regex would let one surviving theorem
 # hide a renamed or deleted sibling.  This list is the fail-closed inventory for the source-backed
-# preprocessing boundary, exact integer-balance transport, and the native-artifact capstones.
+# preprocessing boundary, exact integer-balance transport, the native artifact, and deterministic
+# semantic-execution completeness.
+# Entries may name theorem or definition headlines; in particular functional-completeness maps are
+# deliberately proof-independent definitions whose proof fields are retained by the structure.
 EXACT_REQUIRED_THEOREMS = [
-    # Exact relation -> collision-free projected ledger.
-    ("SP1Clean/Faithful/Transport/ExactBalance.lean", "exactPayloadKey_injective"),
-    ("SP1Clean/Faithful/Transport/ExactBalance.lean", "projectedInteractions_balanced"),
-    ("SP1Clean/Faithful/Transport/ExactBalance.lean", "projectedActiveInteractions_balanced"),
-    ("SP1Clean/Faithful/Transport/ExactBalance.lean", "exactRelation_projectedInteractions_balanced"),
-    ("SP1Clean/Faithful/Transport/ExactBalance.lean",
-     "exactRelation_projectedActiveInteractions_balanced"),
     # Source-backed canonical preprocessing inventory and its literal Clean ledger.
-    ("SP1Clean/Faithful/Transport/PreprocessedProviders.lean",
+    ("SP1Clean/Composition/PreprocessedProviders.lean",
      "inventoryPreprocessedKeys_eq_inventoryRows"),
-    ("SP1Clean/Faithful/Transport/PreprocessedProviders.lean",
+    ("SP1Clean/Composition/PreprocessedProviders.lean",
      "inventoryPreprocessedKeys_nodup"),
-    ("SP1Clean/Faithful/Transport/PreprocessedProviders.lean", "canonicalByteRows_mem_source"),
-    ("SP1Clean/Faithful/Transport/PreprocessedProviders.lean", "canonicalRangeRows_mem_source"),
-    ("SP1Clean/Faithful/Transport/PreprocessedProviders.lean", "canonicalProgramRows_mem_source"),
-    ("SP1Clean/Faithful/Transport/PreprocessedProviders.lean",
+    ("SP1Clean/Composition/PreprocessedProviders.lean", "canonicalByteRows_mem_source"),
+    ("SP1Clean/Composition/PreprocessedProviders.lean", "canonicalRangeRows_mem_source"),
+    ("SP1Clean/Composition/PreprocessedProviders.lean", "canonicalProgramRows_mem_source"),
+    ("SP1Clean/Composition/PreprocessedProviders.lean",
      "extractedPreprocessedProviderTables_constraints"),
-    ("SP1Clean/Faithful/Transport/PreprocessedProviders.lean",
+    ("SP1Clean/Composition/PreprocessedProviders.lean",
      "extractedPreprocessedProviderTables_cleanAccesses"),
-    ("SP1Clean/Faithful/Transport/PreprocessedProviders.lean",
+    ("SP1Clean/Composition/PreprocessedProviders.lean",
      "skeleton_append_recountedPreprocessedProviderAccesses_balanced"),
     # Boundary/system providers and the exact provider segment.
-    ("SP1Clean/Faithful/Transport/MemoryBoundary.lean", "memoryGlobalInitMultiplicity_bool"),
-    ("SP1Clean/Faithful/Transport/MemoryBoundary.lean", "memoryGlobalFinalizeMultiplicity_bool"),
-    ("SP1Clean/Faithful/Transport/MemoryBoundary.lean",
+    ("SP1Clean/Composition/MemoryBoundary.lean", "memoryGlobalInitMultiplicity_bool"),
+    ("SP1Clean/Composition/MemoryBoundary.lean", "memoryGlobalFinalizeMultiplicity_bool"),
+    ("SP1Clean/Composition/MemoryBoundary.lean",
      "memoryBoundaryProviderContract_of_relation"),
-    ("SP1Clean/Faithful/Transport/MemoryBoundary.lean",
+    ("SP1Clean/Composition/MemoryBoundary.lean",
      "extractedMemoryBoundaryTables_constraints"),
-    ("SP1Clean/Faithful/Transport/MemoryBoundary.lean",
+    ("SP1Clean/Composition/MemoryBoundary.lean",
      "extractedMemoryBoundaryTables_activeAccesses"),
-    ("SP1Clean/Faithful/Transport/SystemTables.lean", "extractedBumpTables_constraints"),
-    ("SP1Clean/Faithful/Transport/SystemTables.lean", "extractedBumpTables_accesses"),
-    ("SP1Clean/Faithful/Transport/ProviderSegment.lean", "exactProviderTables_components"),
-    ("SP1Clean/Faithful/Transport/ProviderSegment.lean", "exactProviderTables_constraints"),
-    ("SP1Clean/Faithful/Transport/ProviderSegment.lean", "exactProviderTableBundle_constraints"),
-    ("SP1Clean/Faithful/Transport/ProviderSegment.lean", "exactProviderTables_cleanAccesses"),
+    ("SP1Clean/Composition/SystemTables.lean", "extractedBumpTables_constraints"),
+    ("SP1Clean/Composition/SystemTables.lean", "extractedBumpTables_accesses"),
+    ("SP1Clean/Composition/ProviderSegment.lean", "exactProviderTables_components"),
+    ("SP1Clean/Composition/ProviderSegment.lean", "exactProviderTables_constraints"),
+    ("SP1Clean/Composition/ProviderSegment.lean", "exactProviderTableBundle_constraints"),
+    ("SP1Clean/Composition/ProviderSegment.lean", "exactProviderTables_cleanAccesses"),
     # Complete native table assembly, literal-ledger recount, and public semantic capstones.
-    ("SP1Clean/Faithful/Transport/CoreEnsemble.lean", "exactNativeBoundary_init_u8Pair"),
-    ("SP1Clean/Faithful/Transport/CoreEnsemble.lean", "exactNativeBoundary_final_u8Pair"),
-    ("SP1Clean/Faithful/Transport/CoreEnsemble.lean", "exactNativeBoundary_limbBounds"),
-    ("SP1Clean/Faithful/Transport/CoreEnsemble.lean", "exactNativeTables_components"),
-    ("SP1Clean/Faithful/Transport/CoreEnsemble.lean", "exactNativeTableBundle_components"),
-    ("SP1Clean/Faithful/Transport/CoreEnsemble.lean", "exactNativeTables_constraints"),
-    ("SP1Clean/Faithful/Transport/CoreEnsemble.lean", "exactNativeEnsembleWitness_verifierTable"),
-    ("SP1Clean/Faithful/Transport/CoreEnsemble.lean", "exactNativeEnsembleWitness_constraints"),
-    ("SP1Clean/Faithful/Transport/CoreEnsemble.lean",
+    ("SP1Clean/Composition/CoreEnsemble.lean", "exactNativeBoundary_init_u8Pair"),
+    ("SP1Clean/Composition/CoreEnsemble.lean", "exactNativeBoundary_final_u8Pair"),
+    ("SP1Clean/Composition/CoreEnsemble.lean", "exactNativeBoundary_limbBounds"),
+    ("SP1Clean/Composition/CoreEnsemble.lean", "exactNativeTables_components"),
+    ("SP1Clean/Composition/CoreEnsemble.lean", "exactNativeTableBundle_components"),
+    ("SP1Clean/Composition/CoreEnsemble.lean", "exactNativeTables_constraints"),
+    ("SP1Clean/Composition/CoreEnsemble.lean", "exactNativeEnsembleWitness_verifierTable"),
+    ("SP1Clean/Composition/CoreEnsemble.lean", "exactNativeEnsembleWitness_constraints"),
+    ("SP1Clean/Composition/CoreEnsemble.lean",
      "exactNativeAllCleanAccesses_eq_interactions"),
-    ("SP1Clean/Faithful/Transport/CoreEnsemble.lean", "exactNativeAllCleanAccesses_perm"),
-    ("SP1Clean/Faithful/Transport/CoreEnsemble.lean",
+    ("SP1Clean/Composition/CoreEnsemble.lean", "exactNativeAllCleanAccesses_perm"),
+    ("SP1Clean/Composition/CoreEnsemble.lean",
      "exactNativeAllCleanAccesses_preprocessedBalance"),
-    ("SP1Clean/Faithful/Transport/CoreArtifact.lean",
+    ("SP1Clean/Composition/CoreArtifact.lean",
      "exactNativeEnsembleWitness_preprocessedIntegerBalance"),
-    ("SP1Clean/Faithful/Transport/CoreArtifact.lean", "exactNativeEnsembleWitness_balancedChannels"),
-    ("SP1Clean/Faithful/Transport/CoreArtifact.lean",
+    ("SP1Clean/Composition/CoreArtifact.lean", "exactNativeEnsembleWitness_balancedChannels"),
+    ("SP1Clean/Composition/CoreArtifact.lean",
      "exactNativeArtifact_supportedCoreNativeRelation"),
-    ("SP1Clean/Faithful/Transport/CoreArtifact.lean", "exactNativeArtifact_localExecution"),
+    ("SP1Clean/Composition/CoreArtifact.lean", "exactNativeArtifact_localExecution"),
+    # The representation and semantic agreement seams used by the deterministic native compiler.
+    # Keep these exact (rather than one alternation per file): deleting one side of an agreement
+    # layer must fail generation even when a sibling theorem survives.
+    ("SP1Clean/Proofs/Completeness/NativeStateAgreement.lean",
+     "nativeTrace_stateAgreement"),
+    ("SP1Clean/Proofs/Completeness/NativeStateAgreement.lean",
+     "NativeTraceReady.stateLedgerPerm"),
+    ("SP1Clean/Proofs/Completeness/NativeMemoryAgreement.lean",
+     "nativeTrace_memoryLedgerPermHandoffChains"),
+    ("SP1Clean/Proofs/Completeness/NativeMemoryAgreement.lean",
+     "NativeTraceReady.memoryLedgerPerm"),
+    ("SP1Clean/Proofs/Completeness/NativeMemoryAgreement.lean",
+     "nativeTrace_memoryInitProviderUnique"),
+    ("SP1Clean/Proofs/Completeness/NativeMemoryAgreement.lean",
+     "nativeTrace_memoryFinalizeProviderUnique"),
+    ("SP1Clean/Proofs/Completeness/NativeMemoryAgreement.lean",
+     "nativeTrace_memoryInitProviderBound"),
+    ("SP1Clean/Proofs/Completeness/NativeProgramAgreement.lean",
+     "nativeProgramKey_decodedInROM"),
+    ("SP1Clean/Proofs/Completeness/NativeProgramAgreement.lean",
+     "nativeTrace_programProviderBound"),
+    ("SP1Clean/Proofs/Completeness/NativeBoundaryAgreement.lean",
+     "NativeTraceReady.semanticBoundary"),
+    # Deterministic ordinary-execution -> native ensemble completeness.
+    ("SP1Clean/Soundness/NativeCompleteness.lean",
+     "supported_core_native_functionalCompleteness"),
+    ("SP1Clean/Soundness/NativeCompleteness.lean", "supported_core_native_complete"),
+    ("SP1Clean/Soundness/NativeCompleteness.lean",
+     "sp1Ensemble_statement_of_supported_execution"),
+    # Executable joint-premise regression for the exact admissible source and both capstones.
+    ("SP1CleanTest/Audit/NativeCompletenessNonVacuity.lean",
+     "anchorExecution_nativeTraceReady"),
+    ("SP1CleanTest/Audit/NativeCompletenessNonVacuity.lean",
+     "anchorExecution_admissible"),
+    ("SP1CleanTest/Audit/NativeCompletenessNonVacuity.lean",
+     "anchorExecution_yields_airWitness"),
+    ("SP1CleanTest/Audit/NativeCompletenessNonVacuity.lean",
+     "anchorExecution_yields_ensembleStatement"),
 ]
 
 EXACT_REQUIRED_TARGETS = [
-    (path, rf"theorem\s+({re.escape(name)})\b")
+    (path, rf"(?:theorem|def)\s+({re.escape(name)})\b")
     for path, name in EXACT_REQUIRED_THEOREMS
 ]
 
@@ -130,18 +165,21 @@ TARGETS = [
     # families for each of its twenty-five instantiations, plus the aggregate identity that makes
     # the transported tables the ensemble's own.
     # These are the declarations that put `Faithful/` inside a live import closure.
-    ("SP1Clean/Faithful/Transport/Table.lean",
-     r"theorem\s+(buildRow_input_get|eval_var_buildRow_input_get|signedVal_eq_zero_iff|"
-     r"transportTable_constraints|"
+    # buildRow_input_get / eval_var_buildRow_input_get moved down to Model/CleanLedger.lean in
+    # 2026-08 (pure Clean Component/ProvableType vocabulary; the completeness layer needs them too).
+    ("SP1Clean/Model/CleanLedger.lean",
+     r"theorem\s+(buildRow_input_get|eval_var_buildRow_input_get)\b"),
+    ("SP1Clean/Composition/Table.lean",
+     r"theorem\s+(signedVal_eq_zero_iff|transportTable_constraints|"
      r"transportTable_accesses_perm|transportTable_spec)\b"),
-    ("SP1Clean/Faithful/Transport/Chips.lean",
+    ("SP1Clean/Composition/Chips.lean",
      r"theorem\s+(\w+Chip_transportTable_(?:constraints|accesses|spec))\b"),
-    ("SP1Clean/Faithful/Transport/Ensemble.lean",
+    ("SP1Clean/Composition/Ensemble.lean",
      r"theorem\s+(transported_map_component|transportedInstructionActiveAccesses_perm|"
      r"transported_constraints)\b"),
-    ("SP1Clean/Faithful/Transport/Extracted.lean",
+    ("SP1Clean/Composition/Extracted.lean",
      r"theorem\s+(extractedInstructionRows_valid|extracted_instructionTables_constraints)\b"),
-    ("SP1Clean/Faithful/Transport/Balance.lean",
+    ("SP1Clean/Composition/Balance.lean",
      r"theorem\s+(signedSum_eq_sent_sub_received|signedSum_eq_zero)\b"),
     *EXACT_REQUIRED_TARGETS,
     ("SP1Clean/Soundness/CoreAIRSyscallFree.lean",
@@ -170,7 +208,9 @@ TARGETS = [
      r"verifierBytePulls_asymmetricClockOrder|"
      r"active_instruction_count|active_decoded_instruction_row_count|"
      r"active_real_decoded_instruction_row_count|"
-     r"activeTrace_yields_airWitness|activeTrace_yields_localExecution)\b"),
+     r"activeTrace_yields_airWitness|activeTrace_yields_localExecution|"
+     r"activeTrace_suppliesDemand|activeTrace_stateHandoff|activeTrace_memoryHandoff|"
+     r"activePaddedTrace_stateHandoff|activePaddedTrace_stateHandoff_raw_false)\b"),
     # The W4 completeness layer's provider/ledger half: the built provider and verifier tables'
     # constraint theorems, and the generic push/pull balance bridge the W5 assembly consumes.
     ("SP1Clean/Proofs/Completeness/Providers.lean",
@@ -180,6 +220,84 @@ TARGETS = [
     ("SP1Clean/Proofs/Completeness/Ledger.lean",
      r"theorem\s+(balancedInteractions_of_signed_perm|balancedInteractions_of_flatMap_perm|"
      r"balanceOf_eq_pushed_sub_pulled)\b"),
+    # The provider closure. The ledger-level balance theorem and the key-selection lemmas that make
+    # its two side conditions structural rather than caller-supplied; plus the trace-level
+    # instantiation and the two conservativeness results that pin the closure out of State/Memory.
+    # The ledger-level half of the provider closure moved to Model/InteractionBus.lean in 2026-08
+    # (its namespace already said so); the trace-level half stayed in Closure.lean.
+    # Tier 1 of the provider closure: what one built provider row emits, in Clean orientation.
+    ("SP1Clean/Proofs/Completeness/ProviderInteractions.lean",
+     r"theorem\s+(interactions_eq_interactionsWith_of_onlyChannel|"
+     r"u8Range_interactionsWith_byte|u8Range_buildRow_cleanAccesses|"
+     r"msb_buildRow_result|msb_buildRow_cleanAccesses|"
+     r"and_buildRow_result_val|and_buildRow_cleanAccesses|"
+     r"or_buildRow_cleanAccesses|xor_buildRow_cleanAccesses|"
+     r"ltu_buildRow_cleanAccesses|range_buildRow_cleanAccesses|"
+     r"program_buildRow_cleanAccesses)\b"),
+    # Tier 2: a whole provider table's ledger is exactly its occurrence list.
+    # Tier 3: the provider lists a shard's demand determines, and the balance that follows.
+    ("SP1Clean/Proofs/Completeness/ClosureRealization.lean",
+     r"theorem\s+(family_ledger_eq|family_multiplicitySum|program_round|"
+     r"closureRange_contribution|providerLedger_multiplicitySum|"
+     r"fullLedger_multiplicitySum|byteProgram_balanced|"
+     r"fullLedger_multiplicitySum_channel|channelLedger_isConsistentBalanced|"
+     r"channelLedger_isConsistentBalanced_of_handoff)\b"),
+    # The ensemble's own channel discipline, which the orientation bridge rests on.
+    ("SP1Clean/Soundness/EnsembleChannels.lean",
+     r"theorem\s+(sp1Tables_channels_subset|sp1ProviderTables_channels_subset|"
+     r"sp1Ensemble_allTables_channels_subset|channel_eq_of_name_eq)\b"),
+    # Phase 3: the clock bridge, the generator's shadow bookkeeping, and the ALU fold.
+    ("SP1Clean/FormalModel/TraceGen/ClockBridge.lean",
+     r"theorem\s+(ordinarySchedule_duration_eq|accessOffsets_ordered|"
+     r"clockAt_ordinary_eq|clockAt_ordinary_mod)\b"),
+    ("SP1Clean/FormalModel/TraceGen/GenState.lean",
+     r"theorem\s+(initial_bounded|prevTs_lt|stepRType_bounded)\b"),
+    ("SP1Clean/FormalModel/TraceGen/AluGenerator.lean",
+     r"theorem\s+(aluEvents_wellFormed|witnessStep_wellFormed|"
+     r"witnessEvents_wellFormed)\b"),
+    ("SP1Clean/FormalModel/TraceGen/SailAlu.lean",
+     r"theorem\s+(aluStepOfState_wellFormed|aluStepOfState_isSome|"
+     r"aluStepsFrom_wellFormed|aluStepsFrom_length_le)\b"),
+    ("SP1Clean/Proofs/Completeness/AluGeneration.lean",
+     r"theorem\s+(aluEvents_addTable_constraints|aluEvents_addTable_guarantees|"
+     r"aluEvents_subTable_constraints|sailRun_addTable_constraints|"
+     r"sailRun_subTable_constraints|sailRun_rows_le)\b"),
+    # Phase 2: the two system tables' rows are built from crossings, not supplied.
+    ("SP1Clean/FormalModel/TraceGen/Bump.lean",
+     r"theorem\s+(stateBump_spec|memoryBump_spec|stateBumpTraceInputs_spec|"
+     r"memoryBumpTraceInputs_spec|stateBumpEvent_wellFormed_witness|"
+     r"memoryBumpEvent_wellFormed_witness)\b"),
+    ("SP1Clean/Proofs/Completeness/ProviderTables.lean",
+     r"theorem\s+(u8Range_traceTable_cleanAccesses|msb_traceTable_cleanAccesses|"
+     r"and_traceTable_cleanAccesses|or_traceTable_cleanAccesses|"
+     r"xor_traceTable_cleanAccesses|ltu_traceTable_cleanAccesses|"
+     r"range_traceTable_cleanAccesses|program_traceTable_cleanAccesses)\b"),
+    # A1: a built instruction table's State ledger — registry-wide, no case split.
+    ("SP1Clean/Proofs/Completeness/ChipLedger.lean",
+     r"theorem\s+(supportedChip_table_mem_allTables|tableStateLedger_eq_nil|"
+     r"tableStateLedger_eq_of_component|stateLedger_eq_flatMap|"
+     r"busLedger_eq_channelLedger|stateLedger_eq_channelLedger|"
+     r"memoryLedger_eq_channelLedger|active_stateLedger_eq|"
+     r"stateLedger_perm_handoff|memoryLedger_eq|memoryLedger_perm_handoff|"
+     r"stateLedger_perm_handoff_singleChain|hnonpos_of_consumersOnlyPull)\b"),
+    ("SP1Clean/Soundness/EnsembleChannels.lean",
+     r"theorem\s+(channel_eq_of_kindOf_eq|interactions_channel_eq_of_kindOf)\b"),
+    # A0: the ledger decomposition a per-chip sweep peels with.
+    ("SP1Clean/Model/CleanLedger.lean",
+     r"theorem\s+(tablesCleanAccesses_cons|tableCleanAccesses_buildHinted|"
+     r"tableCleanAccesses_filterKind)\b"),
+    ("SP1Clean/Model/InteractionBus.lean",
+     r"theorem\s+(multiplicitySum_append_closingAccesses|multiplicitySum_append_closing|"
+     r"multiplicitySum_closingAccesses|mem_closingKeys_of_multiplicitySum_ne_zero|"
+     r"multiplicitySum_closingAccesses_of_not_select|multiplicitySum_handoff|"
+     r"multiplicitySum_of_perm_handoff|isConsistentBalanced_of_perm_handoff|"
+     r"multiplicitySum_filterKind|chainLedger_perm_handoff|"
+     r"multiplicitySum_chainLedger|active_append|active_flatMap_gatedPair|"
+     r"handoff_append|multiChainLedger_perm_handoff|multiplicitySum_nonpos)\b"),
+    ("SP1Clean/Proofs/Completeness/Closure.lean",
+     r"theorem\s+(closingAccesses_balances|closingAccesses_not_preprocessed|"
+     r"closingAccesses_state|closingAccesses_memory|"
+     r"preprocessedProviderTables_eq|preprocessedProviderLedger_eq)\b"),
     # W5: the machine-level assembly and its completeness capstone. The assembly's constraint
     # theorem is the join of all 54 tables' own theorems (53 ensemble tables plus verifier), so a
     # regression anywhere in the
@@ -187,8 +305,22 @@ TARGETS = [
     ("SP1Clean/Proofs/Completeness/Assembly.lean",
      r"theorem\s+(witness_constraints|tables_map_component)\b"),
     ("SP1Clean/Soundness/AIRCompleteness.lean",
-     r"theorem\s+(supported_core_native_complete|sp1Ensemble_statement_of_traceGeneratable|"
-     r"balancedOn_of_signed_perm|witness_balancedChannels)\b"),
+     r"(?:theorem|def)\s+(supported_core_generated_trace_functionalCompleteness|"
+     r"supported_core_generated_trace_complete|"
+     r"sp1Ensemble_statement_of_generated_trace|"
+     r"balancedOn_of_signed_perm|witness_balancedChannels|balancedOn_of_closure|"
+     r"balancedOn_of_handoff|balanced_of_closure_and_handoff|"
+     r"sp1Ensemble_statement_of_structural_balance)\b"),
+    # The deterministic semantic-execution -> native-trace compiler and the final converse
+    # capstone.  Keep the trace-map readiness lemmas separate from the stratum-10 channel join so
+    # the census mirrors the architectural boundary.
+    ("SP1Clean/Proofs/Completeness/NativeTraceCompiler.lean",
+     r"theorem\s+(nativeBaseTraceOfCompiled_wellFormed|"
+     r"nativeInitialClock_encodable)\b"),
+    ("SP1Clean/Soundness/NativeCompleteness.lean",
+     r"(?:theorem|def)\s+(supported_core_native_functionalCompleteness|"
+     r"supported_core_native_complete|"
+     r"sp1Ensemble_statement_of_supported_execution)\b"),
     # The W4 completeness layer: each chip's trace-table constraint/guarantee theorems and its
     # event-to-prover-assumptions discharge. Probed from the pilot onward so the rollout cannot
     # silently introduce a compiler-trusted or deferred step.
@@ -209,14 +341,17 @@ TARGETS = [
      r"balancedInteractions_of_isConsistentBalanced)\b"),
     ("SP1Clean/Model/InteractionProjection.lean",
      r"lemma\s+(signedVal_natCast_of_twice_le)\b"),
+    ("SP1Clean/Model/InteractionProjection.lean",
+     r"theorem\s+(toAccess_pulledIfValue|toAccess_pushedIfValue)\b"),
     ("SP1Clean/Soundness/SP1Ensemble.lean",
-     r"(?:theorem|def)\s+((?:sp1|balanced)\w*)\b"),
+     r"(?:theorem|def)\s+((?:sp1|balanced)\w*\??)(?=\s|\()"),
     ("SP1Clean/Soundness/AIR.lean",
      r"theorem\s+(statePullAlign8_of_stateWalk|"
      r"supportedCore_groundingObligations_of_constraints|"
      r"supportedCore_orderedRows_dynamic_of_obligations|"
      r"supportedCore_orderedRows_dynamic|supported_core_witness_grounding|"
-     r"supported_core_native_grounding|supported_core_native_sound)\b"),
+     r"supported_core_native_grounding|supported_core_native_sound|"
+     r"supported_core_native_ordinary_sound)\b"),
     # Exact v6.4.0 table/profile guards and the public ArkLib-facing Core AIR capstone.  These are
     # release headlines: adding a new capstone file must not silently leave it outside the census.
     ("SP1Clean/FormalModel/CoreProfile.lean",
@@ -257,12 +392,6 @@ TARGETS = [
      r"theorem\s+(run_bind_ok_\w+|decode_\w+)\b"),
     ("SP1Clean/FormalModel/Trace/Witness.lean",
      r"(?:theorem|lemma)\s+(isInitialState_nonvacuous|cfgState_[\w?]+|mem_fullRegs)\b"),
-    ("SP1Clean/Soundness/MemoryGlobal.lean",
-     r"theorem\s+(memProviderGenesis_of_contributions|memProviderGenesis_of_boundary|"
-     r"traceMemoryValid_of_genesis_and_balance|traceMemoryValid_of_boundary_and_balance)\b"),
-    ("SP1Clean/Soundness/MemoryIsU64.lean",
-     r"(?:theorem|def)\s+(memBalanceHyps_of_genesis|memBalanceHyps_of_boundary|"
-     r"operand_\w+_isU64_of_memBalance)\b"),
 ]
 
 NS_RE = re.compile(r"^namespace\s+([\w.]+)")

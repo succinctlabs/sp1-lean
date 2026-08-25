@@ -3,7 +3,7 @@ import Mathlib.Data.ZMod.Basic
 import SP1Clean.Model.SP1Constraint
 import SP1Clean.Model.InteractionProjection
 import ToClean.Circuit.InteractionRecovery
-import SP1Clean.Faithful.ExtractedInteractionModel
+import SP1Clean.Extracted.InteractionModel
 import SP1Clean.Native.Readers.RTypeReader
 import SP1Clean.Extracted.RTypeReader
 import SP1Clean.Faithful.ChipTactics
@@ -14,12 +14,12 @@ Sibling of `Faithful/CPUState.lean`, for the register-adapter fragment. SP1's ge
 `RTypeReader.constraints` (`Extracted/RTypeReader.lean`) emits, under `is_real = is_trusted = 1`:
 
 - four copies of the `is_real` binary gate `.assertZero (is_real * (is_real - 1))` (vacuous at `1`);
-- the `.send (.program …) is_trusted` instruction fetch (per-row meaning `True`; its content is the
-  trace-level program bus, `Soundness/ProgramConsistency.lean`);
+- the `.send (.program …) is_trusted` instruction fetch (per-row meaning `True`; its global content is
+  grounded by `Soundness/TypedProgram.lean`);
 - per operand: a `.send (.byte Range diff 16 0)` (16-bit range) and a `.send (.byte U8Range 0 scaled 0)`
   (`< 256`) timestamp check, a `.send (.memory …)` (read prev) and a `.receive (.memory …)` (write/read
-  new) — the memory interactions' per-row meaning is `True` (their content is the trace-level memory
-  bus, `Soundness/MemoryConsistency.lean`);
+  new) — the memory interactions' per-row meaning is `True` (their cross-row content is derived by
+  `Soundness/TypedMemory.lean`);
 - four `.assertZero (op_a_0 * (op_a_write_value[i] - 0))` zeroing gates (`rd = x0 ⟹ write 0`).
 
 `rtypereader_constraints_faithful` proves the constraint lists hold exactly iff the four `op_a_0`
@@ -218,7 +218,7 @@ theorem rtypereader_program_interactions_faithful_syntactic
     SP1Clean.Channels.memoryChannel_eq_programChannel_false, if_false]
   -- SC Phase 2a: `programChannel` is a `Channel` — `circuit_norm` recovers the program pull in the raw
   -- `ChannelInteraction.toRaw` form, so unfold the kernel's `pulledIf`/`toRaw` to match it (cf. the
-  -- `StateConsistency` state-kernel pattern), then rewrite.
+  -- the shared State-interaction kernel pattern), then rewrite.
   have hk := fun (g : Expression (ZMod p)) (m : SP1Clean.Channels.ProgramMsg (Expression (ZMod p))) =>
     toAccess_pullIf_program env g m
   simp only [hk]

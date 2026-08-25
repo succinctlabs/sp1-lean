@@ -206,9 +206,9 @@ theorem AddChip.registerOperandPullContract :
 registry theorem. -/
 theorem addChip_registerOperandPullShape_descriptor :
     DecodedInstructionRow.RegisterOperandPullShape
-      (⟨AddChip.kind, AddChip.circuit, rfl, [.ADD], .nonX0⟩ : SupportedChip p) := by
+      (⟨.add, AddChip.kind, AddChip.circuit, rfl⟩ : SupportedChip p) := by
   apply DecodedInstructionRow.registerOperandPullShape_of_circuitContract
-    AddChip.kind AddChip.circuit rfl [.ADD] .nonX0 (fun input => input.is_real)
+    AddChip.kind AddChip.circuit rfl .add (fun input => input.is_real)
   · intro input output
     rfl
   · exact AddChip.registerOperandPullContract

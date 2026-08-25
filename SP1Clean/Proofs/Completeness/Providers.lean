@@ -73,6 +73,7 @@ structure ByteEntry where
   b : ℕ
   c : ℕ
   multiplicity : ℕ
+deriving DecidableEq
 
 /-- A byte-table occurrence is well-formed when both slots really are bytes. -/
 def ByteEntry.WellFormed (e : ByteEntry) : Prop := e.b < 2 ^ 8 ∧ e.c < 2 ^ 8
@@ -86,6 +87,7 @@ def ByteEntry.MultiplicityFits (p : ℕ) (e : ByteEntry) : Prop :=
 structure RangeEntry where
   a : ℕ
   multiplicity : ℕ
+deriving DecidableEq
 
 /-- A range occurrence is well-formed at width `n` when the value fits in `n` bits. -/
 def RangeEntry.WellFormed (n : ℕ) (e : RangeEntry) : Prop := e.a < 2 ^ n
@@ -107,6 +109,7 @@ structure RomEntry where
   immB : ℕ
   immC : ℕ
   multiplicity : ℕ
+deriving DecidableEq
 
 /-- A ROM entry is well-formed when its write-register index is a real register index and its
 `op_a = x0` flag is a bit. The pc needs no premise: the builder limbs it, so every limb is `< 2^16`
@@ -125,6 +128,7 @@ structure MemRecordEntry where
   value : ℕ
   clk : ℕ
   multiplicity : Bool
+deriving DecidableEq
 
 /-- An init record is well-formed when its clock is zero, which is what the provider circuit pins
 both limbs to. -/

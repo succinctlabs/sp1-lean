@@ -13,7 +13,7 @@ fail=0
 # 1. Every repo-relative path cited in a reader-facing doc must exist.
 for doc in "$report" README.md docs/README.md docs/overview.md docs/architecture.md \
            docs/release-audit.md docs/roadmap.md docs/witgen-wire-format.md \
-           docs/audit-surface.md \
+           docs/audit-surface.md docs/layering.md \
            docs/audits/2026-08-pr110-external-report-disposition.md; do
   [ -f "$doc" ] || { echo "FAIL: expected doc missing: $doc"; fail=1; continue; }
   paths=$(grep -oE '`(SP1Clean|SP1CleanTest|ToClean|ToMathlib|docs|scripts)/[A-Za-z0-9_/.-]+`' "$doc" | tr -d '`' | sort -u || true)
@@ -45,14 +45,14 @@ check_decl SP1Clean/Faithful/AddChip.lean "addChip_faithful"
 check_decl SP1Clean/Faithful/ChipOracle.lean "ChipFaithful"
 check_decl SP1Clean/Faithful/SupportedMachine.lean "supportedChipFaithfulness"
 check_decl SP1Clean/Faithful/SupportedMachine.lean "instructionOracleMainWidth_isSome_iff"
-check_decl SP1Clean/Faithful/Transport/PreprocessedProviders.lean \
+check_decl SP1Clean/Composition/PreprocessedProviders.lean \
   "extractedPreprocessedProviderTables_cleanAccesses"
-check_decl SP1Clean/Faithful/Transport/CoreEnsemble.lean \
+check_decl SP1Clean/Composition/CoreEnsemble.lean \
   "exactNativeEnsembleWitness_constraints"
-check_decl SP1Clean/Faithful/Transport/CoreArtifact.lean \
+check_decl SP1Clean/Composition/CoreArtifact.lean \
   "exactNativeArtifact_supportedCoreNativeRelation"
 check_decl SP1Clean/Soundness/SP1Ensemble.lean "sp1Ensemble"
-check_decl SP1Clean/Soundness/AIRCompleteness.lean "supported_core_native_complete"
+check_decl SP1Clean/Soundness/NativeCompleteness.lean "supported_core_native_complete"
 check_decl SP1CleanTest/Audit/ActiveTraceNonVacuity.lean \
   "active_real_decoded_instruction_row_count"
 check_decl SP1Clean/FormalModel/Contracts/DivRem.lean "Case"

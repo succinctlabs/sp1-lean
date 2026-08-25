@@ -16,6 +16,11 @@ Completed:
   `supported_core_native_grounding` endpoint retaining final-State and memory-finalize truth;
 - Program and Memory timed grounding for the native 53-table ensemble;
 - `supported_core_native_sound`;
+- the exact `supported_core_native_ordinary_sound` theorem over the shared proof-free
+  `EventExecutionTrace`, with normal-retirement evidence and canonical 25-chip routing on every
+  transition;
+- neutral `InstructionChipId`/`InstructionRouting`/`ProviderTableId` registries shared by native
+  ensemble construction, completeness assembly, decoding, and transport;
 - exact list-level 34-table execution and 6-table memory-boundary relations;
 - constructive exact-row assembly of all 53 native tables plus the verifier row, with local
   constraints proved from valid clusters, a caller-supplied `CanonicalPreprocessedInventory`, and
@@ -33,7 +38,10 @@ Not completed:
 - cross-shard boot-to-halt soundness;
 - concrete syscall-handler refinements beyond the abstract relation;
 - ArkLib verifier knowledge soundness; and
-- whole-machine witness-generation completeness.
+- a shared capacity-bounded semantic relation for soundness and completeness, plus the residual
+  implications from that relation to `NativeTraceReady` and `NativeTraceFootprint.Fits`; and
+- the exact-upstream reconfiguration theorem relating this native compiler output to Rust's full
+  Core trace.
 
 ## P0: close exact Core AIR soundness
 
@@ -59,19 +67,19 @@ Deliverable: a theorem that projects the exact 25 instruction tables into the in
 valid native witness, with assertion and bus-balance transport proved once at the registry layer.
 
 **Status (2026-08-22): the instruction-table transport and its access aggregation are delivered.**
-`SP1Clean/Faithful/Transport/` proves the transport once over an
+`SP1Clean/Composition/` proves the transport once over an
 arbitrary codec/oracle/`ChipFaithful` triple — no chip is named, so the 25 instantiations cannot
 drift apart — and `extracted_instructionTables_constraints` runs it against the real extracted
 relation: a witness satisfying `CoreAIR.Current.Relation` yields 25 native Clean tables satisfying their whole
 circuits' constraint systems. `transported_map_component` shows those tables *are* `sp1Tables`, by
 `rfl`; `transportedInstructionActiveAccesses_perm` appends the 25 per-table interaction
-permutations into one ordered active ledger. `Transport/Balance.lean` carries the
+permutations into one ordered active ledger. `Composition/Balance.lean` carries the
 extracted ℕ-exact balance to a zero signed-ℤ sum per payload under an explicit `SmallMultiplicities`
 premise (`ZMod.val` and the centred `signedVal` diverge above `p / 2`; this is the multiplicity bound
-the interaction-argument extractor must supply anyway), and `ExactBalance.lean` proves the
-payload→native-key projection injective and closes the per-key integer balance step as a reusable
-transport theorem. Those lemmas are not yet composed across the provider/public redistribution to
-derive `CoreArtifact`'s global balance contract.
+the interaction-argument extractor must supply anyway). The former payload→native-key closure was
+retired as unused: it balanced the full exact cluster, not the reduced native ensemble whose
+Byte/Range/Program providers are recounted. `CoreArtifact` therefore keeps the remaining native
+State/Memory integer balance as an explicit integration contract.
 
 The current instantiation remains 25 generated citations of the generic theorems rather than a fold
 over `supportedChipFaithfulness`; adding a Core table is still caught by the separately proved exact
@@ -156,9 +164,8 @@ projected-key `Nodup`; it may omit raw keys with zero native demand. The recount
 keeps nonzero Byte/Program-key coverage, skeleton nonpositivity, and `2 * count ≤ p` explicit.
 `freshRowsByKey` is declarative/regression-only, not the inventory construction path. PCS/program
 identity, State and Memory balance, and `SemanticBoundaryBinding` also remain explicit. The
-exact-access permutation and
-`ExactBalance` lemmas remain available; there is no joint inhabitance anchor for that contract and
-valid exact clusters. The open proof must also cross the deliberately named
+exact/native table access permutations remain available; there is no joint inhabitance anchor for
+that contract and valid exact clusters. The open proof must also cross the deliberately named
 Range13-quotient→Range16 and raw `Global`→typed-Memory transformations; neither is a literal
 interaction permutation.
 
@@ -278,36 +285,55 @@ The source relation must express supported, trace-generatable executions and con
 behavior. The conformance pipeline remains the empirical regression layer during this work but is not
 a substitute for the theorem.
 
-**Status (2026-08-22): native assembly is proved conditionally, and one active path is witnessed.**
-W4 built `ToClean/Air/TableBuild.lean` and local completeness tables for all 25 chips plus the 28
-providers and verifier row. W5's `supported_core_native_complete`
-(`SP1Clean/Soundness/AIRCompleteness.lean`) turns a supplied trace into an `EnsembleWitness`
-satisfying `SupportedCoreNativeRelation` when it has `WellFormed`, `ProviderMultiplicitiesFit`
-(`2 * m ≤ p` for each
-aggregate Byte/Range/Program count), exact centered-integer per-key `BalancedOn` plus the separate
-interaction-count bound `< p`, public-value equality, and `SemanticBoundaryBinding`. It targets
-`SupportedCoreNativeRelation` itself with nothing weakened on the AIR side.
-`SP1CleanTest/Audit/ActiveTraceNonVacuity.lean` hand-assembles one semantic trace record for
-`JAL x0, 0`; its event count and decoded physical instruction-row count are both one, and its
-matching native provider occurrences close all four channel ledgers. Completeness then generates
-the physical AIR rows through the circuits, and soundness sends the resulting witness to the
-official-Sail local-execution relation for any supplied model satisfying `UsesOrdinarySchedule`.
-This is a real-row non-vacuity anchor, not a verified or full
-trace generator. Bitwise/Lt/Addw/ShiftLeft/ShiftRight immediate rows and UType/JAL x0 rows are now
-included by their
-generator-relative completeness theorems.
+**Status (2026-08-24): deterministic all-table native completeness is closed on the explicit
+admissible compiler image; aligning both directions on one capacity-bounded semantic language
+remains open.**
 
-What that does **not** yet say, and what P3 still means:
+W4 built `ToClean/Air/TableBuild.lean` and local completeness tables for all 25 instruction chips,
+the 28 provider/boundary tables, and the verifier row.  W5 now adds the semantic construction:
 
-- **The generator is not verified.** Nothing proves every supported Sail execution yields a
-  trace meeting the routing, provider-capacity, exact integer-balance, public-equality, and boundary
-  contracts above; the theorem is completeness *relative to* a correct generator.
-- **Bump inputs are assumed, not derived.** The trace record carries StateBump/MemoryBump input rows
-  satisfying the chips' `Spec`; `Table.build` constructs the physical rows, but no generator derives
-  those inputs at window crossings — the very rows that
-  make shards above ~2²¹ rows witnessable on the soundness side.
-- The third and fourth bullets above (reconfiguration to the exact upstream trace, proof-system
-  completeness) are untouched.
+- `InstructionEvent.lean` implements all 25 instruction-family projections;
+- `ExecutionCompiler.lean` folds the one `Machine.EventExecutionTrace` chronologically;
+- the shared field-free scheduler inserts register `MemoryBump` rows at timestamp-window crossings,
+  while `stateBumpEvents` derives State refreshes;
+- `MemoryHistory.lean` constructs the canonical initial/final record per touched location;
+- `CanonicalClosure.lean` constructs Byte, Range, and Program providers from the trace's own literal
+  Clean ledger; direct field balance removes the old `2 * multiplicity <= p` restriction; and
+- `nativeTrace` deterministically assembles the exact 53-table witness and verifier boundary with
+  no proof argument and no instruction padding.
+
+`supported_core_native_functionalCompleteness`
+(`SP1Clean/Soundness/NativeCompleteness.lean`) maps that trace into the unchanged
+`SupportedCoreNativeRelation`.  Its source,
+`SupportedCoreNativeAdmissibleExecutionRelation`, is the exact ordinary Sail relation plus the
+pinned Core row budget, the named compiler/readiness facts for this same execution, and the actual
+four-channel interaction footprint `< p`.  Constraints, channel balance, public equality, and the
+semantic boundary are conclusions.  `supported_core_native_complete` is its existential form and
+`sp1Ensemble_statement_of_supported_execution` is the direct Clean statement theorem.
+
+The old abstract language-certificate API was removed: it permitted a witness map that ignored the
+semantic execution and therefore could not establish compiler fidelity.  The concrete compiler now
+retains each `LocatedTransition` beside its generated routed event and access schedule.
+
+What P3 still means:
+
+- prove `Execution.NativeCompilerReady`—especially every generated event's rich per-chip `Valid`
+  contract—from every supported official Sail transition, rather than restricting the source;
+- discharge the remaining State/Memory chronology and physical-row agreement fields from the
+  deterministic compiler, including canonical addresses and initial Memory content;
+- derive literal-ledger Byte polarity and Byte/Program demand servability instead of carrying them
+  as broad closure assumptions;
+- close Program row agreement and the configured-state decode-stability gap (the semantic relation
+  records successful decode in the actual source state, while `ProgTruth` quantifies over all
+  configured states); and
+- derive the emitted interaction footprint from the Core row budget and table arities.
+
+Closing these implications is necessary but not sufficient for `WitnessRelation.Correct`: the
+current exact soundness target is unbounded and therefore cannot return `WithinCoreShardLimit` or
+the physical `< p` capacity fact.  The capstone first needs a shared capacity-bounded semantic
+relation on both directions (or an equivalent strengthening/weakening proved on both sides).
+Until then no public-language equality is claimed. Reconfiguration to the exact upstream trace and
+cryptographic proof-system completeness remain separate workstreams.
 
 ## Maintenance gates
 

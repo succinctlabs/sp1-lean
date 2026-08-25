@@ -24,7 +24,7 @@ high bit `msb` of `selected_half` (gated by `is_lh`) to drive the sign extension
 The SP1 memory **bus** access stays 8-byte-aligned: `MemoryAccess` sends/receives the full 4-limb
 `prev_value`. Two selectors `is_lh` / `is_lhu` replace the single `is_real` (`is_real = is_lh + is_lhu`);
 LH sign-extends, LHU zero-extends (`msb` zeroed by `is_lhu·msb`). The cross-row offline-memory meaning
-lives at the trace level (`Soundness/MemoryConsistency.lean`). -/
+is derived by `Soundness/TypedMemory.lean`. -/
 
 namespace SP1Clean.LoadHalfChip
 

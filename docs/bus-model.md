@@ -9,6 +9,11 @@
 > the migration that superseded this file is the 2026-07 architecture-consolidation proposal
 > (removed from the tree; see git history)
 > §3.5. Kept for the design rationale in §5 below; do not cite §0's "current status" as current.
+> The historical `ByteConsistency`, `MemoryConsistency`, `MemoryIsU64`, `MemoryGlobal`, `ChipAir`,
+> `ProgramProviderSpike`, `StateConsistency`, and `ProgramConsistency` modules described below were
+> retired in 2026-08; use git history when following those archaeological references. The live
+> `StateAccess`/`ProgramAccess` views are in `Soundness/RowView.lean`, and the live buses are consumed
+> directly by the `TypedState`/`TypedProgram`/`TypedMemory` grounding modules.
 >
 > **For the channel/ensemble/balance machinery itself, the upstream authority is Clean's own
 > `Clean/Air/README.md`** (flat-AIR components, `Balance.lean`'s `BalancedInteractions` +

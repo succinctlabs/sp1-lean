@@ -1,6 +1,5 @@
 import SP1Clean.Proofs.Sail.TryStepReduction
 import SP1Clean.Soundness.RowEffectDefs
-import SP1Clean.Soundness.ProgramConsistency
 import RISCV.Instructions
 import RISCV.SailToRV64
 
@@ -555,6 +554,7 @@ theorem sailStep_of_ladder (s s_a s'' : SailState) (w : BitVec 32) (I : instruct
     (h_active'' : s''.regs.get? Register.hart_state = some (HartState.HART_ACTIVE ()))
     (hinit'' : s''.isInitialized) :
     ∃ s_final : SailState, (try_step 0 false).run s = .ok false s_final
+      ∧ SailRetiresNormally s s_final
       ∧ s_final.regs.get? Register.PC = s''.regs.get? Register.nextPC
       ∧ (∀ idx : BitVec 5, s_final.get_reg? idx = s''.get_reg? idx)
       ∧ s_final.mem = s''.mem
@@ -562,9 +562,12 @@ theorem sailStep_of_ladder (s s_a s'' : SailState) (w : BitVec 32) (I : instruct
           s_final.regs.get? R = s''.regs.get? R)
       ∧ s_final.isInitialized := by
   obtain ⟨s_final, hrun, hPC, hxreg, hmem, hframe, hinitf⟩ := tail_effect s'' hinit''
-  refine ⟨s_final, ?_, hPC, hxreg, hmem, hframe, hinitf⟩
-  rw [tryStep_reaches s s_a s'' w I b hb hcp hactive hslr hdec hsa hexec h_active'']
-  exact hrun
+  have hstep : (try_step 0 false).run s = .ok false s_final := by
+    rw [tryStep_reaches s s_a s'' w I b hb hcp hactive hslr hdec hsa hexec h_active'']
+    exact hrun
+  refine ⟨s_final, hstep, ?_, hPC, hxreg, hmem, hframe, hinitf⟩
+  exact ⟨b, zero_extend (m := 32) w, s'', hb,
+    run_hart_active_reaches _ s_a s'' w I 0 hslr hdec hsa hexec, hstep⟩
 
 /-! ## Per-chip `advance` composition helpers -/
 
@@ -647,7 +650,7 @@ theorem SailConfigured.congr {sf s : SailState} (cfg : SailConfigured s) (hinit 
 `hfetch`, the committed pc, the fetched-word decode to `I`, `rd ≠ x0`, the `Spec`-derived write `value`),
 one real `try_step` realizes the row's `RowEffect`. The **execute** enters as a hypothesis `hexec` (over any
 state agreeing with `s` on the register file), so each family plugs in its own execute-reaches lemma
-(`rtype_execute_reaches`/`itype_execute_reaches`/…) — the ladder + the five-clause `RowEffect` readoff are
+(`rtype_execute_reaches`/`itype_execute_reaches`/…) — the ladder + the six-clause `RowEffect` readoff are
 shared. The only per-chip inputs to a wrapper are `I`, `value`/`hexec`, and `hval`. -/
 theorem advance_write_core {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : SailState}
     (I : instruction) (rd : BitVec 5) (value : BitVec 64) (pc : BitVec 64)
@@ -724,7 +727,7 @@ theorem advance_write_core {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s
       (hrdreg Register.hart_state (by tauto))]; exact cfg.active
   have hinit'' : SailState.isInitialized s'' := by
     rw [hs''_def]; exact SailState.isInitialized_insert s_a hinit_sa _ _
-  obtain ⟨s_final, hrun, hPCf, hxf, hmemf, hframef, hinitf⟩ :=
+  obtain ⟨s_final, hrun, hnormal, hPCf, hxf, hmemf, hframef, hinitf⟩ :=
     sailStep_of_ladder s s_a s'' (data₃ ++ data₂ ++ data₁ ++ data₀) I b
       hb hcp hactive hslr hdec hsa hexec_sa h_active'' hinit''
   -- the s_final → s config-register frame
@@ -739,7 +742,7 @@ theorem advance_write_core {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s
       (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide) (hrdreg R hR)]
   have hmem_fin : s_final.mem = s.mem := by rw [hmemf, hs''_def, hsa_def, hs'_def]
   refine ⟨s_final, ⟨false, hrun⟩,
-    { pc := ?_, regs := ?_,
+    { normal := hnormal, pc := ?_, regs := ?_,
       mem := ⟨fun _ a => by rw [hmem_fin],
         fun mw hmw => absurd (hnomem.symm.trans hmw) (by simp)⟩,
       init := fun _ => hinitf, cfg := fun _ => ?_ }⟩
@@ -1226,7 +1229,7 @@ theorem advance_jump_core {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s 
   have hinit'' : SailState.isInitialized s'' := by
     rw [hs''_def]
     exact SailState.isInitialized_insert _ (SailState.isInitialized_insert s_a hinit_sa _ _) _ _
-  obtain ⟨s_final, hrun, hPCf, hxf, hmemf, hframef, hinitf⟩ :=
+  obtain ⟨s_final, hrun, hnormal, hPCf, hxf, hmemf, hframef, hinitf⟩ :=
     sailStep_of_ladder s s_a s'' (data₃ ++ data₂ ++ data₁ ++ data₀) I b
       hb hcp hactive hslr hdec hsa hexec_sa h_active'' hinit''
   have hcfg_frame : ∀ R : Register,
@@ -1240,7 +1243,7 @@ theorem advance_jump_core {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s 
       (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide) (hrdreg R hR)]
   have hmem_fin : s_final.mem = s.mem := by rw [hmemf, hs''_def, hsa_def, hs'_def]
   refine ⟨s_final, ⟨false, hrun⟩,
-    { pc := ?_, regs := ?_,
+    { normal := hnormal, pc := ?_, regs := ?_,
       mem := ⟨fun _ a => by rw [hmem_fin],
         fun mw hmw => absurd (hnomem.symm.trans hmw) (by simp)⟩,
       init := fun _ => hinitf, cfg := fun _ => ?_ }⟩
@@ -1857,7 +1860,7 @@ theorem advance_of_ctrl {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : 
     rw [hframe_s Register.hart_state (by decide) (by decide)]; exact cfg.active
   have hinit'' : SailState.isInitialized s'' := by
     rw [hs''_def]; exact SailState.isInitialized_insert s_a hinit_sa _ _
-  obtain ⟨s_final, hrun, hPCf, hxf, hmemf, hframef, hinitf⟩ :=
+  obtain ⟨s_final, hrun, hnormal, hPCf, hxf, hmemf, hframef, hinitf⟩ :=
     sailStep_of_ladder s s_a s'' (data₃ ++ data₂ ++ data₁ ++ data₀) I b
       hb hcp hactive hslr hdec hsa hexec_sa h_active'' hinit''
   have hcfg_frame : ∀ R : Register,
@@ -1871,7 +1874,7 @@ theorem advance_of_ctrl {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : 
       (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)]
   have hmem_fin : s_final.mem = s.mem := by rw [hmemf, hs''_def, hsa_def, hs'_def]
   refine ⟨s_final, ⟨false, hrun⟩,
-    { pc := ?_, regs := ?_,
+    { normal := hnormal, pc := ?_, regs := ?_,
       mem := ⟨fun _ a => by rw [hmem_fin],
         fun mw hmw => absurd (hnomem.symm.trans hmw) (by simp)⟩,
       init := fun _ => hinitf, cfg := fun _ => ?_ }⟩
@@ -2026,7 +2029,7 @@ theorem execute_LOAD_reaches_width1 (imm : BitVec 12) (rs1_idx rd_idx : BitVec 5
 
 /-- **The load register-writing core.** The `advance_write_core` twin whose `hexec` additionally receives
 the **memory frame** `t.mem = s.mem` and `SailConfigured t` — so a load's `execute_LOAD` (which reads
-`t.mem`) can be discharged. Straight-line (`nextPC = pc+4`), writes only `rd`; identical ladder + five-clause
+`t.mem`) can be discharged. Straight-line (`nextPC = pc+4`), writes only `rd`; identical ladder + six-clause
 `RowEffect` read-off to `advance_write_core`. The two changes vs. `advance_write_core`: `hexec`'s antecedents
 (`t.mem = s.mem`, `SailConfigured t`) and the `hmem_sa`/`hcfg_sa` haves feeding `hexec s_a …`. -/
 theorem advance_load_core {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s : SailState}
@@ -2105,7 +2108,7 @@ theorem advance_load_core {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s 
       (hrdreg Register.hart_state (by tauto))]; exact cfg.active
   have hinit'' : SailState.isInitialized s'' := by
     rw [hs''_def]; exact SailState.isInitialized_insert s_a hinit_sa _ _
-  obtain ⟨s_final, hrun, hPCf, hxf, hmemf, hframef, hinitf⟩ :=
+  obtain ⟨s_final, hrun, hnormal, hPCf, hxf, hmemf, hframef, hinitf⟩ :=
     sailStep_of_ladder s s_a s'' (data₃ ++ data₂ ++ data₁ ++ data₀) I b
       hb hcp hactive hslr hdec hsa hexec_sa h_active'' hinit''
   have hcfg_frame : ∀ R : Register,
@@ -2119,7 +2122,7 @@ theorem advance_load_core {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s 
       (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide) (hrdreg R hR)]
   have hmem_fin : s_final.mem = s.mem := by rw [hmemf, hs''_def, hsa_def, hs'_def]
   refine ⟨s_final, ⟨false, hrun⟩,
-    { pc := ?_, regs := ?_,
+    { normal := hnormal, pc := ?_, regs := ?_,
       mem := ⟨fun _ a => by rw [hmem_fin],
         fun mw hmw => absurd (hnomem.symm.trans hmw) (by simp)⟩,
       init := fun _ => hinitf, cfg := fun _ => ?_ }⟩
@@ -2408,7 +2411,7 @@ theorem advance_of_store {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s :
     rw [hframe_s Register.hart_state (by decide) (by decide)]; exact cfg.active
   have hinit'' : SailState.isInitialized s'' := by
     rw [hs''_def]; exact hinit_sa
-  obtain ⟨s_final, hrun, hPCf, hxf, hmemf, hframef, hinitf⟩ :=
+  obtain ⟨s_final, hrun, hnormal, hPCf, hxf, hmemf, hframef, hinitf⟩ :=
     sailStep_of_ladder s s_a s'' (data₃ ++ data₂ ++ data₁ ++ data₀) I b
       hb hcp hactive hslr hdec hsa hexec_sa h_active'' hinit''
   have hcfg_frame : ∀ R : Register,
@@ -2422,7 +2425,7 @@ theorem advance_of_store {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {s :
       (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)]
   have hmem_fin : s_final.mem = writeMem s.mem := by rw [hmemf, hs''_def]
   refine ⟨s_final, ⟨false, hrun⟩,
-    { pc := ?_, regs := ?_,
+    { normal := hnormal, pc := ?_, regs := ?_,
       mem := ⟨fun hnone _ => absurd (hmw.symm.trans hnone) (by simp),
               fun mw' hmw' => ?_⟩,
       init := fun _ => hinitf, cfg := fun _ => ?_ }⟩
@@ -2860,7 +2863,7 @@ theorem advance_load_x0_core {prog : GuestProgram} {r : Trace.RowView (ZMod p)} 
       hs'_def, Std.ExtDHashMap.get?_insert, dif_neg (fun hc => h1 (beq_iff_eq.mp hc).symm)]
   have h_active_sa : s_a.regs.get? Register.hart_state = some (HartState.HART_ACTIVE ()) := by
     rw [hframe_s Register.hart_state (by decide) (by decide)]; exact cfg.active
-  obtain ⟨s_final, hrun, hPCf, hxf, hmemf, hframef, hinitf⟩ :=
+  obtain ⟨s_final, hrun, hnormal, hPCf, hxf, hmemf, hframef, hinitf⟩ :=
     sailStep_of_ladder s s_a s_a (data₃ ++ data₂ ++ data₁ ++ data₀) I b
       hb hcp hactive hslr hdec hsa hexec_sa h_active_sa hinit_sa
   have hcfg_frame : ∀ R : Register,
@@ -2874,7 +2877,7 @@ theorem advance_load_x0_core {prog : GuestProgram} {r : Trace.RowView (ZMod p)} 
       (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)]
   have hmem_fin : s_final.mem = s.mem := by rw [hmemf, hmem_sa]
   refine ⟨s_final, ⟨false, hrun⟩,
-    { pc := ?_, regs := ?_,
+    { normal := hnormal, pc := ?_, regs := ?_,
       mem := ⟨fun _ a => by rw [hmem_fin],
         fun mw hmw => absurd (hnomem.symm.trans hmw) (by simp)⟩,
       init := fun _ => hinitf, cfg := fun _ => ?_ }⟩
@@ -3247,7 +3250,7 @@ theorem advance_alu_x0_core {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {
       hs'_def, Std.ExtDHashMap.get?_insert, dif_neg (fun hc => h1 (beq_iff_eq.mp hc).symm)]
   have h_active_sa : s_a.regs.get? Register.hart_state = some (HartState.HART_ACTIVE ()) := by
     rw [hframe_s Register.hart_state (by decide) (by decide)]; exact cfg.active
-  obtain ⟨s_final, hrun, hPCf, hxf, hmemf, hframef, hinitf⟩ :=
+  obtain ⟨s_final, hrun, hnormal, hPCf, hxf, hmemf, hframef, hinitf⟩ :=
     sailStep_of_ladder s s_a s_a (data₃ ++ data₂ ++ data₁ ++ data₀) I b
       hb hcp hactive hslr hdec hsa hexec_sa h_active_sa hinit_sa
   have hcfg_frame : ∀ R : Register,
@@ -3261,7 +3264,7 @@ theorem advance_alu_x0_core {prog : GuestProgram} {r : Trace.RowView (ZMod p)} {
       (by rcases hR with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)]
   have hmem_fin : s_final.mem = s.mem := by rw [hmemf, hmem_sa]
   refine ⟨s_final, ⟨false, hrun⟩,
-    { pc := ?_, regs := ?_,
+    { normal := hnormal, pc := ?_, regs := ?_,
       mem := ⟨fun _ a => by rw [hmem_fin],
         fun mw hmw => absurd (hnomem.symm.trans hmw) (by simp)⟩,
       init := fun _ => hinitf, cfg := fun _ => ?_ }⟩

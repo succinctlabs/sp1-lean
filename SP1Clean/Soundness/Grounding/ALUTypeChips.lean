@@ -840,7 +840,7 @@ variable [Fact (2 ^ 25 < p)]
 omit [Fact (2 ^ 25 < p)] in
 /-- The immediate-capable Addw descriptor in the supported Core registry. -/
 def addwChipDescriptor : SupportedChip p :=
-  ⟨AddwChip.kind, AddwChip.circuit, rfl, [.ADDW], .nonX0⟩
+  ⟨.addw, AddwChip.kind, AddwChip.circuit, rfl⟩
 
 omit [Fact (2 ^ 25 < p)] in
 noncomputable def addwViewOf (env : Environment (ZMod p)) : Trace.RowView (ZMod p) :=
@@ -852,6 +852,7 @@ theorem addwViewOf_decodeRow (data : ProverData (ZMod p)) (physical : Array (ZMo
     ((addwChipDescriptor (p := p)).decodeRow data physical).view =
       addwViewOf (Environment.fromArray physical data) := rfl
 
+omit [Fact (2 ^ 25 < p)] in
 theorem addwChipDescriptor_table :
     (addwChipDescriptor (p := p)).table =
       (⟨AddwChip.circuit (p := p)⟩ : Component (ZMod p)) := rfl
@@ -1018,7 +1019,7 @@ variable [Fact (2 ^ 25 < p)]
 omit [Fact (2 ^ 25 < p)] in
 /-- The immediate-capable Bitwise descriptor in the supported Core registry. -/
 def bitwiseChipDescriptor : SupportedChip p :=
-  ⟨BitwiseChip.kind, BitwiseChip.circuit, rfl, [.XOR, .OR, .AND], .nonX0⟩
+  ⟨.bitwise, BitwiseChip.kind, BitwiseChip.circuit, rfl⟩
 
 omit [Fact (2 ^ 25 < p)] in
 noncomputable def bitwiseViewOf (env : Environment (ZMod p)) : Trace.RowView (ZMod p) :=
@@ -1028,6 +1029,7 @@ theorem bitwiseViewOf_decodeRow (data : ProverData (ZMod p)) (physical : Array (
     ((bitwiseChipDescriptor (p := p)).decodeRow data physical).view =
       bitwiseViewOf (Environment.fromArray physical data) := rfl
 
+omit [Fact (2 ^ 25 < p)] in
 theorem bitwiseChipDescriptor_table :
     (bitwiseChipDescriptor (p := p)).table =
       (⟨BitwiseChip.circuit (p := p)⟩ : Component (ZMod p)) := rfl
@@ -1183,7 +1185,7 @@ variable [Fact (2 ^ 25 < p)]
 omit [Fact (2 ^ 25 < p)] in
 /-- The immediate-capable Lt descriptor in the supported Core registry. -/
 def ltChipDescriptor : SupportedChip p :=
-  ⟨LtChip.kind, LtChip.circuit, rfl, [.SLT, .SLTU], .nonX0⟩
+  ⟨.lt, LtChip.kind, LtChip.circuit, rfl⟩
 
 omit [Fact (2 ^ 25 < p)] in
 noncomputable def ltViewOf (env : Environment (ZMod p)) : Trace.RowView (ZMod p) :=
@@ -1193,6 +1195,7 @@ theorem ltViewOf_decodeRow (data : ProverData (ZMod p)) (physical : Array (ZMod 
     ((ltChipDescriptor (p := p)).decodeRow data physical).view =
       ltViewOf (Environment.fromArray physical data) := rfl
 
+omit [Fact (2 ^ 25 < p)] in
 theorem ltChipDescriptor_table :
     (ltChipDescriptor (p := p)).table =
       (⟨LtChip.circuit (p := p)⟩ : Component (ZMod p)) := rfl
@@ -1338,7 +1341,7 @@ variable [Fact (2 ^ 25 < p)]
 omit [Fact (2 ^ 25 < p)] in
 /-- The immediate-capable ShiftLeft descriptor in the supported Core registry. -/
 def shiftLeftChipDescriptor : SupportedChip p :=
-  ⟨ShiftLeftChip.kind, ShiftLeftChip.circuit, rfl, [.SLL, .SLLW], .nonX0⟩
+  ⟨.shiftLeft, ShiftLeftChip.kind, ShiftLeftChip.circuit, rfl⟩
 
 omit [Fact (2 ^ 25 < p)] in
 noncomputable def shiftLeftViewOf (env : Environment (ZMod p)) : Trace.RowView (ZMod p) :=
@@ -1349,6 +1352,7 @@ theorem shiftLeftViewOf_decodeRow (data : ProverData (ZMod p))
     ((shiftLeftChipDescriptor (p := p)).decodeRow data physical).view =
       shiftLeftViewOf (Environment.fromArray physical data) := rfl
 
+omit [Fact (2 ^ 25 < p)] in
 theorem shiftLeftChipDescriptor_table :
     (shiftLeftChipDescriptor (p := p)).table =
       (⟨ShiftLeftChip.circuit (p := p)⟩ : Component (ZMod p)) := rfl
@@ -1559,8 +1563,7 @@ variable [Fact (2 ^ 25 < p)]
 omit [Fact (2 ^ 25 < p)] in
 /-- The immediate-capable ShiftRight descriptor in the supported Core registry. -/
 def shiftRightChipDescriptor : SupportedChip p :=
-  ⟨ShiftRightChip.kind, ShiftRightChip.circuit, rfl,
-    [.SRL, .SRA, .SRLW, .SRAW], .nonX0⟩
+  ⟨.shiftRight, ShiftRightChip.kind, ShiftRightChip.circuit, rfl⟩
 
 omit [Fact (2 ^ 25 < p)] in
 noncomputable def shiftRightViewOf (env : Environment (ZMod p)) : Trace.RowView (ZMod p) :=
@@ -1571,6 +1574,7 @@ theorem shiftRightViewOf_decodeRow (data : ProverData (ZMod p))
     ((shiftRightChipDescriptor (p := p)).decodeRow data physical).view =
       shiftRightViewOf (Environment.fromArray physical data) := rfl
 
+omit [Fact (2 ^ 25 < p)] in
 theorem shiftRightChipDescriptor_table :
     (shiftRightChipDescriptor (p := p)).table =
       (⟨ShiftRightChip.circuit (p := p)⟩ : Component (ZMod p)) := rfl
@@ -1767,11 +1771,7 @@ variable [Fact (2 ^ 25 < p)]
 omit [Fact (2 ^ 25 < p)] in
 /-- AluX0's descriptor in the supported Core registry. -/
 def aluX0ChipDescriptor : SupportedChip p :=
-  ⟨AluX0Chip.kind, AluX0Chip.circuit, rfl,
-    [.ADD, .ADDI, .ADDW, .SUB, .SUBW, .XOR, .OR, .AND, .SLT, .SLTU,
-     .SLL, .SLLW, .SRL, .SRA, .SRLW, .SRAW,
-     .MUL, .MULH, .MULHU, .MULHSU, .MULW,
-     .DIV, .DIVU, .REM, .REMU, .DIVW, .DIVUW, .REMW, .REMUW], .onlyX0⟩
+  ⟨.aluX0, AluX0Chip.kind, AluX0Chip.circuit, rfl⟩
 
 omit [Fact (2 ^ 25 < p)] in
 noncomputable def aluX0ViewOf (env : Environment (ZMod p)) :
@@ -1785,6 +1785,7 @@ theorem aluX0ViewOf_decodeRow (data : ProverData (ZMod p))
     ((aluX0ChipDescriptor (p := p)).decodeRow data physical).view =
       aluX0ViewOf (Environment.fromArray physical data) := rfl
 
+omit [Fact (2 ^ 25 < p)] in
 theorem aluX0ChipDescriptor_table :
     (aluX0ChipDescriptor (p := p)).table =
       (⟨AluX0Chip.circuit (p := p)⟩ : Component (ZMod p)) := rfl

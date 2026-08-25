@@ -265,10 +265,10 @@ theorem stateTimeConstraintShape_of_circuit (kind : ChipKind p)
       kind.provableInputs kind.provableCols)
     (spec_eq : @GeneralFormalCircuit.Spec (ZMod p) kind.Inputs kind.Cols inferInstance
       kind.provableInputs kind.provableCols circuit = kind.chipSpec)
-    (opcodes : List Opcode) (rdGuard : RdGuard)
+    (id : InstructionChipId)
     (shape : @CircuitStateTimeStep p _ kind.Inputs kind.Cols kind.provableInputs
       kind.provableCols circuit kind.view) :
-    StateTimeConstraintShape ⟨kind, circuit, spec_eq, opcodes, rdGuard⟩ := by
+    StateTimeConstraintShape ⟨id, kind, circuit, spec_eq⟩ := by
   letI := kind.provableInputs
   letI := kind.provableCols
   intro data physical

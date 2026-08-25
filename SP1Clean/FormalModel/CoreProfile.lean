@@ -24,6 +24,16 @@ def sp1SemanticRevision : String := "f66b4bff51d0ccff51d152e0f7f66b2ffedf3529"
 revision. -/
 def sp1SemanticDescription : String := "v6.4.0"
 
+/-- Maximum execution-clock budget of one Core shard in the pinned executor.  This is
+`MAX_SHARD_SIZE = 1 << 24` from `crates/core/executor/src/opts.rs` at
+`sp1SemanticRevision`.  The ordinary instruction schedule consumes eight clock ticks per row. -/
+def maxShardCycles : ℕ := 2 ^ 24
+
+/-- Maximum number of ordinary instruction rows in a shard that uses no syscall windows. -/
+def maxOrdinaryTransitions : ℕ := maxShardCycles / 8
+
+@[simp] theorem maxOrdinaryTransitions_eq : maxOrdinaryTransitions = 2 ^ 21 := by decide
+
 /-- Generated AIR artifacts and the hand-audited profile name the same unmodified Rust source. -/
 theorem checkedIn_semanticRevision :
     SP1Clean.Extracted.checkedInProvenance.semanticRevision = sp1SemanticRevision := rfl

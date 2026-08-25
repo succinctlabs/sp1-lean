@@ -498,7 +498,7 @@ variable [Fact (2 ^ 25 < p)]
 omit [Fact (2 ^ 25 < p)] in
 /-- JAL's descriptor in the supported Core registry. -/
 def jalChipDescriptor : SupportedChip p :=
-  ⟨JalChip.kind, JalChip.circuit, rfl, [.JAL], .any⟩
+  ⟨.jal, JalChip.kind, JalChip.circuit, rfl⟩
 
 omit [Fact (2 ^ 25 < p)] in
 noncomputable def jalViewOf (env : Environment (ZMod p)) : Trace.RowView (ZMod p) :=
@@ -510,10 +510,12 @@ theorem jalViewOf_decodeRow (data : ProverData (ZMod p)) (physical : Array (ZMod
     ((jalChipDescriptor (p := p)).decodeRow data physical).view =
       jalViewOf (Environment.fromArray physical data) := rfl
 
+omit [Fact (2 ^ 25 < p)] in
 theorem jalChipDescriptor_table :
     (jalChipDescriptor (p := p)).table =
       (⟨JalChip.circuit (p := p)⟩ : Component (ZMod p)) := rfl
 
+omit [Fact (2 ^ 25 < p)] in
 /-- Folded descriptor projection for JAL's circuit assumptions.  Consumers rewrite through this
 small theorem instead of asking unification to normalize the complete circuit-bearing descriptor. -/
 theorem jalChipDescriptor_assumptions_iff (data : ProverData (ZMod p))
@@ -698,7 +700,7 @@ variable [Fact (2 ^ 25 < p)]
 omit [Fact (2 ^ 25 < p)] in
 /-- U-type's descriptor in the supported Core registry. -/
 def uTypeChipDescriptor : SupportedChip p :=
-  ⟨UTypeChip.kind, UTypeChip.circuit, rfl, [.AUIPC, .LUI], .any⟩
+  ⟨.uType, UTypeChip.kind, UTypeChip.circuit, rfl⟩
 
 omit [Fact (2 ^ 25 < p)] in
 noncomputable def uTypeViewOf (env : Environment (ZMod p)) : Trace.RowView (ZMod p) :=
@@ -710,10 +712,12 @@ theorem uTypeViewOf_decodeRow (data : ProverData (ZMod p)) (physical : Array (ZM
     ((uTypeChipDescriptor (p := p)).decodeRow data physical).view =
       uTypeViewOf (Environment.fromArray physical data) := rfl
 
+omit [Fact (2 ^ 25 < p)] in
 theorem uTypeChipDescriptor_table :
     (uTypeChipDescriptor (p := p)).table =
       (⟨UTypeChip.circuit (p := p)⟩ : Component (ZMod p)) := rfl
 
+omit [Fact (2 ^ 25 < p)] in
 /-- Folded descriptor projection for U-type's circuit assumptions. -/
 theorem uTypeChipDescriptor_assumptions_iff (data : ProverData (ZMod p))
     (physical : Array (ZMod p)) :

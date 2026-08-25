@@ -5,7 +5,7 @@ import SP1Clean.Native.Operations.U16MSBOperation.Defs
 import SP1Clean.Model.SP1Constraint
 import SP1Clean.Model.InteractionProjection
 import ToClean.Circuit.InteractionRecovery
-import SP1Clean.Faithful.ExtractedInteractionModel
+import SP1Clean.Extracted.InteractionModel
 import SP1Clean.Extracted.U16MSBOperation
 import SP1Clean.Faithful.ChipTactics
 import SP1Clean.Faithful.ChipOracle

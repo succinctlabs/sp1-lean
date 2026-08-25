@@ -1473,7 +1473,7 @@ variable [Fact (2 ^ 25 < p)]
 omit [Fact (2 ^ 25 < p)] in
 /-- The Add instruction descriptor (entry 0 of `supportedChips`). -/
 def addChipDescriptor : SupportedChip p :=
-  ⟨AddChip.kind, AddChip.circuit, rfl, [.ADD], .nonX0⟩
+  ⟨.add, AddChip.kind, AddChip.circuit, rfl⟩
 
 omit [Fact (2 ^ 25 < p)] in
 /-- The Add row view denoted by one physical environment. -/
@@ -1495,6 +1495,7 @@ theorem addViewOf_decodeRow (data : ProverData (ZMod p)) (physical : Array (ZMod
     ((addChipDescriptor (p := p)).decodeRow data physical).view =
       addViewOf (Environment.fromArray physical data) := rfl
 
+omit [Fact (2 ^ 25 < p)] in
 /-- The descriptor's flat table is the bare Add component — again structure-literal projection. -/
 theorem addChipDescriptor_table :
     (addChipDescriptor (p := p)).table = (⟨AddChip.circuit (p := p)⟩ : Component (ZMod p)) := rfl
@@ -2009,7 +2010,7 @@ variable [Fact (2 ^ 25 < p)]
 omit [Fact (2 ^ 25 < p)] in
 /-- The Sub instruction descriptor (entry 3 of `supportedChips`). -/
 def subChipDescriptor : SupportedChip p :=
-  ⟨SubChip.kind, SubChip.circuit, rfl, [.SUB], .nonX0⟩
+  ⟨.sub, SubChip.kind, SubChip.circuit, rfl⟩
 
 omit [Fact (2 ^ 25 < p)] in
 noncomputable def subViewOf (env : Environment (ZMod p)) : Trace.RowView (ZMod p) :=
@@ -2020,6 +2021,7 @@ theorem subViewOf_decodeRow (data : ProverData (ZMod p)) (physical : Array (ZMod
     ((subChipDescriptor (p := p)).decodeRow data physical).view =
       subViewOf (Environment.fromArray physical data) := rfl
 
+omit [Fact (2 ^ 25 < p)] in
 theorem subChipDescriptor_table :
     (subChipDescriptor (p := p)).table =
       (⟨SubChip.circuit (p := p)⟩ : Component (ZMod p)) := rfl

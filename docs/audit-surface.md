@@ -30,9 +30,14 @@ kernel, each with the question it decides. Reading these, plus `FormalModel/Cont
 | `WitnessRelation.Relation` | `SP1Clean/FormalModel/Relations.lean` | What a statement/witness relation is |
 | `WitnessRelation.Sound` | `SP1Clean/FormalModel/Relations.lean` | Direction and shape of the soundness claim |
 | `WitnessRelation.Complete` | `SP1Clean/FormalModel/Relations.lean` | Direction and shape of the completeness claim |
+| `WitnessRelation.FunctionalCompleteness` | `SP1Clean/FormalModel/Relations.lean` | The proof-independent reverse witness map; no witness-preservation law is implicit |
+| `WitnessRelation.Correct` | `SP1Clean/FormalModel/Relations.lean` | Both existential directions, hence public-language equality rather than witness inversion |
 | `SupportedCoreNativeRelation` | `SP1Clean/Soundness/AIR.lean` | The hypothesis side: exactly two conjuncts |
 | `supported_core_native_sound` | `SP1Clean/Soundness/AIR.lean` | The headline theorem |
+| `supported_core_native_ordinary_sound` | `SP1Clean/Soundness/AIR.lean` | The native witness projected to the exact ordinary supported target |
 | `SupportedCoreLocalExecutionRelation` | `SP1Clean/FormalModel/Execution.lean` | What the conclusion actually says |
+| `SupportedOrdinaryShardExecutionRelation` | `SP1Clean/FormalModel/SupportedShard.lean` | The shared normal-retirement, 25-route semantic target |
+| `SupportedDecodedTransition` | `SP1Clean/FormalModel/SupportedShard.lean` | What “supported” requires of each transition |
 | `LocalSegmentMatchesBoundary` | `SP1Clean/FormalModel/Execution.lean` | How the conclusion is pinned to the public endpoints |
 
 ## Which machine is being verified
@@ -76,6 +81,7 @@ granularity gap is recorded on the definitions themselves.
 |---|---|---|
 | `GuestProgram` | `SP1Clean/Model/Semantics/GuestProgram.lean` | What a "program" is, and its guards |
 | `SailStep` | `SP1Clean/Model/Semantics/GuestProgram.lean` | One step of the real generated interpreter |
+| `SailRetiresNormally` | `SP1Clean/Model/Semantics/GuestProgram.lean` | Excludes trap/illegal/wait exits by recording the official `Retire_Success` branch |
 | `SailChain` | `SP1Clean/Model/Semantics/GuestProgram.lean` | A multi-step run |
 | `SailConfigured` | `SP1Clean/Model/Semantics/GuestProgram.lean` | Which platform state is assumed (incl. the single RWX PMA region) |
 | `SailCodeMemoryCompatible` | `SP1Clean/Model/Semantics/GuestProgram.lean` | The code/data separation contract — self-modifying code excluded by assumption |
@@ -84,6 +90,7 @@ granularity gap is recorded on the definitions themselves.
 | `decodedInROM` | `SP1Clean/Model/Semantics/Decode.lean` | The decode correspondence |
 | `instrToProgramRow` | `SP1Clean/Model/Semantics/Decode.lean` | How a decoded instruction projects to a Program row |
 | `Commit.progOf` | `SP1Clean/Model/Semantics/ProgramCommitment.lean` | How the program is bound to prover data |
+| `Commit.CanonicalEncoding` | `SP1Clean/Model/Semantics/ProgramCommitment.lean` | The range/singleton conditions that make decoding canonical |
 | `Commit.StatementFor` | `SP1Clean/Model/Semantics/ProgramCommitment.lean` | The committed-program statement |
 
 ## Faithfulness to Rust, and the transport
@@ -93,10 +100,10 @@ granularity gap is recorded on the definitions themselves.
 | `ChipFaithful` | `SP1Clean/Faithful/ChipOracle.lean` | What "faithful to Rust" means |
 | `ChipOracle` | `SP1Clean/Faithful/ChipOracle.lean` | The generated Rust side of the comparison |
 | `FaithfulPropFor` | `SP1Clean/Faithful/SupportedMachine.lean` | That an anchor is bound to *its own* table's theorem |
-| `CanonicalPreprocessedInventory` | `SP1Clean/Faithful/Transport/PreprocessedProviders.lean` | Caller-supplied provider carriers + projected-key `Nodup` |
-| `PreprocessedProviderContract` | `SP1Clean/Faithful/Transport/PreprocessedProviders.lean` | Caller-supplied row-local provider semantics |
-| `PreprocessedProviderRecountContract` | `SP1Clean/Faithful/Transport/PreprocessedProviders.lean` | Coverage, nonpositivity, canonical capacity |
-| `ExactNativeGlobalContract` | `SP1Clean/Faithful/Transport/CoreArtifact.lean` | What the artifact still assumes globally |
+| `CanonicalPreprocessedInventory` | `SP1Clean/Composition/PreprocessedProviders.lean` | Caller-supplied provider carriers + projected-key `Nodup` |
+| `PreprocessedProviderContract` | `SP1Clean/Composition/PreprocessedProviders.lean` | Caller-supplied row-local provider semantics |
+| `PreprocessedProviderRecountContract` | `SP1Clean/Composition/PreprocessedProviders.lean` | Coverage, nonpositivity, canonical capacity |
+| `ExactNativeGlobalContract` | `SP1Clean/Composition/CoreArtifact.lean` | What the artifact still assumes globally |
 | `CoreAIRRefinementObligations` | `SP1Clean/Soundness/CoreAIR.lean` | The 14-field exact-refinement bundle (`executionCase` open) |
 
 ## The completeness direction
@@ -104,11 +111,34 @@ granularity gap is recorded on the definitions themselves.
 | Declaration | File | Question it decides |
 |---|---|---|
 | `SupportedCoreTraceWitness` | `SP1Clean/Proofs/Completeness/Assembly.lean` | What a supplied trace is |
-| `supported_core_native_complete` | `SP1Clean/Soundness/AIRCompleteness.lean` | The converse, relative to a generator |
+| `compileExecution` | `SP1Clean/Proofs/Completeness/ExecutionCompiler.lean` | The proof-independent chronological all-25 compiler |
+| `nativeTrace` | `SP1Clean/Proofs/Completeness/NativeTraceCompiler.lean` | The unique 53-table trace produced from a statement and execution |
+| `NativeTraceReady` | `SP1Clean/Proofs/Completeness/NativeTraceCompiler.lean` | The remaining named semantic/representation facts about that exact compiler output |
+| `NativeStateRowProjection` | `SP1Clean/Proofs/Completeness/NativeTraceCompiler.lean` | The sole physical-row projection seam for State instruction accesses |
+| `NativeMemoryRowProjection` | `SP1Clean/Proofs/Completeness/NativeTraceCompiler.lean` | The two physical-row projection seams for instruction and MemoryBump accesses |
+| `NativeMemoryGenesis` | `SP1Clean/Proofs/Completeness/NativeTraceCompiler.lean` | The field-free initial-memory fact, before any Clean provider representation |
+| `NativeProgramRowProjection` | `SP1Clean/Proofs/Completeness/NativeTraceCompiler.lean` | The physical Program pulls' link to retained compiler decodes |
+| `nativeTrace_stateAgreement` | `SP1Clean/Proofs/Completeness/NativeStateAgreement.lean` | State projection plus generated boundaries/bumps yields the complete State ledger |
+| `nativeTrace_memoryLedgerPermHandoffChains` | `SP1Clean/Proofs/Completeness/NativeMemoryAgreement.lean` | Physical Memory tables regroup to the canonical per-location histories |
+| `nativeTrace_memoryInitProviderBound` | `SP1Clean/Proofs/Completeness/NativeMemoryAgreement.lean` | Field-free Memory genesis grounds the generated init-provider rows |
+| `nativeTrace_programProviderBound` | `SP1Clean/Proofs/Completeness/NativeProgramAgreement.lean` | Retained decode agreement grounds the generated Program-provider rows |
+| `NativeTraceReady.semanticBoundary` | `SP1Clean/Proofs/Completeness/NativeBoundaryAgreement.lean` | The derived Program/Memory provider facts joined with the exact semantic boundary |
+| `SupportedCoreNativeAdmissibleExecutionRelation` | `SP1Clean/Proofs/Completeness/NativeTraceCompiler.lean` | The honest semantic source on which the deterministic compiler is presently proved complete |
+| `supported_core_native_functionalCompleteness` | `SP1Clean/Soundness/NativeCompleteness.lean` | The proof-independent semantic-execution-to-AIR witness map |
+| `supported_core_native_complete` | `SP1Clean/Soundness/NativeCompleteness.lean` | Existential whole-ensemble completeness on the admissible image |
+| `sp1Ensemble_statement_of_supported_execution` | `SP1Clean/Soundness/NativeCompleteness.lean` | The direct Clean `Ensemble.Statement` consequence |
+| `anchorExecution_admissible` | `SP1CleanTest/Audit/NativeCompletenessNonVacuity.lean` | A concrete boundary-only execution jointly inhabits every admissibility premise |
+| `anchorExecution_yields_airWitness` | `SP1CleanTest/Audit/NativeCompletenessNonVacuity.lean` | The functional capstone returns its literal compiled 53-table witness |
+| `SupportedCoreGeneratedTraceRelation` | `SP1Clean/Soundness/AIRCompleteness.lean` | The lower generated-trace assembly boundary, kept distinct from semantic completeness |
 
-Completeness is **generator-relative**: nothing yet proves that every supported Sail execution
-yields a well-formed, balanced trace, and the StateBump/MemoryBump inputs a large shard needs are
-supplied rather than derived at window crossings.
+Completeness now covers the deterministic compiler's full 53-table admissible image: all 25 instruction
+families, refresh-aware StateBump/MemoryBump placement, canonical Byte/Range/Program closure, both
+Memory boundary tables, the State verifier row, constraints, and all four channel balances.  It is
+still narrower than the entire unbounded exact ordinary semantic relation. Its compiler domain needs
+registry-wide event-validity, Memory-genesis, configured-state decode-stability, and interaction-
+footprint theorems on the intended bounded source. A language-equality theorem additionally needs
+soundness to target that same capacity-bounded relation. No abstract certificate or existential AIR
+witness hides those facts, and no public-language equality is claimed.
 
 ## Outside this list
 

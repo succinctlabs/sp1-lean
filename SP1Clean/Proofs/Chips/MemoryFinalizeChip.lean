@@ -21,7 +21,7 @@ close. This chip is that finalize row: it reads an explicit **boolean** multipli
 A pull *receives* the channel guarantee (`MemoryMsg.isU64`) and owes nothing, so
 `channelsWithRequirements = []` and the local `Spec` is `True` — the finalize row's meaning (its key
 really is the last access of its address chain) is a bus-balance fact established at the capstone
-(`Soundness/MemoryGlobal.lean`'s boundary predicates), not a per-row constraint. -/
+(`Soundness/ProviderBindings.lean` and `Composition/MemoryBoundary.lean`), not a per-row constraint. -/
 
 namespace SP1Clean.MemoryFinalizeChip
 

@@ -141,6 +141,29 @@ PC commit — so nothing of the interpreter is bypassed. -/
 def SailStep (s s' : SailState) : Prop :=
   ∃ b : Bool, (try_step 0 false).run s = .ok b s'
 
+/-- One real interpreter step whose active-hart branch executed an instruction to
+`Retire_Success`, rather than taking one of `run_hart_active`'s trap, illegal-instruction,
+wait, or extension-failure exits.
+
+The `should_inc_minstret` equation pins `b` to the value actually selected by `try_step`; the
+`run_hart_active` equation then observes the corresponding post-`minstret_increment` state.  The
+final equation retains the actual `try_step` target, including its PC/minstret tail.  Keeping this
+predicate below the row model lets both the semantic shard relation and `RowEffect` use the same
+official-Sail notion of normal retirement. -/
+def SailRetiresNormally (s s' : SailState) : Prop :=
+  ∃ minstretIncrement : Bool, ∃ instructionBits : instbits, ∃ postExecute : SailState,
+    (should_inc_minstret Privilege.Machine).run s = .ok minstretIncrement s ∧
+    (run_hart_active 0).run
+        ({s with regs := s.regs.insert Register.minstret_increment minstretIncrement}) =
+      .ok (Step.Step_Execute (ExecutionResult.Retire_Success (), instructionBits)) postExecute ∧
+    (try_step 0 false).run s = .ok false s'
+
+/-- Normal retirement is, in particular, a real Sail step. -/
+theorem SailRetiresNormally.sailStep {s s' : SailState}
+    (normal : SailRetiresNormally s s') : SailStep s s' := by
+  obtain ⟨_, _, _, _, _, step⟩ := normal
+  exact ⟨false, step⟩
+
 /-- An `n`-step Sail execution chain. -/
 inductive SailChain : ℕ → SailState → SailState → Prop
   | refl (s : SailState) : SailChain 0 s s

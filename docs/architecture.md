@@ -18,6 +18,37 @@ This produces four distinct objects:
 
 No one of these objects is silently treated as another.
 
+That rule does not license duplicate *views* of the same object. The machine layer therefore has
+two explicit strata and proved views at their boundary:
+
+1. **Operational semantics:** `Machine.EventExecutionTrace` is the sole proof-free execution
+   carrier. A valid trace converts directly to PolyFun's `DynSystem.Prefix`; its ordinary fragment
+   converts directly to `SailChain`. `FormalModel/SupportedShard.lean` states the exact native
+   supported image over this carrier.
+2. **Physical AIR:** `DecodedInstructionRow`, `ChipRow`, and `RowView` retain dependent circuit
+   types and field encodings. They are codecs for the physical witness, not competing execution
+   models.
+
+The completeness compiler also has **derived, field-free views**: `InstructionAccessPlan`,
+`AccessSchedule`, `MemoryHistoryAccess`, and the State-history records.  They are deterministic
+projections of `EventExecutionTrace`, not a second proof-free execution witness.  Their physical-row
+projections are either proved in the agreement modules or named explicitly in `NativeTraceReady`;
+an unbridged standalone timeline would still be duplicate representation.
+
+Instruction identity follows the same rule. `Model/InstructionChipId.lean` fixes the neutral
+25-entry order; `Model/InstructionRouting.lean` owns the pure opcode/`x0` route; and
+`Soundness/SupportedMachine.lean` is only the circuit-bearing realization of those identities.
+Adding another opcode list or positional 25-chip literal is an architecture regression.
+
+The interaction layer deliberately has **two** primary views because their information differs:
+
+- typed `TypedInteraction`s for soundness, where a message retains its State/Memory/Program shape;
+- computable `LookupAccess` ledgers for completeness, recounting, and integer balance.
+
+`Interaction.toAccess`, lifted table/ensemble-wide, is their bridge. Clean orientation is canonical
+inside the native model. The Memory/Program sign dualization used by extracted Rust faithfulness is
+an explicit Rust-facing projection, never a second native ledger definition.
+
 ## Repository layers
 
 | Layer | Responsibility |
@@ -30,6 +61,7 @@ No one of these objects is silently treated as another.
 | `Proofs/` | circuit soundness/completeness and Sail bridges |
 | `Faithful/` | whole-chip comparisons on canonical native rows reconstructed from extracted Rust rows |
 | `Soundness/` | machine registry, typed decoding, grounding, and capstones |
+| `Composition/` | the composed exact→native artifact: transport, provider redistribution, the 53-table assembly |
 | `SP1CleanTest/` | compiler-trusted executable conformance tests, isolated from the main library |
 
 `SP1Clean.lean` imports the complete main proof library (`scripts/check_root_index.sh` gates that it
@@ -151,15 +183,17 @@ the 25-entry instruction coverage certificate.
 
 ## The native supported machine
 
-`Soundness/SupportedMachine.lean` is the single instruction registry. Each of its 25 entries carries:
+`Soundness/SupportedMachine.lean` is the circuit-bearing instruction registry. Each of its 25
+entries carries:
 
+- its neutral `InstructionChipId`;
 - the verified Clean circuit;
 - its semantic `ChipKind`;
-- the routed SP1 opcodes; and
-- the `rd = x0` routing guard.
+- and the proof that the circuit contract is the registered semantic contract.
 
-The registry drives the Clean table list, typed row decoder, opcode coverage, Sail dispatch, and
-faithfulness coverage. Its order is a witness-format decision.
+Opcode families and the `rd = x0` guard are derived from the neutral identity's pure route rather
+than stored again. `InstructionChipId.all` drives the Clean table list, typed row decoder, opcode
+coverage, Sail dispatch, and faithfulness coverage. Its order is a witness-format decision.
 
 `SP1Ensemble.lean` adds 28 proof-oriented provider/boundary tables to form a 53-table Clean ensemble:
 six Byte-op providers at positions 25–30, one fixed Range provider for every width `0..16` at
@@ -168,7 +202,7 @@ StateBump at 51/52. The complete Range family is semantic, not padding: shift co
 outside the former `8/13/14/16` subset, so that subset could not balance an honest shift trace.
 These provider circuits are not asserted to be row-wise copies of the exact upstream Core system
 tables. They are the small native interface used to prove the instruction execution theorem;
-`Faithful/Transport/ProviderSegment.lean` consumes a caller-supplied, source-backed
+`Composition/ProviderSegment.lean` consumes a caller-supplied, source-backed
 `CanonicalPreprocessedInventory` together with the exact memory-boundary and bump rows, and
 `CoreEnsemble.lean` proves the complete 53-table local constraint system.
 
@@ -217,7 +251,11 @@ The whole-machine proof derives meaning in this order:
 6. `LocalExecution.lean` applies `ChipKind.advance` in order to construct an actual Sail chain.
 
 The generic timed engine and every one of the 25 registry contracts are proved. The result is packaged
-by `supported_core_witness_grounding` and consumed by `supported_core_native_sound`.
+by `supported_core_witness_grounding` and consumed in two forms: `supported_core_native_sound`
+targets the broad shard-local Sail relation, while `supported_core_native_ordinary_sound` constructs
+the exact `EventExecutionTrace` target shared with completeness and proves that every transition has
+normal `Retire_Success` evidence and a canonical `InstructionChipId` route. This excludes routed
+instructions that enter Sail's trap path but cannot produce a valid native instruction row.
 
 The source relation keeps non-algebraic facts visible. The exact AIR/PCS integration must derive the
 authenticated provider contents, their uniqueness, and their binding to the committed program and
@@ -334,11 +372,32 @@ supported semantic execution
   → accepting cryptographic proof
 ```
 
-The source must be restricted to supported, trace-generatable executions. Clean's exportable witness
-generation is the intended implementation vehicle. The current
-`supported_core_native_complete` theorem proves the final native assembly arrow **from an already
-well-formed, balanced trace**; it does not implement either preceding semantic-generation arrow, so
-no whole-machine semantic completeness theorem is declared today.
+The source is `SupportedOrdinaryShardExecutionRelation`, the exact supported ordinary image also
+produced by `supported_core_native_ordinary_sound`.  The forward implementation is now the total,
+proof-independent `nativeTrace statement execution` function.  It decodes and compiles all 25
+instruction families, schedules Memory refreshes, derives State refreshes, creates canonical
+Memory boundaries, recounts Byte/Range/Program providers from the literal Clean consumer ledger,
+and stores the public boundary once.
+
+`supported_core_native_functionalCompleteness` proves that map satisfies
+`SupportedCoreNativeRelation` on `SupportedCoreNativeAdmissibleExecutionRelation`; its existential
+projection is `supported_core_native_complete`, and
+`sp1Ensemble_statement_of_supported_execution` exposes the direct Clean statement.  Admissibility
+contains the exact semantic relation, pinned Core row budget, named readiness facts for this exact
+compiler output, and `NativeTraceFootprint.Fits`.  It does not assume table constraints, channel
+balance, or an existential generated trace.
+
+The source is deliberately capacity-bounded and still narrower than every exact ordinary execution.
+The remaining compiler-domain work includes registry-wide event validity; State and Memory chronology/row-agreement
+lemmas; literal-ledger Byte polarity and demand servability; initial-Memory content; configured-state
+Program row/decode agreement; and the actual interaction-count bound.  Deterministic representation
+facts should migrate out of readiness as their agreement theorems close.  These implications alone
+cannot widen completeness to the current unbounded exact relation: soundness does not return the
+Core row cap or physical `< p` capacity. A future `WitnessRelation.Correct` therefore needs one
+shared capacity-bounded semantic relation (or an equivalent two-sided refinement). The library does
+not claim unconditional public-language equality. The older abstract language-certificate API
+was removed because its map could ignore the semantic witness and therefore did not express
+compiler fidelity.
 
 ## Performance discipline
 

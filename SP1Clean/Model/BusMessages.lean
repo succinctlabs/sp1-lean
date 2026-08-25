@@ -36,9 +36,8 @@ deriving ProvableStruct
 (`crates/core/machine/src/adapter/state.rs:90-98`) range-checks *only* the clock (`clk_0_16` 13-bit Range
 + `clk_16_24` U8Range) — **it does not range-check `pc`** (the `receive_state`/`send_state` pass `cols.pc`/
 `next_pc` un-bounded). So the State *send* proves no local guarantee; the pc-limb bounds are *received*
-facts (the previous row's send / the verifier-committed initial pc via the PC chain, and the program ROM),
-exactly like the register-index bounds. The cross-row PC chain stays the trace level
-(`Soundness/StateConsistency.lean`). -/
+facts established by the typed State ledger, boundary records, and ranked grounding, exactly like the
+register-index bounds (`Soundness/TypedState.lean`). -/
 def StateMsg.Spec (_ : StateMsg (ZMod p)) : Prop := True
 
 /-- The Memory-bus message — `(clk_high, clk_low, addr0, addr1, addr2, value)`, where `value : Word` is
@@ -248,8 +247,8 @@ ROM row of *any* instruction type: the destination register index `op_a < 32`, t
 `op_a_0` boolean. This is the per-message `Guarantees` the **ROM provider proves on push** and the chips
 **pull-and-derive** (W11 polarity flip) — program-INDEPENDENT, exactly analogous to
 `byteChannel.Guarantees = ByteRowSpec`. The *program-specific* membership (`inROM` — the fetch is in
-*this* committed program) is the finished-channel **balance** fact, not a per-message guarantee (see
-`Soundness/ProgramConsistency.lean`). -/
+*this* committed program) is the finished-channel balance and commitment fact, not a per-message
+guarantee (see `Soundness/TypedProgram.lean`). -/
 def ProgramMsg.RowSpec (msg : ProgramMsg (ZMod p)) : Prop :=
   msg.op_a.val < 32 ∧
   msg.pc0.val < 2 ^ 16 ∧ msg.pc1.val < 2 ^ 16 ∧ msg.pc2.val < 2 ^ 16 ∧

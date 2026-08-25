@@ -32,6 +32,8 @@ jobs:
         run: scripts/check_report_citations.sh
       - name: Audit-surface index matches the tree
         run: scripts/check_audit_surface.sh
+      - name: Layering contract holds
+        run: scripts/check_layering.sh
 
   build:
     runs-on:

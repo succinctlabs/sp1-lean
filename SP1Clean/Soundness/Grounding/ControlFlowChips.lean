@@ -222,7 +222,7 @@ variable [Fact (2 ^ 25 < p)]
 omit [Fact (2 ^ 25 < p)] in
 /-- JALR's descriptor in the supported Core registry. -/
 def jalrChipDescriptor : SupportedChip p :=
-  ⟨JalrChip.kind, JalrChip.circuit, rfl, [.JALR], .any⟩
+  ⟨.jalr, JalrChip.kind, JalrChip.circuit, rfl⟩
 
 omit [Fact (2 ^ 25 < p)] in
 noncomputable def jalrViewOf (env : Environment (ZMod p)) : Trace.RowView (ZMod p) :=
@@ -234,10 +234,12 @@ theorem jalrViewOf_decodeRow (data : ProverData (ZMod p)) (physical : Array (ZMo
     ((jalrChipDescriptor (p := p)).decodeRow data physical).view =
       jalrViewOf (Environment.fromArray physical data) := rfl
 
+omit [Fact (2 ^ 25 < p)] in
 theorem jalrChipDescriptor_table :
     (jalrChipDescriptor (p := p)).table =
       (⟨JalrChip.circuit (p := p)⟩ : Component (ZMod p)) := rfl
 
+omit [Fact (2 ^ 25 < p)] in
 /-- Folded descriptor projection for JALR's circuit assumptions. -/
 theorem jalrChipDescriptor_assumptions_iff (data : ProverData (ZMod p))
     (physical : Array (ZMod p)) :
@@ -818,8 +820,7 @@ variable [Fact (2 ^ 25 < p)]
 omit [Fact (2 ^ 25 < p)] in
 /-- Branch's descriptor in the supported Core registry. -/
 def branchChipDescriptor : SupportedChip p :=
-  ⟨BranchChip.kind, BranchChip.circuit, rfl,
-    [.BEQ, .BNE, .BLT, .BGE, .BLTU, .BGEU], .any⟩
+  ⟨.branch, BranchChip.kind, BranchChip.circuit, rfl⟩
 
 omit [Fact (2 ^ 25 < p)] in
 noncomputable def branchViewOf (env : Environment (ZMod p)) : Trace.RowView (ZMod p) :=
@@ -831,10 +832,12 @@ theorem branchViewOf_decodeRow (data : ProverData (ZMod p)) (physical : Array (Z
     ((branchChipDescriptor (p := p)).decodeRow data physical).view =
       branchViewOf (Environment.fromArray physical data) := rfl
 
+omit [Fact (2 ^ 25 < p)] in
 theorem branchChipDescriptor_table :
     (branchChipDescriptor (p := p)).table =
       (⟨BranchChip.circuit (p := p)⟩ : Component (ZMod p)) := rfl
 
+omit [Fact (2 ^ 25 < p)] in
 /-- Folded descriptor projection for Branch's circuit assumptions. -/
 theorem branchChipDescriptor_assumptions_iff (data : ProverData (ZMod p))
     (physical : Array (ZMod p)) :

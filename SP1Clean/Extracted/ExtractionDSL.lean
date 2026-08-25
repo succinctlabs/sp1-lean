@@ -101,18 +101,19 @@ multiset balance (`Model/InteractionBus.lean`), not a row predicate. -/
 @[simp] lemma toProp_receive {p : ℕ} [NeZero p] (i : AirInteraction (ZMod p)) (mult : ZMod p) :
     (⟨.receive, i, mult⟩ : Interaction (ZMod p)).toProp ↔ True := Iff.rfl
 
-/-- A `send` of a `.state` interaction has trivial per-row meaning (the State bus's consistency is
-the trace-level PC chain, `Soundness/StateConsistency.lean`). -/
+/-- A `send` of a `.state` interaction has trivial per-row meaning. State reachability is derived
+globally from the typed interaction ledger and ranked grounding (`Soundness/TypedState.lean`). -/
 @[simp] lemma toProp_send_state {p : ℕ} [NeZero p] (a b c d e mult : ZMod p) :
     (⟨.send, .state a b c d e, mult⟩ : Interaction (ZMod p)).toProp ↔ True := Iff.rfl
 
-/-- A `send` of a `.memory` interaction has trivial per-row meaning (the memory bus's consistency is
-the trace-level register/RAM permutation, `Soundness/MemoryConsistency.lean`). -/
+/-- A `send` of a `.memory` interaction has trivial per-row meaning. Memory reachability is derived
+globally from the typed interaction ledger and timed per-location grounding
+(`Soundness/TypedMemory.lean`). -/
 @[simp] lemma toProp_send_memory {p : ℕ} [NeZero p] (a b c d e f g h i mult : ZMod p) :
     (⟨.send, .memory a b c d e f g h i, mult⟩ : Interaction (ZMod p)).toProp ↔ True := Iff.rfl
 
-/-- A `send` of a `.program` interaction has trivial per-row meaning (the program bus's consistency is
-the trace-level instruction-fetch membership, `Soundness/ProgramConsistency.lean`). -/
+/-- A `send` of a `.program` interaction has trivial per-row meaning. Committed-ROM membership is
+derived globally by the typed Program grounding (`Soundness/TypedProgram.lean`). -/
 @[simp] lemma toProp_send_program {p : ℕ} [NeZero p]
     (a b c : ZMod p) (op : Opcode) (d e f g h i j k l m n o mult : ZMod p) :
     (⟨.send, .program a b c op d e f g h i j k l m n o, mult⟩ : Interaction (ZMod p)).toProp ↔ True :=

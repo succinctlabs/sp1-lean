@@ -1,5 +1,5 @@
 import SP1Clean.Soundness.ChipRegistry
-import SP1Clean.FormalModel.Execution
+import SP1Clean.FormalModel.SupportedShard
 import SP1Clean.Model.Semantics.MicroTime
 
 /-! # Ordered grounded rows produce a local Sail execution
@@ -91,6 +91,67 @@ theorem GroundedRow.advance {data : ProverData (ZMod p)} {program : GuestProgram
   exact advance.down row.inputs row.cols data program state grounded.real grounded.spec
     configured romLoaded pc grounded.operands grounded.decoded grounded.ready
 
+/-- A grounded row exposes the exact proof-free decode route required by the ordinary-shard
+relation.  The Program and State pc keys are definitionally the same three row limbs; the route
+projection retains both its `InstructionRouteKey` and selected `InstructionChipId` until the exact
+relation consumes the latter. -/
+theorem GroundedRow.supportedDecodedTransition
+    {data : ProverData (ZMod p)} {program : GuestProgram}
+    {row : ChipRow p} {state next : SailState}
+    (grounded : GroundedRow data program row state)
+    (normal : SailRetiresNormally state next)
+    (configured : SailConfigured state)
+    (pc : state.regs.get? Register.PC = some (rcvPcOf (stateAccess row.view))) :
+    SupportedDecodedTransition program
+      ⟨state, ⟨Machine.ExecutionEvent.ordinary, next⟩⟩ := by
+  obtain ⟨word, instruction, fetch, decoded, projection⟩ :=
+    grounded.decoded.decodes state configured
+  obtain ⟨key, chipId, keyEq, routeEq⟩ := instrToProgramRow_route_exists projection
+  refine ⟨rfl, normal, configured, rcvPcOf (stateAccess row.view), word, instruction, pc, ?_,
+    decoded, chipId, routeEq⟩
+  exact fetch
+
+/-- Ordinary events impose no carried timestamp, so an all-ordinary proof-free transition list is
+clocked from every initial clock. -/
+private theorem ordinaryTransitions_clocked :
+    ∀ (transitions : List Machine.EventTransition) (clock : ℕ),
+      (∀ transition ∈ transitions, transition.event = .ordinary) →
+      Machine.EventTransitionsClocked clock transitions := by
+  intro transitions clock ordinary
+  induction transitions generalizing clock with
+  | nil => trivial
+  | cons transition rest ih =>
+      have head : transition.event = .ordinary := ordinary transition (by simp)
+      have tail : ∀ item ∈ rest, item.event = .ordinary :=
+        fun item itemMem => ordinary item (by simp [itemMem])
+      rcases transition with ⟨event, target⟩
+      simp only at head
+      subst event
+      exact ⟨trivial, ih _ tail⟩
+
+/-- The ordinary eight-tick schedule makes the final event clock a simple step count. -/
+private theorem ordinaryTransitions_finalClock :
+    ∀ (transitions : List Machine.EventTransition) (clock : ℕ),
+      (∀ transition ∈ transitions, transition.event = .ordinary) →
+      Machine.clockAfterEvents clock (transitions.map Machine.EventTransition.event) =
+        clock + 8 * transitions.length := by
+  intro transitions clock ordinary
+  induction transitions generalizing clock with
+  | nil => simp [Machine.clockAfterEvents]
+  | cons transition rest ih =>
+      have head : transition.event = .ordinary := ordinary transition (by simp)
+      have tail : ∀ item ∈ rest, item.event = .ordinary :=
+        fun item itemMem => ordinary item (by simp [itemMem])
+      rcases transition with ⟨event, target⟩
+      simp only at head
+      subst event
+      simp only [List.map_cons, Machine.clockAfterEvents, List.foldl_cons,
+        Machine.ExecutionEvent.duration_ordinary, List.length_cons]
+      change Machine.clockAfterEvents (clock + 8)
+          (rest.map Machine.EventTransition.event) = clock + 8 * (rest.length + 1)
+      rw [ih _ tail]
+      omega
+
 /-- Execute the unprocessed suffix of a pc walk, retaining the already-executed prefix only as an
 index into `RowsGrounded`. -/
 private theorem executePcWalkAux {Row : Type u}
@@ -146,6 +207,121 @@ theorem sailChain_of_groundedRows {Row : Type u} (rowOf : Row → ChipRow p)
       finalState.regs.get? Register.PC = some finalPc := by
   simpa using executePcWalkAux rowOf data program initial rows grounded codeMemoryCompatible
     [] rows initialPc finalPc initial (by simp) walk (.refl initial) pc rom cfg
+
+/-- Execute the unprocessed suffix into the single proof-free event-trace carrier used by the exact
+semantic relation.  Prefix Sail chains remain only the position index required by `RowsGrounded`;
+every newly fired row is recorded as one ordinary transition with its canonical decode route. -/
+private theorem executePcWalkEventsAux {Row : Type u}
+    (handler : Machine.SyscallHandler)
+    (rowOf : Row → ChipRow p)
+    (data : ProverData (ZMod p)) (program : GuestProgram) (initial : SailState)
+    (rows : List Row) (grounded : RowsGrounded rowOf data program initial rows)
+    (codeMemoryCompatible : SailCodeMemoryCompatible program initial) :
+    ∀ (done suffix : List Row) (current final : BitVec 64) (state : SailState),
+      rows = done ++ suffix →
+      PcWalk rowOf current final suffix →
+      SailChain done.length initial state →
+      state.regs.get? Register.PC = some current →
+      RomLoaded program state → SailConfigured state →
+      ∃ execution : Machine.EventExecutionTrace,
+        execution.initialState = state ∧
+        execution.steps = suffix.length ∧
+        execution.finalState.regs.get? Register.PC = some final ∧
+        execution.Valid handler program ∧
+        execution.AllOrdinary ∧
+        AllTransitionsSupported program execution := by
+  intro done suffix
+  induction suffix generalizing done with
+  | nil =>
+      intro current final state rowsEq walk chain pc rom cfg
+      have currentEq : current = final := walk
+      refine ⟨⟨state, []⟩, rfl, rfl, ?_, ?_, ?_, ?_⟩
+      · simpa [Machine.EventExecutionTrace.finalState, Machine.stateAfterTransitions, currentEq]
+          using pc
+      · exact .nil state
+      · intro transition transitionMem
+        simp at transitionMem
+      · intro located locatedMem
+        simp [Machine.EventExecutionTrace.locatedTransitions, Machine.locateTransitions]
+          at locatedMem
+  | cons row suffix ih =>
+      intro current final state rowsEq walk chain pc rom cfg
+      obtain ⟨rowSource, tailWalk⟩ := walk
+      have pcRow : state.regs.get? Register.PC =
+          some (rcvPcOf (stateAccess (rowOf row).view)) := by
+        rw [rowSource]
+        exact pc
+      have rowGrounded := grounded.at done row suffix rowsEq state chain
+      obtain ⟨next, step, effect⟩ := rowGrounded.advance cfg rom pcRow
+      have rowsEq' : rows = (done ++ [row]) ++ suffix := by
+        simpa [List.append_assoc] using rowsEq
+      have chain' : SailChain (done ++ [row]).length initial next := by
+        simpa using chain.snoc step
+      have nextRom : RomLoaded program next := codeMemoryCompatible chain step rom
+      obtain ⟨tailExecution, tailInitial, tailSteps, tailFinal, tailValid, tailOrdinary,
+          tailSupported⟩ :=
+        ih (done ++ [row]) (sndPcOf (stateAccess (rowOf row).view)) final next rowsEq'
+          tailWalk chain' effect.pc nextRom (effect.cfg cfg)
+      have headSupported :=
+        rowGrounded.supportedDecodedTransition effect.normal cfg pcRow
+      let head : Machine.EventTransition := ⟨.ordinary, next⟩
+      let execution : Machine.EventExecutionTrace :=
+        ⟨state, head :: tailExecution.transitions⟩
+      refine ⟨execution, rfl, ?_, ?_, ?_, ?_, ?_⟩
+      · change tailExecution.transitions.length + 1 = suffix.length + 1
+        simpa only [Machine.EventExecutionTrace.steps] using
+          congrArg (fun n => n + 1) tailSteps
+      · simpa [execution, Machine.EventExecutionTrace.finalState,
+          Machine.stateAfterTransitions, tailInitial] using tailFinal
+      · refine .cons head (.ordinary headSupported.notAboutToExecuteEcall step) ?_
+        change Machine.EventTransitionsValid handler program next tailExecution.transitions
+        rw [← tailInitial]
+        exact tailValid
+      · intro transition transitionMem
+        simp only [execution, List.mem_cons] at transitionMem
+        rcases transitionMem with rfl | transitionMem
+        · rfl
+        · exact tailOrdinary transition transitionMem
+      · intro located locatedMem
+        simp only [execution, Machine.EventExecutionTrace.locatedTransitions,
+          Machine.locateTransitions, List.mem_cons] at locatedMem
+        rcases locatedMem with rfl | locatedMem
+        · exact headSupported
+        · apply tailSupported
+          simpa [Machine.EventExecutionTrace.locatedTransitions, tailInitial] using locatedMem
+
+/-- A fully grounded ordered row list constructs one exact proof-free ordinary event trace.  Its
+validity is the official event-step relation, its transition order is the row order, every decode
+retains a canonical instruction-chip route, and the ordinary schedule gives the exact eight-tick
+clock count. -/
+theorem eventExecution_of_groundedRows {Row : Type u}
+    (handler : Machine.SyscallHandler) (rowOf : Row → ChipRow p)
+    (data : ProverData (ZMod p)) (program : GuestProgram) (initial : SailState)
+    (rows : List Row) (initialPc finalPc : BitVec 64)
+    (walk : PcWalk rowOf initialPc finalPc rows)
+    (grounded : RowsGrounded rowOf data program initial rows)
+    (codeMemoryCompatible : SailCodeMemoryCompatible program initial)
+    (pc : initial.regs.get? Register.PC = some initialPc)
+    (rom : RomLoaded program initial) (cfg : SailConfigured initial) (initialClock : ℕ) :
+    ∃ execution : Machine.EventExecutionTrace,
+      execution.initialState = initial ∧
+      execution.steps = rows.length ∧
+      execution.finalState.regs.get? Register.PC = some finalPc ∧
+      execution.Valid handler program ∧
+      execution.Clocked initialClock ∧
+      execution.finalClock initialClock = initialClock + 8 * rows.length ∧
+      execution.AllOrdinary ∧
+      AllTransitionsSupported program execution := by
+  obtain ⟨execution, initialEq, stepsEq, finalEq, valid, ordinary, supported⟩ :=
+    executePcWalkEventsAux handler rowOf data program initial rows grounded
+      codeMemoryCompatible [] rows initialPc finalPc initial (by simp) walk (.refl initial) pc rom cfg
+  refine ⟨execution, initialEq, stepsEq, finalEq, valid,
+    ordinaryTransitions_clocked execution.transitions initialClock ordinary, ?_, ordinary, supported⟩
+  change Machine.clockAfterEvents initialClock
+      (execution.transitions.map Machine.EventTransition.event) = initialClock + 8 * rows.length
+  rw [ordinaryTransitions_finalClock execution.transitions initialClock ordinary]
+  change execution.transitions.length = rows.length at stepsEq
+  rw [stepsEq]
 
 /-- Package the grounded-row engine as the honest local execution relation.  Schedule/clock equality
 is kept as a structural grounding premise because it comes from decoded State rows, not Sail steps. -/

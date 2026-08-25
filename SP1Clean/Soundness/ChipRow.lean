@@ -2,14 +2,12 @@ import SP1Clean.Soundness.RowView
 import SP1Clean.Model.SailWrap
 import SP1Clean.Math.Word
 import SP1Clean.Soundness.RowEffectDefs
-import SP1Clean.Soundness.ProgramConsistency
 
 /-! # `ChipKind` / `ChipRow` — the heterogeneous trace row, dispatched by *value*
 
-A single ordered trace mixing rows of different chips. Every per-row bus projection in
-`Soundness/*Consistency.lean` is defined once over the chip-agnostic `Trace.RowView`; a `ChipRow` maps to
-its `RowView` via `ChipRow.view`, and one `List (ChipRow …)` yields one `List RowView` whose interleaved
-PC chain / memory consistency are genuinely cross-chip.
+A single ordered trace mixing rows of different chips. Every row is projected once into the
+chip-agnostic `Trace.RowView`; a `ChipRow` maps to its `RowView` via `ChipRow.view`, and one
+`List (ChipRow …)` yields one homogeneous list for the grounding and execution layers.
 
 A `ChipKind` is a **structure of functions**: a chip registers one value (its `Inputs`/`Cols` type maps,
 the projections, and its `advance` proof), a `ChipRow` names its kind by value, and the capstone

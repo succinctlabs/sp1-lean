@@ -15,6 +15,12 @@ reader-facing docs one level up (start with [`../architecture.md`](../architectu
 
 ## Index
 
+- [shard-completeness-handoff.md](shard-completeness-handoff.md) — the per-shard completeness+soundness
+  decision log, written for a reader with no context: the two capstone theorems and the gap between
+  them, what is proved / legitimately assumed / an open residue, the decisions behind each so they are
+  not relitigated, the corrections and traps that cost real time, and the next actions in dependency
+  order. Its architectural companion is
+  [../proposals/bus-representation-consolidation.md](../proposals/bus-representation-consolidation.md).
 - [porting-recipe.md](porting-recipe.md) — step-by-step checklist to port a new chip from the Add/Bitwise template: create the four artifacts, wire the root import, verify build + axioms.
 - [proof-patterns.md](proof-patterns.md) — the witnessed-`FormalCircuit` soundness/completeness skeleton; `ZMod p` / `Word` / `circuit_proof_start` landmines; the fold recipes that keep proofs inside the default elaboration budget; the `ElaboratedCircuit` field-obligation recipe; the **Golf & cleanup discipline** section (how to golf/clean proofs safely).
 - [lean-sail-notes.md](lean-sail-notes.md) — the Lean 4.32.2 dependency environment: the immutable git

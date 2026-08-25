@@ -6,8 +6,7 @@ import SP1Clean.Model.InteractionBus
 SP1's `ByteChip` (`crates/core/machine/src/bytes/`) is the **preprocessed receiver** of the Byte bus:
 every consumer `send_byte(op, a, b, c, is_real)`s a byte row, the `ByteChip` *receives* each with a count
 multiplicity, and the LogUp argument balances them. Its preprocessed trace contains **only valid byte-op
-rows** (`ByteRowSpec`), so a balanced Byte bus forces every real send to be a valid row — which is exactly
-what `Soundness/ByteConsistency.lean`'s `TraceByteLink` threads.
+rows** (`ByteRowSpec`), so a balanced Byte bus transfers that row-local fact to every active consumer.
 
 This module models the receiver's side of that argument *natively*, shrinking the threaded assumption to
 the lone `isConsistentBalanced` (the LogUp/GKR fact Clean cannot model). The receiver is characterized by
@@ -24,7 +23,7 @@ open SP1Clean.LookupAccessList
 variable {p : ℕ} [NeZero p]
 
 /-- The val-projected Byte-bus key of a byte row — `(.Byte, "SP1Byte", [op.val, a.val, b.val, c.val])`,
-the grouping key of the row's `send_byte` (matching `Soundness/ByteConsistency.lean`'s `byteSend`). -/
+the grouping key used by the native provider recount. -/
 def byteRowKey (row : ByteRow (ZMod p)) : LookupKey :=
   (.Byte, "SP1Byte", [row.opcode.val, row.a.val, row.b.val, row.c.val])
 
