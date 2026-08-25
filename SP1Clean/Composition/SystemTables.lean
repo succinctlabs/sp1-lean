@@ -217,7 +217,7 @@ theorem extractedBumpTables_constraints {Digest : Type}
     ∀ table ∈ extractedBumpTables witness data, table.Constraints := by
   have rowValid : ∀ table row, row ∈ witness.trace.rows table →
       List.Forall (· = 0) (CoreAIR.Current.assertions statement.publicValues table row) :=
-    valid.2.2.1
+    fun _ _ rowMem => (CoreAIR.Current.system binds).localValid_of_relationFor valid rowMem
   intro table hmem
   simp only [extractedBumpTables, List.mem_cons, List.not_mem_nil, or_false] at hmem
   rcases hmem with rfl | rfl

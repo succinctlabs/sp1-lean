@@ -88,6 +88,17 @@ def System.relationFor {Public : Type} (system : System Public) (cluster : Clust
     WitnessRelation.Relation Public (Witness system.Row) :=
   fun statement witness => witness.cluster = cluster ∧ system.relation statement witness
 
+/-- Recover one table row's complete local validity directly from a cluster-restricted relation.
+This is the shared elimination rule for exact-row consumers: they should not depend on the nested
+conjunction layout of `System.relation`/`relationFor`. -/
+theorem System.localValid_of_relationFor {Public : Type} {system : System Public}
+    {cluster : Cluster} {statement : Public} {witness : Witness system.Row}
+    {table : Table} {row : system.Row table}
+    (valid : system.relationFor cluster statement witness)
+    (rowMem : row ∈ witness.trace.rows table) :
+    system.localValid table statement row :=
+  valid.2.2.1 table row rowMem
+
 /-- The extraction adapter is for the exact current semantic source/profile. -/
 def System.IsCurrent {Public : Type} (system : System Public) : Prop :=
   system.profile = CoreProfile.current

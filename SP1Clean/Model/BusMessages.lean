@@ -4,7 +4,7 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 
 /-! # Bus message types (the low layer below both the channels and the semantic predicates)
 
-The `ProvableStruct` message tuples of SP1's dynamic buses — State, Memory, Program — plus the
+The `ProvableStruct` message tuples of SP1's dynamic buses — State, Memory, Program, Syscall — plus the
 **structural** (program-independent, execution-independent) per-row predicates over them
 (`Spec`/`isU64`/`RowSpec`). Extracted from `Model/Channels.lean` so this layer sits *below* both the
 channel definitions and the semantic-execution predicates (`Model/Semantics/Truth.lean`), which need
@@ -31,6 +31,50 @@ structure StateMsg (F : Type) where
   pc1 : F
   pc2 : F
 deriving ProvableStruct
+
+/-- The exact v6.4.0 Syscall-bus message — `(clk_high, clk_low, syscall_id, arg1[0..2],
+arg2[0..2])`, arity 9. `SyscallInstrs` sends this tuple when byte one of the raw syscall code says
+that the handler has its own table, and `SyscallCore` receives it.
+
+This is deliberately only a shared typed carrier, not a new Clean channel and not a row-local
+semantic predicate. Syscall meaning comes from exact cross-table balance plus the trace-level host
+handler relation; putting either fact in this structure would turn a global conclusion into an
+unjustified channel guarantee. -/
+structure SyscallMsg (F : Type) where
+  clk_high : F
+  clk_low : F
+  syscall_id : F
+  arg1 : Vector F 3
+  arg2 : Vector F 3
+deriving ProvableStruct
+
+private theorem vector3_toList {F : Type} (values : Vector F 3) :
+    values.toList = [values[0], values[1], values[2]] := by
+  cases values using Vector.casesOn with
+  | mk array sizeEq =>
+      cases array using Array.casesOn with
+      | mk values =>
+          simp only [List.size_toArray] at sizeEq
+          match values with
+          | [] => simp at sizeEq
+          | [_] => simp [List.length] at sizeEq
+          | [_, _] => simp [List.length] at sizeEq
+          | [_, _, _] => rfl
+          | _ :: _ :: _ :: _ :: _ => simp [List.length] at sizeEq
+
+/-- The `ProvableStruct` flattening of `SyscallMsg` is exactly the pinned raw-bus field order. -/
+theorem SyscallMsg.toElements_toList {F : Type} (msg : SyscallMsg F) :
+    (toElements msg).toList =
+      [msg.clk_high, msg.clk_low, msg.syscall_id,
+       msg.arg1[0], msg.arg1[1], msg.arg1[2],
+       msg.arg2[0], msg.arg2[1], msg.arg2[2]] := by
+  change (#v[msg.clk_high] ++ (#v[msg.clk_low] ++ (#v[msg.syscall_id] ++
+    (msg.arg1 ++ (msg.arg2 ++ (#v[] : Vector F 0)))))).toList = _
+  simp only [Vector.toList_append, Vector.toList_mk, List.cons_append, List.nil_append,
+    vector3_toList]
+  rw [Vector.getElem_append_left (by omega : 0 < 3),
+    Vector.getElem_append_left (by omega : 1 < 3),
+    Vector.getElem_append_left (by omega : 2 < 3)]
 
 /-- Per-row well-formedness of a State message: **`True`**. SP1's `CPUState::eval`
 (`crates/core/machine/src/adapter/state.rs:90-98`) range-checks *only* the clock (`clk_0_16` 13-bit Range

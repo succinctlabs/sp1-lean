@@ -42,6 +42,21 @@ open SP1Clean
 
 variable {p : ℕ}
 
+/-! ## Typed message adapters
+
+The generated oracle remains authoritative for directions and multiplicities. These constructors
+only turn the shared Model-layer message carriers into the exact extracted payload ADT, so semantic
+adapters can name a bus tuple without copying its field list. -/
+
+/-- Embed a typed Memory message into the exact nine-field Memory payload. -/
+def AirInteraction.ofMemoryMsg {F : Type} (msg : Channels.MemoryMsg F) : AirInteraction F :=
+  .memory msg.clk_high msg.clk_low msg.addr0 msg.addr1 msg.addr2
+    msg.value[0] msg.value[1] msg.value[2] msg.value[3]
+
+/-- Embed the shared typed Syscall message into the pinned raw Syscall payload. -/
+def AirInteraction.ofSyscallMsg {F : Type} (msg : Channels.SyscallMsg F) : AirInteraction F :=
+  .raw .syscall (toElements msg).toList
+
 /-- The signed multiplicity of an extracted interaction by direction. Local and global sends are
 positive; local and global receives are negative, matching the upstream interaction polarity. -/
 def Dir.sign (d : Dir) (mult : ZMod p) : ZMod p :=
