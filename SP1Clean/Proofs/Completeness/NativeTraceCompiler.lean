@@ -207,11 +207,11 @@ def NativeProgramRowProjection (statement : SupportedCoreStatement p)
           (TraceGen.compileExecution statement.program execution
             (nativeInitialClock statement)).rows,
         ∃ row : ProgramChip.ProgramRow (ZMod p),
-          SP1Clean.Semantics.decodeLocated? statement.program compiledRow.located =
-              some compiledRow.decoded ∧
+          SP1Clean.Semantics.projectSP1Transition? statement.program compiledRow.located =
+              some compiledRow.view ∧
             compiledRow.located.source.regs.get? Register.PC =
               some (pcBitsOfRow row) ∧
-            instrToProgramRow' (rowPcVec row) compiledRow.decoded = some row ∧
+            instrToProgramRow' (rowPcVec row) compiledRow.view.decoded = some row ∧
             key = ProgramChip.programRowKey row
 
 @[simp] theorem nativeBaseTraceOfCompiled_publicValues

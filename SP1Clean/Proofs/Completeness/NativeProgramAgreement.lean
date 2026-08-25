@@ -10,7 +10,7 @@ to the semantic program named by the ordinary-execution relation.
 
 There is one representation seam: `NativeProgramRowProjection` says that an actual generated
 instruction Program pull is the projection of the retained located decode.  The shared semantic
-relation's `SupportedDecodedTransition` already owns the same decoded instruction for every
+relation's `SupportedSP1Transition` already owns the same shared transition view for every
 configured Sail state, so the `decodedInROM` hoist is projected from semantic validity rather than
 stored again in `NativeTraceReady`.
 -/
@@ -120,24 +120,22 @@ theorem nativeProgramKey_decodedInROM
     (keyKind : key.1 = InteractionKind.Program) :
     ∃ row : ProgramChip.ProgramRow (ZMod p),
       key = ProgramChip.programRowKey row ∧ decodedInROM statement.program row := by
-  obtain ⟨compiledRow, compiledRowMem, row, generatedDecode, sourcePc, projected, keyEq⟩ :=
+  obtain ⟨compiledRow, compiledRowMem, row, generatedView, sourcePc, projected, keyEq⟩ :=
     projection key keyMem keyKind
   have locatedMem : compiledRow.located ∈ execution.locatedTransitions :=
     compiledRow_located_mem compiler compiledRowMem
-  obtain ⟨-, -, sourceConfigured, pc, word, decoded, pcEq, fetch, decode, -, -⟩ :=
-    semantic.supported compiledRow.located locatedMem
-  have relationDecode :
-      SP1Clean.Semantics.decodeLocated? statement.program compiledRow.located = some decoded :=
-    SP1Clean.Semantics.decodeLocated?_eq_some_of pcEq fetch
-      (decode compiledRow.located.source sourceConfigured)
-  have decodedEq : compiledRow.decoded = decoded :=
-    Option.some.inj (generatedDecode.symm.trans relationDecode)
-  have pcValueEq : pc = pcBitsOfRow row :=
-    Option.some.inj (pcEq.symm.trans sourcePc)
-  subst decoded
-  refine ⟨row, keyEq, word, compiledRow.decoded, ?_, ?_, projected⟩
-  · simpa only [pcValueEq] using fetch
-  · exact decode
+  obtain ⟨semanticView, semanticViewEq, stableDecode⟩ :=
+    (semantic.supported compiledRow.located locatedMem).view
+  have viewEq : semanticView = compiledRow.view :=
+    Option.some.inj (semanticViewEq.symm.trans generatedView)
+  subst semanticView
+  obtain ⟨viewPc, viewFetch, -, -, -, -, -⟩ :=
+    SP1Clean.Semantics.projectSP1Transition?_components generatedView
+  have pcValueEq : compiledRow.view.pc = pcBitsOfRow row :=
+    Option.some.inj (viewPc.symm.trans sourcePc)
+  refine ⟨row, keyEq, compiledRow.view.word, compiledRow.view.decoded, ?_, stableDecode,
+    projected⟩
+  simpa only [pcValueEq] using viewFetch
 
 /-! ## Canonical provider grounding -/
 

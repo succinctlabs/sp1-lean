@@ -28,7 +28,7 @@ open SP1Clean.Soundness.Target
 /-- One chronological compiler record, retaining the exact semantic transition it represents. -/
 structure CompiledLocatedInstruction where
   located : Machine.LocatedTransition
-  decoded : instruction
+  view : SP1TransitionView
   clock : ℕ
   instruction : CompiledInstructionEvent
 
@@ -68,14 +68,13 @@ noncomputable def compileLocatedTransitions? (program : GuestProgram) :
   | clock, frontier, [] =>
       some { rows := [], finalClock := clock, finalFrontier := frontier }
   | clock, frontier, located :: rest => do
-      let decoded ← SP1Clean.Semantics.decodeLocated? program located
-      let instruction ← compileInstructionEvent? decoded located.source
-        located.transition.target frontier clock
+      let view ← projectSP1Transition? program located
+      let instruction ← compileInstructionEvent? view frontier clock
       let tail ← compileLocatedTransitions? program (clock + ordinaryClkInc)
         instruction.nextFrontier rest
       pure
         { rows := { located := located
-                    decoded := decoded
+                    view := view
                     clock := clock
                     instruction := instruction } :: tail.rows
           finalClock := tail.finalClock
@@ -125,12 +124,11 @@ theorem compileLocatedTransitions?_rows_length
       rfl
   | cons located rest ih =>
       simp only [compileLocatedTransitions?] at generated
-      cases decodeEq : SP1Clean.Semantics.decodeLocated? program located with
-      | none => simp [decodeEq] at generated
-      | some decoded =>
-          simp only [decodeEq] at generated
-          cases instructionEq : compileInstructionEvent? decoded located.source
-              located.transition.target frontier clock with
+      cases projectionEq : projectSP1Transition? program located with
+      | none => simp [projectionEq] at generated
+      | some view =>
+          simp only [projectionEq] at generated
+          cases instructionEq : compileInstructionEvent? view frontier clock with
           | none => simp [instructionEq] at generated
           | some instruction =>
               simp [instructionEq] at generated
@@ -156,12 +154,11 @@ theorem compileLocatedTransitions?_located
       rfl
   | cons located rest ih =>
       simp only [compileLocatedTransitions?] at generated
-      cases decodeEq : SP1Clean.Semantics.decodeLocated? program located with
-      | none => simp [decodeEq] at generated
-      | some decoded =>
-          simp only [decodeEq] at generated
-          cases instructionEq : compileInstructionEvent? decoded located.source
-              located.transition.target frontier clock with
+      cases projectionEq : projectSP1Transition? program located with
+      | none => simp [projectionEq] at generated
+      | some view =>
+          simp only [projectionEq] at generated
+          cases instructionEq : compileInstructionEvent? view frontier clock with
           | none => simp [instructionEq] at generated
           | some instruction =>
               simp [instructionEq] at generated
@@ -186,12 +183,11 @@ theorem compileLocatedTransitions?_finalClock
       simp
   | cons located rest ih =>
       simp only [compileLocatedTransitions?] at generated
-      cases decodeEq : SP1Clean.Semantics.decodeLocated? program located with
-      | none => simp [decodeEq] at generated
-      | some decoded =>
-          simp only [decodeEq] at generated
-          cases instructionEq : compileInstructionEvent? decoded located.source
-              located.transition.target frontier clock with
+      cases projectionEq : projectSP1Transition? program located with
+      | none => simp [projectionEq] at generated
+      | some view =>
+          simp only [projectionEq] at generated
+          cases instructionEq : compileInstructionEvent? view frontier clock with
           | none => simp [instructionEq] at generated
           | some instruction =>
               simp [instructionEq] at generated
@@ -204,6 +200,50 @@ theorem compileLocatedTransitions?_finalClock
                   rw [ih tailEq]
                   simp only [List.length_cons]
                   simp [Nat.mul_succ, Nat.add_assoc, Nat.add_comm]
+
+/-- Structural totality of the chronological fold, isolated from per-chip semantic validity.
+
+The shared transition projector and one-row compiler are the only optional steps in the fold. If
+each input transition has one projected view whose row-shape compiler succeeds for every incoming
+frontier/clock, recursion itself cannot fail. This is the reusable totality lemma behind the
+`NativeCompilerReady` campaign; rich `InstructionChipId.Valid` facts remain the separate
+`CompiledExecution.WellFormed` half of that boundary. -/
+theorem compileLocatedTransitions?_exists_of_views
+    {program : GuestProgram} {clock : ℕ} {frontier : AccessFrontier}
+    {transitions : List Machine.LocatedTransition}
+    (ready : ∀ located ∈ transitions,
+      ∃ view : SP1TransitionView,
+        projectSP1Transition? program located = some view ∧
+          ∀ frontier clock, InstructionEventReady view frontier clock) :
+    ∃ compiled, compileLocatedTransitions? program clock frontier transitions = some compiled := by
+  induction transitions generalizing clock frontier with
+  | nil =>
+      exact ⟨{ rows := [], finalClock := clock, finalFrontier := frontier }, rfl⟩
+  | cons located rest ih =>
+      obtain ⟨view, projected, eventReady⟩ := ready located (by simp)
+      obtain ⟨instruction, instructionEq⟩ :=
+        instructionEventReady_iff.mp (eventReady frontier clock)
+      obtain ⟨tail, tailEq⟩ := ih
+        (clock := clock + ordinaryClkInc) (frontier := instruction.nextFrontier)
+        (fun item itemMem => ready item (by simp [itemMem]))
+      refine ⟨
+        { rows := { located := located, view := view, clock := clock,
+                    instruction := instruction } :: tail.rows
+          finalClock := tail.finalClock
+          finalFrontier := tail.finalFrontier }, ?_⟩
+      simp [compileLocatedTransitions?, projected, instructionEq, tailEq]
+
+/-- Execution-level form of structural compiler totality. The premise is stated on the literal
+`locatedTransitions` view of the one operational witness; no parallel instruction trace is
+introduced. -/
+theorem compileExecution?_exists_of_views
+    {program : GuestProgram} {execution : Machine.EventExecutionTrace} {initialClock : ℕ}
+    (ready : ∀ located ∈ execution.locatedTransitions,
+      ∃ view : SP1TransitionView,
+        projectSP1Transition? program located = some view ∧
+          ∀ frontier clock, InstructionEventReady view frontier clock) :
+    ∃ compiled, compileExecution? program execution initialClock = some compiled :=
+  compileLocatedTransitions?_exists_of_views ready
 
 /-- Execution-level preservation of the chronological operational carrier. -/
 theorem compileExecution?_located
@@ -227,5 +267,24 @@ def NativeCompilerReady (statementProgram : GuestProgram)
   ∃ compiled : TraceGen.CompiledExecution,
     TraceGen.compileExecution? statementProgram execution initialClock = some compiled ∧
       compiled.WellFormed
+
+/-- The shared semantic relation already discharges the outer transition projection for the
+chronological compiler.  Consequently, compiler success reduces to the one-row event compiler on
+the retained view; fetch, decode, image, and route are not separate completeness premises. -/
+theorem SupportedOrdinaryShardExecutionValid.compileExecution?_exists_of_instructionEventsReady
+    {p : ℕ} [Fact p.Prime] {handler : Machine.SyscallHandler}
+    {statement : SupportedCoreStatement p} {execution : Machine.EventExecutionTrace}
+    {initialClock : ℕ}
+    (valid : SupportedOrdinaryShardExecutionValid handler statement execution)
+    (ready : ∀ located ∈ execution.locatedTransitions,
+      ∀ view : SP1Clean.Semantics.SP1TransitionView,
+        SP1Clean.Semantics.projectSP1Transition? statement.program located = some view →
+          ∀ frontier clock, TraceGen.InstructionEventReady view frontier clock) :
+    ∃ compiled,
+      TraceGen.compileExecution? statement.program execution initialClock = some compiled := by
+  apply TraceGen.compileExecution?_exists_of_views
+  intro located member
+  obtain ⟨view, projected, -⟩ := (valid.supported located member).view
+  exact ⟨view, projected, ready located member view projected⟩
 
 end SP1Clean.Execution

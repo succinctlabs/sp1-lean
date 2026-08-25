@@ -91,25 +91,38 @@ theorem GroundedRow.advance {data : ProverData (ZMod p)} {program : GuestProgram
   exact advance.down row.inputs row.cols data program state grounded.real grounded.spec
     configured romLoaded pc grounded.operands grounded.decoded grounded.ready
 
-/-- A grounded row exposes the exact proof-free decode route required by the ordinary-shard
-relation.  The Program and State pc keys are definitionally the same three row limbs; the route
-projection retains both its `InstructionRouteKey` and selected `InstructionChipId` until the exact
-relation consumes the latter. -/
-theorem GroundedRow.supportedDecodedTransition
+/-- A grounded row exposes the one shared SP1 transition view required by the ordinary-shard
+relation. The Program and State pc keys are definitionally the same three row limbs; guarded
+Program grounding proves the decoder-image check, and the access-plan attempt is retained exactly
+without being assumed successful. -/
+theorem GroundedRow.supportedSP1Transition
     {data : ProverData (ZMod p)} {program : GuestProgram}
     {row : ChipRow p} {state next : SailState}
     (grounded : GroundedRow data program row state)
     (normal : SailRetiresNormally state next)
     (configured : SailConfigured state)
     (pc : state.regs.get? Register.PC = some (rcvPcOf (stateAccess row.view))) :
-    SupportedDecodedTransition program
+    SupportedSP1Transition program
       ⟨state, ⟨Machine.ExecutionEvent.ordinary, next⟩⟩ := by
   obtain ⟨word, instruction, fetch, decoded, projection⟩ := grounded.decoded
-  have projection' := instrToProgramRow'_some projection
-  obtain ⟨key, chipId, keyEq, routeEq⟩ := instrToProgramRow_route_exists projection'
-  refine ⟨rfl, normal, configured, rcvPcOf (stateAccess row.view), word, instruction, pc, ?_,
-    decoded, chipId, routeEq⟩
-  exact fetch
+  have image := instructionImageOK_of_instrToProgramRow'_some projection
+  obtain ⟨key, chipId, keyEq, routeEq⟩ := instrToProgramRow'_route_exists projection
+  let view : SP1Clean.Semantics.SP1TransitionView :=
+    { pc := rcvPcOf (stateAccess row.view)
+      word := word
+      decoded := instruction
+      routeKey := key
+      chipId := chipId
+      accessPlan? := SP1Clean.Semantics.instructionAccessPlan? instruction state next }
+  have decodeEq : SP1Clean.Semantics.decodeLocated? program
+      ⟨state, ⟨Machine.ExecutionEvent.ordinary, next⟩⟩ = some instruction :=
+    SP1Clean.Semantics.decodeLocated?_eq_some_of pc fetch (decoded state configured)
+  have fetch' : program.fetchWord (rcvPcOf (stateAccess row.view)) = some word := fetch
+  have projected : SP1Clean.Semantics.projectSP1Transition? program
+      ⟨state, ⟨Machine.ExecutionEvent.ordinary, next⟩⟩ = some view := by
+    simp [SP1Clean.Semantics.projectSP1Transition?, view, pc, fetch', decodeEq, image, keyEq,
+      routeEq]
+  exact ⟨rfl, normal, configured, view, projected, decoded⟩
 
 /-- Ordinary events impose no carried timestamp, so an all-ordinary proof-free transition list is
 clocked from every initial clock. -/
@@ -263,7 +276,7 @@ private theorem executePcWalkEventsAux {Row : Type u}
         ih (done ++ [row]) (sndPcOf (stateAccess (rowOf row).view)) final next rowsEq'
           tailWalk chain' effect.pc nextRom (effect.cfg cfg)
       have headSupported :=
-        rowGrounded.supportedDecodedTransition effect.normal cfg pcRow
+        rowGrounded.supportedSP1Transition effect.normal cfg pcRow
       let head : Machine.EventTransition := ⟨.ordinary, next⟩
       let execution : Machine.EventExecutionTrace :=
         ⟨state, head :: tailExecution.transitions⟩

@@ -1,7 +1,6 @@
 import SP1Clean.FormalModel.Execution
 import SP1Clean.FormalModel.CoreProfile
-import SP1Clean.Model.Semantics.Decode
-import SP1Clean.Model.Semantics.TransitionDecode
+import SP1Clean.Model.Semantics.TransitionView
 import SP1Clean.Model.Semantics.ProgramCommitment
 
 /-!
@@ -30,68 +29,73 @@ open SP1Clean.Soundness.Target
 /-- One chronological transition retires normally, fetches, decodes, and routes to the canonical
 supported profile.
 
-The decoded instruction and chip identity are existential facts rather than a second trace carrier.
-The decode is pinned once for every configured Sail state; its run at the actual source is a
-projection of that shared fact, not a separate completeness premise.  The compiler computes the
-same values from `source` and `program`, and uses this predicate to show that computation cannot take
-an unsupported branch. -/
-def SupportedDecodedTransition (program : GuestProgram)
+The proof-free fields live in the one Model-layer `SP1TransitionView` consumed by both proof
+directions. The decode is pinned once for every configured Sail state; its run at the actual source
+is a projection of that shared fact, not a separate completeness premise. The compiler retains the
+same projected view rather than reconstructing a completeness-only tuple. -/
+def SupportedSP1Transition (program : GuestProgram)
     (located : Machine.LocatedTransition) : Prop :=
   located.transition.event = .ordinary ∧
     SailRetiresNormally located.source located.transition.target ∧
     SailConfigured located.source ∧
-    ∃ pc : BitVec 64, ∃ word : BitVec 32, ∃ instruction : instruction,
-      located.source.regs.get? Register.PC = some pc ∧
-      program.fetchWord pc = some word ∧
-      ConfiguredDecode word instruction ∧
-      ∃ chipId : InstructionChipId,
-        instructionRouteId instruction = some chipId
+    ∃ view : SP1Clean.Semantics.SP1TransitionView,
+      SP1Clean.Semantics.projectSP1Transition? program located = some view ∧
+        ConfiguredDecode view.word view.decoded
 
 /-- Every transition of a proof-free execution routes through the native instruction registry. -/
 def AllTransitionsSupported (program : GuestProgram)
     (execution : Machine.EventExecutionTrace) : Prop :=
   ∀ located ∈ execution.locatedTransitions,
-    SupportedDecodedTransition program located
+    SupportedSP1Transition program located
 
-/-- The existential decode evidence in the semantic relation agrees with the compiler's total,
-proof-independent decode projection. -/
-theorem SupportedDecodedTransition.decodeLocated
+/-- Eliminate one supported transition to the exact shared projection and stable decode evidence. -/
+theorem SupportedSP1Transition.view
     {program : GuestProgram} {located : Machine.LocatedTransition}
-    (supported : SupportedDecodedTransition program located) :
-    ∃ decoded : instruction, ∃ chipId : InstructionChipId,
-      SP1Clean.Semantics.decodeLocated? program located = some decoded ∧
-        instructionRouteId decoded = some chipId := by
-  obtain ⟨_, _, configured, pc, word, decoded, pcEq, fetch, decode, chipId, routed⟩ := supported
-  exact ⟨decoded, chipId,
-    SP1Clean.Semantics.decodeLocated?_eq_some_of pcEq fetch
-      (decode located.source configured), routed⟩
+    (supported : SupportedSP1Transition program located) :
+    ∃ view : SP1Clean.Semantics.SP1TransitionView,
+      SP1Clean.Semantics.projectSP1Transition? program located = some view ∧
+        ConfiguredDecode view.word view.decoded :=
+  supported.2.2.2
+
+/-- The shared projection exposes the actual-source official decode without choosing another
+instruction or chip identity. -/
+theorem SupportedSP1Transition.decodeLocated
+    {program : GuestProgram} {located : Machine.LocatedTransition}
+    (supported : SupportedSP1Transition program located) :
+    ∃ view : SP1Clean.Semantics.SP1TransitionView,
+      SP1Clean.Semantics.projectSP1Transition? program located = some view ∧
+        SP1Clean.Semantics.decodeLocated? program located = some view.decoded := by
+  obtain ⟨view, projected, -⟩ := supported.view
+  exact ⟨view, projected, SP1Clean.Semantics.projectSP1Transition?_decode projected⟩
 
 /-- A routed ordinary transition cannot be the host-handled `ECALL` boundary.  This derives the
 negative premise of `Machine.EventStep.ordinary` from the exact transition evidence itself: the
 official decoder maps the fixed ECALL word to the unsupported `.ECALL` constructor. -/
-theorem SupportedDecodedTransition.notAboutToExecuteEcall
+theorem SupportedSP1Transition.notAboutToExecuteEcall
     {program : GuestProgram} {located : Machine.LocatedTransition}
-    (supported : SupportedDecodedTransition program located) :
+    (supported : SupportedSP1Transition program located) :
     ¬ Machine.AboutToExecuteEcall program located.source := by
   rintro ⟨ecallPc, ecallPcEq, ecallFetch⟩
-  obtain ⟨_, _, cfg, pc, word, instruction, pcEq, fetch, decode, chipId, routed⟩ := supported
-  have ecallPcEq' : ecallPc = pc := by
+  obtain ⟨_, _, cfg, view, projected, decode⟩ := supported
+  obtain ⟨pcEq, fetch, -, -, -, routed, -⟩ :=
+    SP1Clean.Semantics.projectSP1Transition?_components projected
+  have ecallPcEq' : ecallPc = view.pc := by
     rw [ecallPcEq] at pcEq
     exact Option.some.inj pcEq
   subst ecallPc
-  have wordEq : word = ECALL_ENC := by
+  have wordEq : view.word = ECALL_ENC := by
     rw [fetch] at ecallFetch
     exact Option.some.inj ecallFetch
-  subst word
+  rw [wordEq] at decode
   have ecallDecode :
       (ext_decode ECALL_ENC).run located.source =
         .ok (LeanRV64D.Defs.instruction.ECALL ()) located.source := by
     simpa [ECALL_ENC] using SailDecode.decode_ECALL located.source cfg.init cfg.priv
       cfg.mseccfg_disabled
-  have instructionEq : instruction = LeanRV64D.Defs.instruction.ECALL () := by
+  have instructionEq : view.decoded = LeanRV64D.Defs.instruction.ECALL () := by
     have same := (decode located.source cfg).symm.trans ecallDecode
     injection same
-  subst instruction
+  rw [instructionEq] at routed
   simp [instructionRouteId, instructionRouteKey] at routed
 
 /-- Named audit surface of one native-supported semantic shard.
@@ -153,8 +157,8 @@ theorem SupportedOrdinaryShardExecutionValid.sailChain {p : ℕ} [Fact p.Prime]
     SailChain execution.steps execution.initialState execution.finalState :=
   execution.sailChain valid.segment.1 valid.allOrdinary
 
-/-- Every located transition in the exact relation is ordinary, independently of the route witness
-chosen in `SupportedDecodedTransition`. -/
+/-- Every located transition in the exact relation is ordinary, independently of the projected
+view retained by `SupportedSP1Transition`. -/
 theorem SupportedOrdinaryShardExecutionValid.located_event_eq_ordinary {p : ℕ}
     [Fact p.Prime]
     {handler : Machine.SyscallHandler}

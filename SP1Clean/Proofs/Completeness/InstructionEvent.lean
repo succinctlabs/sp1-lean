@@ -1,4 +1,4 @@
-import SP1Clean.Model.Semantics.InstructionPlan
+import SP1Clean.Model.Semantics.TransitionView
 import SP1Clean.Model.Semantics.AccessSchedule
 import SP1Clean.Proofs.Completeness.EventBuckets
 
@@ -31,22 +31,6 @@ open SP1Clean.Semantics
 open SP1Clean.Soundness.Target
 
 /-! ## Small family-neutral projections -/
-
-/-- The numeric PC read from the source Sail state. -/
-def sourcePc? (source : SailState) : Option ℕ :=
-  (source.regs.get? Register.PC).map BitVec.toNat
-
-/-- The SP1 opcode discriminant of a supported decoded instruction. -/
-private def instructionOpcode? (decoded : instruction) : Option ℕ :=
-  (instructionRouteKey decoded).map fun key => key.opcode.toNat
-
-/-- The guarded image of the pinned decoder.  These are precisely the three constructor families
-whose raw Sail carrier has values outside the actual instruction encoding image. -/
-def instructionImageOK : instruction → Bool
-  | .MUL (_, _, _, operation) => mulOpCanonical operation
-  | .LOAD (_, _, _, isUnsigned, width) => loadWidthOK width isUnsigned
-  | .STORE (_, _, _, width) => storeWidthOK width
-  | _ => true
 
 private def sext12Nat (immediate : BitVec 12) : ℕ :=
   (immediate.signExtend 64).toNat
@@ -374,160 +358,138 @@ refresh-naive `stampPlan` schedule.
 Failure means exactly one of: the raw Sail constructor is outside the decoder image, the source
 PC/value image is absent, routing is unsupported, or the canonical adapter shape no longer agrees
 with the selected registry family. -/
-def compileInstructionEvent? (decoded : instruction) (source target : SailState)
+def compileInstructionEvent? (view : SP1TransitionView)
     (frontier : AccessFrontier) (clk : ℕ) : Option CompiledInstructionEvent :=
-  if instructionImageOK decoded then
-    match sourcePc? source with
-    | none => none
-    | some pc =>
-      match instructionOpcode? decoded with
+  match view.accessPlan? with
+  | none => none
+  | some accesses =>
+      let schedule := scheduleAccessPlan frontier clk accesses
+      match instructionEventFor? view.chipId view.decoded schedule.stampedTouches clk
+          view.pc.toNat view.routeKey.opcode.toNat with
       | none => none
-      | some opcode =>
-        match instructionAccessPlan? decoded source target with
-        | none => none
-        | some plan =>
-          let schedule := scheduleAccessPlan frontier clk plan
-          match instructionRouteId decoded with
-          | none => none
-          | some id =>
-            match instructionEventFor? id decoded schedule.stampedTouches clk pc opcode with
-            | none => none
-            | some event =>
-              some
-                { routed := ⟨id, event⟩
-                  plan := plan
-                  schedule := schedule }
-  else none
+      | some event =>
+          some
+            { routed := ⟨view.chipId, event⟩
+              plan := accesses
+              schedule := schedule }
 
 /-- The narrow transparent readiness boundary for one instruction event.  No row-validity theorem
 or Clean witness is hidden here. -/
-def InstructionEventReady (decoded : instruction) (source target : SailState)
+def InstructionEventReady (view : SP1TransitionView)
     (frontier : AccessFrontier) (clk : ℕ) : Prop :=
-  (compileInstructionEvent? decoded source target frontier clk).isSome
+  (compileInstructionEvent? view frontier clk).isSome
 
-theorem instructionEventReady_iff {decoded : instruction} {source target : SailState}
+theorem instructionEventReady_iff {view : SP1TransitionView}
     {frontier : AccessFrontier} {clk : ℕ} :
-    InstructionEventReady decoded source target frontier clk ↔
-      ∃ result, compileInstructionEvent? decoded source target frontier clk = some result := by
+    InstructionEventReady view frontier clk ↔
+      ∃ result, compileInstructionEvent? view frontier clk = some result := by
   exact Option.isSome_iff_exists
 
 /-- Successful compilation exposes each proof-independent projection used by the `do` block. -/
-private theorem compileInstructionEvent?_components {decoded : instruction}
-    {source target : SailState} {frontier : AccessFrontier} {clk : ℕ}
+private theorem compileInstructionEvent?_components {view : SP1TransitionView}
+    {frontier : AccessFrontier} {clk : ℕ}
     {result : CompiledInstructionEvent}
-    (generated : compileInstructionEvent? decoded source target frontier clk = some result) :
-    ∃ pc opcode plan id event,
-      sourcePc? source = some pc ∧
-        instructionOpcode? decoded = some opcode ∧
-        instructionAccessPlan? decoded source target = some plan ∧
-        instructionRouteId decoded = some id ∧
-        instructionEventFor? id decoded
-            (scheduleAccessPlan frontier clk plan).stampedTouches clk pc opcode =
-          some event ∧
+    (generated : compileInstructionEvent? view frontier clk = some result) :
+    ∃ accesses event,
+      view.accessPlan? = some accesses ∧
+      instructionEventFor? view.chipId view.decoded
+          (scheduleAccessPlan frontier clk accesses).stampedTouches clk
+          view.pc.toNat view.routeKey.opcode.toNat = some event ∧
         result =
-          { routed := ⟨id, event⟩
-            plan := plan
-            schedule := scheduleAccessPlan frontier clk plan } := by
+          { routed := ⟨view.chipId, event⟩
+            plan := accesses
+            schedule := scheduleAccessPlan frontier clk accesses } := by
   unfold compileInstructionEvent? at generated
-  by_cases imageOK : instructionImageOK decoded = true
-  · simp only [if_pos imageOK] at generated
-    cases pcEq : sourcePc? source with
-    | none => simp [pcEq] at generated
-    | some pc =>
-        simp only [pcEq] at generated
-        cases opcodeEq : instructionOpcode? decoded with
-        | none => simp [opcodeEq] at generated
-        | some opcode =>
-            simp only [opcodeEq] at generated
-            cases planEq : instructionAccessPlan? decoded source target with
-            | none => simp [planEq] at generated
-            | some plan =>
-                simp only [planEq] at generated
-                cases routeEq : instructionRouteId decoded with
-                | none => simp [routeEq] at generated
-                | some id =>
-                    simp only [routeEq] at generated
-                    cases eventEq : instructionEventFor? id decoded
-                        (scheduleAccessPlan frontier clk plan).stampedTouches clk pc opcode with
-                    | none =>
-                        rw [eventEq] at generated
-                        simp at generated
-                    | some event =>
-                        rw [eventEq] at generated
-                        simp only [Option.some.injEq] at generated
-                        have resultEq :
-                            ({ routed := ⟨id, event⟩
-                               plan := plan
-                               schedule := scheduleAccessPlan frontier clk plan } :
-                              CompiledInstructionEvent) = result := by
-                          simpa using generated
-                        exact ⟨pc, opcode, plan, id, event, rfl, rfl, rfl, rfl,
-                          eventEq, resultEq.symm⟩
-  · simp [imageOK] at generated
+  cases accessEq : view.accessPlan? with
+  | none => simp [accessEq] at generated
+  | some accesses =>
+      simp only [accessEq] at generated
+      cases eventEq : instructionEventFor? view.chipId view.decoded
+          (scheduleAccessPlan frontier clk accesses).stampedTouches clk
+          view.pc.toNat view.routeKey.opcode.toNat with
+      | none => simp [eventEq] at generated
+      | some event =>
+          rw [eventEq] at generated
+          simp only [Option.some.injEq] at generated
+          exact ⟨accesses, event, rfl, eventEq, generated.symm⟩
 
 /-- Compilation cannot invent or relabel a route: the dependent event carries exactly the identity
 selected by the canonical semantic router. -/
-theorem compileInstructionEvent?_route {decoded : instruction} {source target : SailState}
+theorem compileInstructionEvent?_route {view : SP1TransitionView}
     {frontier : AccessFrontier} {clk : ℕ} {result : CompiledInstructionEvent}
-    (generated : compileInstructionEvent? decoded source target frontier clk = some result) :
-    instructionRouteId decoded = some result.routed.id := by
-  obtain ⟨pc, opcode, plan, id, event, pcEq, opcodeEq, planEq, routeEq, eventEq, rfl⟩ :=
+    (generated : compileInstructionEvent? view frontier clk = some result) :
+    result.routed.id = view.chipId := by
+  obtain ⟨accesses, event, accessEq, eventEq, rfl⟩ :=
     compileInstructionEvent?_components generated
-  exact routeEq
+  rfl
 
 /-- The result retains the exact canonical access plan returned by the field-free extractor. -/
-theorem compileInstructionEvent?_accessPlan {decoded : instruction} {source target : SailState}
+theorem compileInstructionEvent?_accessPlan {view : SP1TransitionView}
     {frontier : AccessFrontier} {clk : ℕ} {result : CompiledInstructionEvent}
-    (generated : compileInstructionEvent? decoded source target frontier clk = some result) :
-    instructionAccessPlan? decoded source target = some result.plan := by
-  obtain ⟨pc, opcode, plan, id, event, pcEq, opcodeEq, planEq, routeEq, eventEq, rfl⟩ :=
+    (generated : compileInstructionEvent? view frontier clk = some result) :
+    view.accessPlan? = some result.plan := by
+  obtain ⟨accesses, event, accessEq, eventEq, rfl⟩ :=
     compileInstructionEvent?_components generated
-  exact planEq
+  exact accessEq
+
+/-- For a retained shared transition projection, the compiler plan is literally the canonical
+Model-layer plan of that source/target pair. -/
+theorem compileInstructionEvent?_accessPlan_generated
+    {program : GuestProgram} {located : Machine.LocatedTransition} {view : SP1TransitionView}
+    {frontier : AccessFrontier} {clk : ℕ} {result : CompiledInstructionEvent}
+    (projected : projectSP1Transition? program located = some view)
+    (generated : compileInstructionEvent? view frontier clk = some result) :
+    instructionAccessPlan? view.decoded located.source located.transition.target =
+      some result.plan := by
+  rw [projectSP1Transition?_accesses projected]
+  exact compileInstructionEvent?_accessPlan generated
 
 /-- Stamping is not a second access representation: erasing its timestamps returns the retained
 canonical plan literally. -/
-theorem compileInstructionEvent?_stamped_touches {decoded : instruction} {source target : SailState}
+theorem compileInstructionEvent?_stamped_touches {view : SP1TransitionView}
     {frontier : AccessFrontier} {clk : ℕ} {result : CompiledInstructionEvent}
-    (generated : compileInstructionEvent? decoded source target frontier clk = some result) :
+    (generated : compileInstructionEvent? view frontier clk = some result) :
     result.stamped.map StampedTouch.touch = result.plan := by
-  obtain ⟨pc, opcode, plan, id, event, pcEq, opcodeEq, planEq, routeEq, eventEq, rfl⟩ :=
+  obtain ⟨accesses, event, accessEq, eventEq, rfl⟩ :=
     compileInstructionEvent?_components generated
-  exact scheduleAccessPlan_erase frontier clk plan
+  exact scheduleAccessPlan_erase frontier clk accesses
 
 /-- A well-formed extracted plan and a bounded incoming frontier make every timestamp copied into
 the event strictly earlier than its own current access.  This discharges the timestamp half of all
 four adapter-family `WellFormed` predicates without any instruction-specific semantic premise. -/
-theorem compileInstructionEvent?_timestamps {decoded : instruction} {source target : SailState}
+theorem compileInstructionEvent?_timestamps {view : SP1TransitionView}
     {frontier : AccessFrontier} {clk : ℕ} {result : CompiledInstructionEvent}
-    (generated : compileInstructionEvent? decoded source target frontier clk = some result)
+    (generated : compileInstructionEvent? view frontier clk = some result)
+    (wellFormed : result.plan.WellFormed)
     (bounded : frontier.BoundedAt clk) :
     ∀ stamped ∈ result.stamped, stamped.previous < stamped.current clk := by
-  obtain ⟨pc, opcode, plan, id, event, pcEq, opcodeEq, planEq, routeEq, eventEq, rfl⟩ :=
+  obtain ⟨accesses, event, accessEq, eventEq, rfl⟩ :=
     compileInstructionEvent?_components generated
-  exact scheduleAccessPlan_previous_lt (instructionAccessPlan_wellFormed planEq) bounded
+  exact scheduleAccessPlan_previous_lt wellFormed bounded
 
 /-- Every refresh inserted for a compiled row satisfies the MemoryBump event boundary. -/
-theorem compileInstructionEvent?_memoryBumps_wellFormed {decoded : instruction}
-    {source target : SailState} {frontier : AccessFrontier} {clk : ℕ}
+theorem compileInstructionEvent?_memoryBumps_wellFormed {view : SP1TransitionView}
+    {frontier : AccessFrontier} {clk : ℕ}
     {result : CompiledInstructionEvent}
-    (generated : compileInstructionEvent? decoded source target frontier clk = some result)
+    (generated : compileInstructionEvent? view frontier clk = some result)
+    (wellFormed : result.plan.WellFormed)
     (bounded : frontier.BoundedAt clk) (aligned : clk % ordinaryClkInc = 1)
     (currLt : clk + 1 < 2 ^ 48) :
     ∀ event ∈ result.memoryBumps, event.WellFormed := by
-  obtain ⟨pc, opcode, plan, id, event, pcEq, opcodeEq, planEq, routeEq, eventEq, rfl⟩ :=
+  obtain ⟨accesses, event, accessEq, eventEq, rfl⟩ :=
     compileInstructionEvent?_components generated
   exact scheduleAccessPlan_memoryBumps_wellFormed
-    (instructionAccessPlan_wellFormed planEq) bounded aligned currLt
+    wellFormed bounded aligned currLt
 
 /-- The scheduler returns a frontier valid at the following ordinary row. -/
-theorem compileInstructionEvent?_frontier_bounded_next {decoded : instruction}
-    {source target : SailState} {frontier : AccessFrontier} {clk : ℕ}
+theorem compileInstructionEvent?_frontier_bounded_next {view : SP1TransitionView}
+    {frontier : AccessFrontier} {clk : ℕ}
     {result : CompiledInstructionEvent}
-    (generated : compileInstructionEvent? decoded source target frontier clk = some result)
+    (generated : compileInstructionEvent? view frontier clk = some result)
     (bounded : frontier.BoundedAt clk) :
     result.nextFrontier.BoundedAt (clk + ordinaryClkInc) := by
-  obtain ⟨pc, opcode, plan, id, event, pcEq, opcodeEq, planEq, routeEq, eventEq, rfl⟩ :=
+  obtain ⟨accesses, event, accessEq, eventEq, rfl⟩ :=
     compileInstructionEvent?_components generated
-  exact scheduleAccessPlan_outgoing_bounded_next plan bounded
+  exact scheduleAccessPlan_outgoing_bounded_next accesses bounded
 
 end SP1Clean.TraceGen
