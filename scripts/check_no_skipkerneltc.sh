@@ -19,7 +19,7 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
-if grep -rniE 'skipKernelTC' SP1Clean --include='*.lean'; then
+if grep -rniE 'skipKernelTC' SP1Clean ToClean ToMathlib --include='*.lean' 2>/dev/null; then
   echo "FAIL: skipKernelTC reintroduced in SP1Clean/ (see lines above)." >&2
   echo "      Fix the kernel error by factoring the expensive compute into an abstract-BitVec" >&2
   echo "      helper proved once over variables (the srl_toNat/sra_toNat pattern) — do NOT" >&2

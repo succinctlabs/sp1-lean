@@ -44,7 +44,7 @@ trap 'rm -f "$tmp_actual" "$tmp_allow"' EXIT
 
 # Actual sites: one "<option> <path> <value>" line per occurrence, aggregated to counts.
 for opt in maxHeartbeats maxRecDepth; do
-  grep -rn "set_option $opt " SP1Clean SP1CleanTest --include='*.lean' 2>/dev/null \
+  grep -rn "set_option $opt " SP1Clean SP1CleanTest ToClean ToMathlib --include='*.lean' 2>/dev/null \
     | sed -E "s|^([^:]+):[0-9]+:.*set_option $opt ([0-9]+).*|$opt \1 \2|"
 done | sort | uniq -c | awk '{print $2, $3, $4, $1}' | sort > "$tmp_actual"
 

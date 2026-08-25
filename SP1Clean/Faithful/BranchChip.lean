@@ -9,7 +9,7 @@ import SP1Clean.Proofs.Chips.BranchChip.Formal
 # Exact whole-chip faithfulness for SP1 `Branch`
 
 This file relates the native Clean Branch row to the complete generated row-level oracle for
-pinned SP1 v6.3.1. The public `ChipFaithful` theorem covers every assertion and the complete active
+pinned SP1 v6.4.0. The public `ChipFaithful` theorem covers every assertion and the complete active
 interaction multiset across State, Byte, Memory, and Program.
 -/
 
@@ -540,13 +540,11 @@ private theorem branchNativeAssertionsDecompose
         (nativeAssertZeros env
           ((BranchChip.main input).operations offset)) ↔
       branchNativeMeaning env input offset := by
-  have hFieldSize : size field = 1 := rfl
   have hLtSize : size Extracted.LtOperationSigned = 10 := rfl
   unfold branchNativeMeaning
   simp only [nativeAssertZeros, BranchChip.main,
     Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-    witnessVectorNative,
-    CircuitNormalization.witnessNative_apply_eq,
+    witnessVectorIR, witnessField, Witnessable.witness, witnessIR,
     subcircuitWithAssertion, assertion, assertZero,
     HasAssertEq.assert_eq, Expression.assertEquals,
     Channel.pullIf, Operations.localLength]
@@ -557,7 +555,6 @@ private theorem branchNativeAssertionsDecompose
     constraints_toSubcircuit_formalAssertion,
     GeneralFormalCircuit.toSubcircuit_localLength,
     FormalAssertion.toSubcircuit_localLength,
-    CircuitNormalization.witnessNative_localLength_eq,
     LtOperationSigned.circuit_localLength,
     Readers.CPUState.circuit_localLength,
     Gadgets.Equality.localLength_eq,
@@ -572,9 +569,8 @@ private theorem branchNativeAssertionsDecompose
     LtOperationSigned.circuit, Readers.CPUState.circuit,
     Readers.ITypeReaderImmutable.circuit,
     Gadgets.Equality.circuit,
-    ProvableType.varFromOffset_field,
     ProvableType.varFromOffset_fields,
-    hFieldSize, hLtSize, Nat.add_zero, Nat.add_assoc, Nat.reduceAdd,
+    hLtSize, Nat.add_zero, Nat.add_assoc, Nat.reduceAdd,
     Vector.getElem_mapRange, List.Forall, true_and, and_true,
     eval_sub, Expression.eval]
   repeat' rw [CanonicalReader.equalityAssertionList]
@@ -1254,7 +1250,7 @@ theorem branchChip_constraints_constructive
 
 open SP1Clean.Channels
   (stateChannel byteChannel memoryChannel programChannel)
-open SP1Clean.InteractionRecovery
+open InteractionRecovery
 
 private theorem ltSigned_interactions_exact
     (env : Environment (ZMod p))
@@ -1476,7 +1472,6 @@ private theorem branchByteInteractions_decompose
           (offset + 20)).interactionsWith byteChannel.toRaw ++
       (branchTailByteInteractions input offset).map
         ChannelInteraction.toRaw := by
-  have hFieldSize : size field = 1 := rfl
   have hLtSize : size Extracted.LtOperationSigned = 10 := rfl
   have heq := fun (n : ℕ)
       (inp : Var (ProvablePair field field) (ZMod p))
@@ -1486,8 +1481,8 @@ private theorem branchByteInteractions_decompose
       (Gadgets.Equality.circuit field) byteChannel.toRaw n inp ops
       List.not_mem_nil List.not_mem_nil
   simp only [BranchChip.main, Circuit.operations,
-    Circuit.bind_def, Circuit.pure_def, witnessVectorNative,
-    CircuitNormalization.witnessNative_apply_eq,
+    Circuit.bind_def, Circuit.pure_def,
+    witnessVectorIR, witnessField, Witnessable.witness, witnessIR,
     subcircuitWithAssertion, assertion, assertZero,
     HasAssertEq.assert_eq, Expression.assertEquals,
     Channel.pullIf, Operations.localLength]
@@ -1500,7 +1495,6 @@ private theorem branchByteInteractions_decompose
     Operations.interactionsWith_assert,
     Operations.interactionsWith_interact,
     Operations.interactionsWith_nil,
-    CircuitNormalization.witnessNative_localLength_eq,
     GeneralFormalCircuit.toSubcircuit_localLength,
     FormalAssertion.toSubcircuit_localLength,
     LtOperationSigned.circuit_localLength,
@@ -1511,7 +1505,7 @@ private theorem branchByteInteractions_decompose
   simp only [branchLtInput, branchCpuInput, branchITypeInput,
     branchTailByteInteractions, branchFlag, branchNextPc,
     branchCompare, branchOpcode,
-    hFieldSize, hLtSize, Nat.add_zero, Nat.add_assoc,
+    hLtSize, Nat.add_zero, Nat.add_assoc,
     Nat.reduceAdd,
     List.map_cons, List.map_nil, List.append_assoc]
   simp only [if_true, List.nil_append, List.append_nil,
@@ -2200,7 +2194,7 @@ private theorem branchTailByte_faithful
   simp only [branchRustInteractionTail]
   rw [branchRustColumns_nextPc, branchRustColumns_sum]
   simp [branchTailByteInteractions,
-    hBytePull, Extracted.Interaction.toAccess, branchNextPc,
+    hBytePull, Extracted.Interaction.toAccess, Extracted.Dir.sign, branchNextPc,
     ← ProvableType.getElem_eval_fields,
     Expression.eval, hinputReal, h6, h14, h16]
 

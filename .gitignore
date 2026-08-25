@@ -6,3 +6,6 @@ scratch/
 .claude/*
 __pycache__/
 local-review/
+
+# The external PR #110 audit report (owner decides whether to commit it)
+sp1clean_pr110_report.pdf

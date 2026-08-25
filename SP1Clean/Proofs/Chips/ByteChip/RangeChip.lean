@@ -11,10 +11,10 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 SP1's `RangeChip` (`crates/core/machine/src/range/{air,columns}.rs`) is a **preprocessed** table over
 all `(a, bits)` with `a < 2^bits`, `bits ≤ 16` (`RangePreprocessedCols { a, bits }`). Its AIR is a single
 `receive_byte(ByteOpcode::Range(6), a, bits, 0, mult)` — on the Byte bus that *receive* is a **push** of
-the valid range row `⟨6, a, bits, 0⟩`, balanced against the consumers' pulls. SP1's consumers pull this
-form for `bits ∈ {8, 13, 14, 16}` (CPUState's `clk_0_16` 13-bit check, RegisterAccessTimestamp's `< 2^16`
-/ `< 2^8` timestamp checks, AddOperation's limb checks, and the Jal/Jalr/Branch chips' 14-bit `next_pc`
-low-limb alignment checks `pc0/4 < 2^14`).
+the valid range row `⟨6, a, bits, 0⟩`, balanced against the consumers' pulls. Several consumers
+use fixed widths (notably 8, 13, 14, and 16), while ShiftLeft and ShiftRight can request widths
+across the full `0, …, 16` interval. The native provider must therefore expose the complete
+preprocessed family; four hand-picked tables leave valid shift rows without a native producer.
 
 Clean has no "trusted preprocessed table" primitive for channels, so a finished-`byteChannel` **provider
 must re-prove each pushed row valid in-circuit** — the `ByteRowSpec` membership predicate
@@ -28,10 +28,11 @@ SP1's `bits` is a runtime column (`≤ 16`), so a fixed `Gadgets.ToBits.rangeChe
 apply to the genuinely variable-width row. This module builds the **fixed-width family**: a provider
 `circuit n hn` parameterized by a *compile-time* width `n` (with `2^n < p`). For each fixed `n` it is a
 faithful `RangeChip` provider — it pushes exactly SP1's `⟨6, a, (n : F), 0⟩` rows for `a < 2^n`. The
-named instantiations `circuit8`/`circuit13`/`circuit14`/`circuit16` cover **every** width SP1's machine
-actually pulls (8 and 16 from the readers/AddOperation, 13 from CPUState, 14 from the Jal/Jalr/Branch
-`next_pc` checks). The genuinely variable-`bits` provider (one circuit serving all widths at once) is a
-separate, harder construction left to a follow-up.
+indexed family `circuitFor : Fin 17 → GeneralFormalCircuit …` covers **every** preprocessed width
+without duplicating seventeen declarations. `allWidths = List.finRange 17` is the canonical table
+order. A genuinely variable-`bits` provider (one circuit serving all widths at once) is a separate,
+harder construction; the indexed family has the same message-level coverage while retaining fixed
+bit-decomposition circuits.
 
 Sibling: `Proofs/Chips/ByteChip/ByteChip.lean` (the `ByteChip` provider, opcodes 0..5 over `(b,c)`). -/
 
@@ -57,18 +58,20 @@ lemma two_pow_lt {n : ℕ} (h : n ≤ 16) : (2 : ℕ) ^ n < p := by
   omega
 
 /-- The committed value `a` — the `a` slot of SP1's `RangeChip` send `⟨6, a, bits, 0⟩`. The bit-width
-`bits` is the compile-time parameter `n`; instantiated at the widths consumers pull (8, 13, 14, 16). -/
+`bits` is the compile-time parameter `n`. -/
 structure Inputs (F : Type) where
   a : F
+  /-- The LogUp count for this preprocessed range-table key. Zero is padding; larger values
+  aggregate repeated occurrences. -/
+  multiplicity : F
 deriving ProvableStruct
 
 /-- Range-checks `a < 2^n` in-circuit (Clean `rangeCheck n` — a genuine bit decomposition, *not* a byte
-lookup, so the provider owes nothing to the bus it provides), witnesses a multiplicity `m` (the LogUp
-lookup count), and pushes the `Range` row `⟨6, a, (n : F), 0⟩` onto `byteChannel` with multiplicity `m`. -/
+lookup, so the provider owes nothing to the bus it provides), and pushes the `Range` row
+`⟨6, a, (n : F), 0⟩` at the explicit input multiplicity. -/
 def main (n : ℕ) (hn : 2 ^ n < p) (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
   assertion (Gadgets.ToBits.rangeCheck n hn) input.a
-  let m ← witnessField 1
-  byteChannel.pushIf m
+  byteChannel.pushIf input.multiplicity
     (⟨6, input.a, Expression.const ((n : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
 
 /-- The `RangeChip` provider at a fixed width `n`: pushes `⟨6, a, n, 0⟩` for an in-circuit
@@ -87,19 +90,16 @@ def circuit (n : ℕ) (hn : 2 ^ n < p) : GeneralFormalCircuit (ZMod p) Inputs un
     circuit_proof_start [Gadgets.ToBits.rangeCheck]
     exact h_assumptions
 
-/-! ## Concrete instantiations at the widths SP1's consumers pull -/
+/-! ## The complete fixed-width profile -/
 
-/-- The 8-bit `Range` provider (`< 2^8`) — RegisterAccessTimestamp's `< 2^8` timestamp check. -/
-def circuit8 : GeneralFormalCircuit (ZMod p) Inputs unit := circuit 8 (two_pow_lt (by norm_num))
+/-- A width supported by SP1's preprocessed range table: exactly `0, …, 16`. -/
+abbrev Width := Fin 17
 
-/-- The 13-bit `Range` provider (`< 2^13`) — CPUState's shifted `clk_0_16` check. -/
-def circuit13 : GeneralFormalCircuit (ZMod p) Inputs unit := circuit 13 (two_pow_lt (by norm_num))
+/-- The canonical increasing order of all fixed-width provider tables. -/
+def allWidths : List Width := List.finRange 17
 
-/-- The 14-bit `Range` provider (`< 2^14`) — the Jal/Jalr/Branch chips' `next_pc` low-limb
-alignment checks (`pc0/4 < 2^14`). -/
-def circuit14 : GeneralFormalCircuit (ZMod p) Inputs unit := circuit 14 (two_pow_lt (by norm_num))
-
-/-- The 16-bit `Range` provider (`< 2^16`) — RegisterAccessTimestamp's `< 2^16` / AddOperation limbs. -/
-def circuit16 : GeneralFormalCircuit (ZMod p) Inputs unit := circuit 16 (two_pow_lt (by norm_num))
+/-- The native fixed-width provider selected by an SP1-supported width. -/
+def circuitFor (width : Width) : GeneralFormalCircuit (ZMod p) Inputs unit :=
+  circuit width.val (two_pow_lt (Nat.le_of_lt_succ width.isLt))
 
 end SP1Clean.RangeChip

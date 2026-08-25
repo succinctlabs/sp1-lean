@@ -5,7 +5,7 @@ import SP1Clean.Proofs.Chips.UTypeChip.Formal
 /-! # Whole-chip faithfulness — native UType row ↔ pinned SP1 Rust AIR
 
 `uTypeChip_faithful` compares the complete native Clean UType circuit with the
-v6.3.1 Rust `UTypeColumns` assertion system and interaction multiset, on real
+v6.4.0 Rust `UTypeColumns` assertion system and interaction multiset, on real
 and padding rows. The physical-row codec preserves the Rust column layout:
 the native input prefix is followed by the three addend limbs and four
 `AddOperation` result limbs.
@@ -437,7 +437,7 @@ private theorem uTypeChipConstraintsDecompose
     uTypeNativeWriteMeaning uTypeNativeScalarMeaning
   simp only [nativeAssertZeros, UTypeChip.main,
     Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-    witnessVectorNative, subcircuitWithAssertion, assertion,
+    witnessVector, witnessVectorIR, subcircuitWithAssertion, assertion,
     assertZero, HasAssertEq.assert_eq, Expression.assertEquals,
     Operations.localLength]
   simp only [Operations.constraints_append,
@@ -1032,7 +1032,7 @@ private theorem uTypeColumnsInteractionsDecompose
 
 open SP1Clean.Channels
   (stateChannel byteChannel memoryChannel programChannel)
-open SP1Clean.InteractionRecovery
+open InteractionRecovery
 
 private theorem uTypeStateInteractionsFaithful
     (env : Environment (ZMod p))

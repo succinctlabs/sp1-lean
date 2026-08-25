@@ -96,50 +96,20 @@ private structure WitnessVars (F : Type) where
   let sllw_msb := varFromOffset (Vector · 1) (offset + 4 + 6 + 3 + 4 + 4 + 4 + 4)
   let flags := varFromOffset (Vector · 3) (offset + 4 + 6 + 3 + 4 + 4 + 4 + 4 + 1)
   (⟨a, c_bits, v, shift_u16, lower_limb, higher_limb, limb_result, sllw_msb, flags⟩,
-    [ .witness 4 (.native fun env : ProverEnvironment (ZMod p) =>
-        populateA
-          #v[env input.adapter.op_b_memory.prev_value[0],
-             env input.adapter.op_b_memory.prev_value[1],
-             env input.adapter.op_b_memory.prev_value[2],
-             env input.adapter.op_b_memory.prev_value[3]]
-          (env input.adapter.op_c_memory.prev_value[0]) (hintFlags env.hint)),
-      .witness 6 (.native fun env : ProverEnvironment (ZMod p) =>
-        cBits (env input.adapter.op_c_memory.prev_value[0])),
-      .witness 3 (.native fun env : ProverEnvironment (ZMod p) =>
-        vPowers (env input.adapter.op_c_memory.prev_value[0])),
-      .witness 4 (.native fun env : ProverEnvironment (ZMod p) =>
-        shiftU16 (env input.adapter.op_c_memory.prev_value[0]) (hintFlags env.hint)),
-      .witness 4 (.native fun env : ProverEnvironment (ZMod p) =>
-        lowerLimb
-          #v[env input.adapter.op_b_memory.prev_value[0],
-             env input.adapter.op_b_memory.prev_value[1],
-             env input.adapter.op_b_memory.prev_value[2],
-             env input.adapter.op_b_memory.prev_value[3]]
-          (env input.adapter.op_c_memory.prev_value[0])),
-      .witness 4 (.native fun env : ProverEnvironment (ZMod p) =>
-        higherLimb
-          #v[env input.adapter.op_b_memory.prev_value[0],
-             env input.adapter.op_b_memory.prev_value[1],
-             env input.adapter.op_b_memory.prev_value[2],
-             env input.adapter.op_b_memory.prev_value[3]]
-          (env input.adapter.op_c_memory.prev_value[0])),
-      .witness 4 (.native fun env : ProverEnvironment (ZMod p) =>
-        limbResult
-          #v[env input.adapter.op_b_memory.prev_value[0],
-             env input.adapter.op_b_memory.prev_value[1],
-             env input.adapter.op_b_memory.prev_value[2],
-             env input.adapter.op_b_memory.prev_value[3]]
-          (env input.adapter.op_c_memory.prev_value[0])),
-      .witness 1 (.native fun env : ProverEnvironment (ZMod p) =>
-        #v[sllwMsb
-          #v[env input.adapter.op_b_memory.prev_value[0],
-             env input.adapter.op_b_memory.prev_value[1],
-             env input.adapter.op_b_memory.prev_value[2],
-             env input.adapter.op_b_memory.prev_value[3]]
-          (env input.adapter.op_c_memory.prev_value[0]) (hintFlags env.hint)]),
-      .witness 3 (.native fun env : ProverEnvironment (ZMod p) =>
-        #v[(hintFlags env.hint)[0], (hintFlags env.hint)[1],
-           (hintFlags env.hint)[1] * env input.adapter.imm_c]) ])
+    [ .witness 4 (populateAIR input.adapter.op_b_memory.prev_value
+        input.adapter.op_c_memory.prev_value[0]),
+      .witness 6 (cBitsIR input.adapter.op_c_memory.prev_value[0]),
+      .witness 3 (vPowersIR input.adapter.op_c_memory.prev_value[0]),
+      .witness 4 (shiftU16IR input.adapter.op_c_memory.prev_value[0]),
+      .witness 4 (lowerLimbIR input.adapter.op_b_memory.prev_value
+        input.adapter.op_c_memory.prev_value[0]),
+      .witness 4 (higherLimbIR input.adapter.op_b_memory.prev_value
+        input.adapter.op_c_memory.prev_value[0]),
+      .witness 4 (limbResultIR input.adapter.op_b_memory.prev_value
+        input.adapter.op_c_memory.prev_value[0]),
+      .witness 1 (sllwMsbIR input.adapter.op_b_memory.prev_value
+        input.adapter.op_c_memory.prev_value[0]),
+      .witness 3 (flagsIR input.adapter.imm_c) ])
 
 omit [Fact (2 ^ 17 < p)] in
 private theorem witnessListSubcircuitsConsistent
@@ -1305,6 +1275,32 @@ set_option linter.unusedSectionVars false in
          is_sllw_imm := Eval.eval env cols.is_sllw_imm } : Columns F) := by
   rw [ProvableStruct.eval_eq_eval]
   rfl
+
+/-! ### Operand projections, in `circuit_norm`'s own orientation (the `AddChip/Defs.lean`
+pattern) — the `ComputableWitnesses` proof projects the struct-level input agreement onto these. -/
+
+@[circuit_norm] theorem eval_opBPrev {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    (ProvableStruct.eval env input).adapter.op_b_memory.prev_value
+      = Vector.map (Expression.eval env) input.adapter.op_b_memory.prev_value := by
+  rw [← ProvableStruct.eval_eq_eval]
+  simp only [eval_inputs, Readers.ALUTypeReader.eval_cols, Readers.ALUTypeReader.eval_accessCols]
+  exact ProvableType.eval_fields env _
+
+@[circuit_norm] theorem eval_opCPrev {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    (ProvableStruct.eval env input).adapter.op_c_memory.prev_value
+      = Vector.map (Expression.eval env) input.adapter.op_c_memory.prev_value := by
+  rw [← ProvableStruct.eval_eq_eval]
+  simp only [eval_inputs, Readers.ALUTypeReader.eval_cols, Readers.ALUTypeReader.eval_accessCols]
+  exact ProvableType.eval_fields env _
+
+@[circuit_norm] theorem eval_immC {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    (ProvableStruct.eval env input).adapter.imm_c
+      = Expression.eval env input.adapter.imm_c := by
+  rw [← ProvableStruct.eval_eq_eval]
+  simp only [eval_inputs, Readers.ALUTypeReader.eval_cols, CircuitType.eval_expr]
 
 @[circuit_norm] theorem eval_inputAdapter {F : Type} [FiniteField F]
     (env : Environment F) (input : Inputs (Expression F)) :

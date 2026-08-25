@@ -22,66 +22,74 @@ census will find them unreferenced in-tree, which is this design choice, not dea
 
 namespace SP1Clean
 
-/-- The two State-bus endpoints committed by the current Clean ensemble. -/
+/-- The two State-bus endpoints committed by the current Clean ensemble — **split-limb form**
+(W3 D5-A, external report Finding 2). Each end carries its clock as the upstream `SP1Timestamp`
+`(16, 8, 8, 16)` limbs (`clk_0_16`/`clk_16_24`/`clk_24_32`/`clk_32_48`, ascending) plus the three
+16-bit pc limbs; the folded State-bus pair is recovered by the `init_clk_high`/`init_clk_low`/
+`final_clk_high`/`final_clk_low` recombination projections below, so `Semantics.clkNat` call sites
+and the boundary State messages read exactly as before. The split is what lets the boundary
+verifier range-check every committed limb in-circuit (`sp1StateVerifier`'s byte pulls), making the
+initial State message's canonicity a theorem of the ensemble rather than an
+`InitialBoundaryFacts` premise — and it is the faithful shape: SP1's real public values commit
+timestamps in precisely these limbs. -/
 structure SP1StateBoundary (F : Type) where
-  init_clk_high : F
-  init_clk_low : F
+  init_clk_0_16 : F
+  init_clk_16_24 : F
+  init_clk_24_32 : F
+  init_clk_32_48 : F
   init_pc0 : F
   init_pc1 : F
   init_pc2 : F
-  final_clk_high : F
-  final_clk_low : F
+  final_clk_0_16 : F
+  final_clk_16_24 : F
+  final_clk_24_32 : F
+  final_clk_32_48 : F
   final_pc0 : F
   final_pc1 : F
   final_pc2 : F
 deriving ProvableStruct
+
+section Recombined
+
+variable {F : Type} [Add F] [Mul F] [OfNat F 256] [OfNat F 65536]
+
+/-- The initial boundary's State-bus `clk_high` (bits 24–48), recombined from its two limbs. -/
+@[circuit_norm] def SP1StateBoundary.init_clk_high (b : SP1StateBoundary F) : F :=
+  b.init_clk_24_32 + b.init_clk_32_48 * 256
+
+/-- The initial boundary's State-bus `clk_low` (bits 0–24), recombined from its two limbs. -/
+@[circuit_norm] def SP1StateBoundary.init_clk_low (b : SP1StateBoundary F) : F :=
+  b.init_clk_0_16 + b.init_clk_16_24 * 65536
+
+/-- The final boundary's State-bus `clk_high`, recombined from its two limbs. -/
+@[circuit_norm] def SP1StateBoundary.final_clk_high (b : SP1StateBoundary F) : F :=
+  b.final_clk_24_32 + b.final_clk_32_48 * 256
+
+/-- The final boundary's State-bus `clk_low`, recombined from its two limbs. -/
+@[circuit_norm] def SP1StateBoundary.final_clk_low (b : SP1StateBoundary F) : F :=
+  b.final_clk_0_16 + b.final_clk_16_24 * 65536
+
+end Recombined
+
+/-- The boundary limbs' range facts — exactly what the verifier row's twelve byte pulls prove
+in-circuit (`sp1StateVerifier.Spec`): each clock in genuine `(16, 8, 8, 16)` limbs and each pc limb
+16-bit. This is the goodness-filter base case: the pushed initial State message is canonical by
+construction, with no boundary premise. -/
+def SP1StateBoundary.LimbBounds {p : ℕ} [Fact p.Prime] (b : SP1StateBoundary (ZMod p)) : Prop :=
+  b.init_clk_0_16.val < 2 ^ 16 ∧ b.init_clk_16_24.val < 2 ^ 8 ∧
+  b.init_clk_24_32.val < 2 ^ 8 ∧ b.init_clk_32_48.val < 2 ^ 16 ∧
+  b.init_pc0.val < 2 ^ 16 ∧ b.init_pc1.val < 2 ^ 16 ∧ b.init_pc2.val < 2 ^ 16 ∧
+  b.final_clk_0_16.val < 2 ^ 16 ∧ b.final_clk_16_24.val < 2 ^ 8 ∧
+  b.final_clk_24_32.val < 2 ^ 8 ∧ b.final_clk_32_48.val < 2 ^ 16 ∧
+  b.final_pc0.val < 2 ^ 16 ∧ b.final_pc1.val < 2 ^ 16 ∧ b.final_pc2.val < 2 ^ 16
 
 /-- Compatibility name used by the existing circuit layer. -/
 abbrev SP1PublicIO := SP1StateBoundary
 
 /-- Exact public-values type of the supported-core prefix theorem.  Naming the prefix explicitly
-prevents callers from importing the terminal-only `exit_code` below into a statement that the
-current Clean ensemble does not constrain. -/
+records that the current Clean ensemble constrains only the State-bus boundary — no exit code,
+digest, or other terminal field (those belong to the full 160-cell layout below). -/
 abbrev SupportedCorePrefixPublicValues := SP1StateBoundary
-
-/-- Legacy terminal-state scaffold: State endpoints plus an exit code.  The current Clean ensemble
-only receives `toStateBoundary`, so this type must not be used by `supported_core_air_sound`.  It is
-retained solely for the older target-execution theorem, whose separate halt premise constrains the
-exit code. -/
-structure SupportedCorePublicValues (F : Type) where
-  init_clk_high : F
-  init_clk_low : F
-  init_pc0 : F
-  init_pc1 : F
-  init_pc2 : F
-  final_clk_high : F
-  final_clk_low : F
-  final_pc0 : F
-  final_pc1 : F
-  final_pc2 : F
-  exit_code : F
-deriving ProvableStruct
-
-/-- Forget the exit code and retain the State-bus boundary consumed by the current ensemble. -/
-def SupportedCorePublicValues.toStateBoundary {F : Type} (pv : SupportedCorePublicValues F) :
-    SP1StateBoundary F :=
-  { init_clk_high := pv.init_clk_high
-    init_clk_low := pv.init_clk_low
-    init_pc0 := pv.init_pc0
-    init_pc1 := pv.init_pc1
-    init_pc2 := pv.init_pc2
-    final_clk_high := pv.final_clk_high
-    final_clk_low := pv.final_clk_low
-    final_pc0 := pv.final_pc0
-    final_pc1 := pv.final_pc1
-    final_pc2 := pv.final_pc2 }
-
-/-- Compatibility name for the legacy target-execution scaffold. -/
-abbrev SP1TargetPublicIO := SupportedCorePublicValues
-
-/-- Compatibility projection for the legacy target-execution scaffold. -/
-abbrev SP1TargetPublicIO.toLegacy {F : Type} (pv : SP1TargetPublicIO F) : SP1PublicIO F :=
-  pv.toStateBoundary
 
 /-! ## The real SP1 shard public-values layout
 

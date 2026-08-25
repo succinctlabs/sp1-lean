@@ -1,6 +1,6 @@
 import SP1Clean.Native.Chips.UTypeChip.Defs
 import SP1Clean.FormalModel.Contracts.ChipAssumptions
-import SP1Clean.Model.InteractionRecovery
+import ToClean.Circuit.InteractionRecovery
 import SP1Clean.Math.EvalVec
 import Clean.Air.Circuit
 
@@ -106,7 +106,7 @@ theorem completeness :
     h_assumptions
   -- G1: the *push* side clock bound, from the prover-supplied CPUState clock byte bounds.
   have h_clk := Readers.ClkDiscipline.of_cpuState_spec h_cpu
-  obtain ⟨_, ⟨_, _, _, hpc⟩, ⟨_, _, _, hob, _⟩, _⟩ := h_input
+  obtain ⟨_, ⟨_, _, _, hpc⟩, ⟨_, _, h_a0, hob, _⟩, hiau⟩ := h_input
   -- `h_env` now bundles the addend/add-result witness equations with the GFC `JTypeReader` subcircuit's
   -- completeness obligation (SC Phase 2pre); the witness equations are `he_addend`/`he_addval`.
   obtain ⟨he_addend, he_addval, -, _⟩ := h_env
@@ -114,11 +114,11 @@ theorem completeness :
       Expression.eval env.toEnvironment input_var_state_pc[i] = input_state_pc[i] :=
     fun i hi => by rw [← hpc]; simp only [Vector.getElem_map]
   have hg0 : env.get i₀ = input_is_auipc * Expression.eval env.toEnvironment input_var_state_pc[0] := by
-    simpa using he_addend 0
+    simpa [circuit_norm, hiau] using he_addend 0
   have hg1 : env.get (i₀ + 1) = input_is_auipc * Expression.eval env.toEnvironment input_var_state_pc[1] := by
-    simpa using he_addend 1
+    simpa [circuit_norm, hiau] using he_addend 1
   have hg2 : env.get (i₀ + 2) = input_is_auipc * Expression.eval env.toEnvironment input_var_state_pc[2] := by
-    simpa using he_addend 2
+    simpa [circuit_norm, hiau] using he_addend 2
   have hAeq : (#v[input_is_auipc * Expression.eval env.toEnvironment input_var_state_pc[0],
         input_is_auipc * Expression.eval env.toEnvironment input_var_state_pc[1],
         input_is_auipc * Expression.eval env.toEnvironment input_var_state_pc[2], 0] : Word (ZMod p))
@@ -128,14 +128,6 @@ theorem completeness :
         Expression.eval env.toEnvironment input_var_adapter_op_b_imm[2],
         Expression.eval env.toEnvironment input_var_adapter_op_b_imm[3]] : Word (ZMod p))
       = input_adapter_op_b_imm := (vec4_eval _ _).trans hob
-  have hval : (Vector.map (Expression.eval env.toEnvironment)
-        (Vector.mapRange 4 fun i => var { index := i₀ + 3 + i }) : Word (ZMod p))
-      = AddOperation.populate #v[env.get i₀, env.get (i₀ + 1), env.get (i₀ + 2), 0]
-          input_adapter_op_b_imm := by
-    apply Vector.ext; intro i hi
-    simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
-    rw [he_addval ⟨i, hi⟩]
-    simp only [hAeq, hbeq]
   have hA_U : Word.isU64 (#v[env.get i₀, env.get (i₀ + 1), env.get (i₀ + 2), 0] : Word (ZMod p)) := by
     rcases h_iaui with h | h
     · have e : (#v[env.get i₀, env.get (i₀ + 1), env.get (i₀ + 2), 0] : Word (ZMod p)) = #v[0, 0, 0, 0] := by
@@ -145,27 +137,81 @@ theorem completeness :
           = #v[input_state_pc[0], input_state_pc[1], input_state_pc[2], 0] := by
         rw [hg0, hg1, hg2, h, epc 0 (by omega), epc 1 (by omega), epc 2 (by omega)]; simp
       rw [e]; exact h_pcU
+  have hval_off (hop0 : input_adapter_op_a_0 = 0) :
+      (Vector.map (Expression.eval env.toEnvironment)
+        (Vector.mapRange 4 fun i => var { index := i₀ + 3 + i }) : Word (ZMod p))
+      = AddOperation.populate #v[env.get i₀, env.get (i₀ + 1), env.get (i₀ + 2), 0]
+          input_adapter_op_b_imm := by
+    -- The addend operand of the witness IR is the *input* product `is_auipc * pc`; `hAeq` is what
+    -- identifies it with the addend cells this statement is phrased in.
+    rw [← AddOperation.populateIRGated_eval_off env input_var_adapter_op_a_0
+      #v[input_var_is_auipc * input_var_state_pc[0], input_var_is_auipc * input_var_state_pc[1],
+         input_var_is_auipc * input_var_state_pc[2], 0]
+      input_var_adapter_op_b_imm _ _ (by simpa [circuit_norm, hiau] using hAeq) hbeq hA_U h_imm
+      (h_a0.trans hop0)]
+    apply Vector.ext; intro i hi
+    simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
+    exact he_addval ⟨i, hi⟩
+  have hval_on (hop1 : input_adapter_op_a_0 = 1) :
+      (Vector.map (Expression.eval env.toEnvironment)
+        (Vector.mapRange 4 fun i => var { index := i₀ + 3 + i }) : Word (ZMod p))
+        = #v[0, 0, 0, 0] := by
+    rw [← AddOperation.populateIRGated_eval_on env input_var_adapter_op_a_0
+      #v[input_var_is_auipc * input_var_state_pc[0], input_var_is_auipc * input_var_state_pc[1],
+         input_var_is_auipc * input_var_state_pc[2], 0]
+      input_var_adapter_op_b_imm (by rw [h_a0, hop1]; exact one_ne_zero)]
+    apply Vector.ext; intro i hi
+    simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
+    exact he_addval ⟨i, hi⟩
   have h_gate2 : input_is_real - input_adapter_op_a_0 = 0 ∨ input_is_real - input_adapter_op_a_0 = 1 := by
-    rw [h_op0]; simpa using h_bin
+    rcases h_op0 with h0 | ⟨hr, h1⟩
+    · rw [h0, sub_zero]
+      exact h_bin
+    · rw [hr, h1]
+      simp
+  have h_op0_bin : input_adapter_op_a_0 = 0 ∨ input_adapter_op_a_0 = 1 := by
+    rcases h_op0 with h0 | ⟨_, h1⟩
+    · exact Or.inl h0
+    · exact Or.inr h1
+  have h_op0_pad : (input_is_real - 1) * input_adapter_op_a_0 = 0 := by
+    rcases h_op0 with h0 | ⟨hr, h1⟩
+    · rw [h0, mul_zero]
+    · rw [hr, h1]
+      simp
+  have hz (i : Fin 4) : input_adapter_op_a_0 * env.get (i₀ + 3 + (i : ℕ)) = 0 := by
+    rcases h_op0 with h0 | ⟨_, h1⟩
+    · rw [h0, zero_mul]
+    · have hi := congrArg (fun v : Word (ZMod p) => v[(i : ℕ)]) (hval_on h1)
+      simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm] at hi
+      rw [h1, one_mul, hi]
+      fin_cases i <;> rfl
   refine ⟨⟨h_bin, h_cpu⟩, ⟨⟨fun _ => ⟨hA_U, h_imm⟩, h_gate2⟩, ?_⟩,
-    ⟨⟨h_bin, h_bin⟩, ⟨⟨?_, ?_, ?_, ?_⟩, (fun _ => Or.inl h_op0), h_rac, hdec,
+    ⟨⟨h_bin, h_bin⟩, ⟨⟨?_, ?_, ?_, ?_⟩, (fun _ => h_op0_bin), h_rac, hdec,
       fun hr => ⟨h_oap hr, hprevclk hr⟩⟩⟩,
     ⟨⟨h_bin, ?_, h_clk.at_four⟩, trivial⟩, ?_, ?_, ?_, ?_, ?_, ?_⟩
-  · rw [hval]; exact AddOperation.spec_populate hA_U h_imm (input_is_real - input_adapter_op_a_0)
-  · rw [h_op0, zero_mul]
-  · rw [h_op0, zero_mul]
-  · rw [h_op0, zero_mul]
-  · rw [h_op0, zero_mul]
-  · -- RegisterWrite op_a write push: `isU64` of the result `add_value` (completeness covers `op_a_0 = 0`).
+  · rcases h_op0 with h0 | ⟨hr, h1⟩
+    · rw [hval_off h0]
+      exact AddOperation.spec_populate hA_U h_imm (input_is_real - input_adapter_op_a_0)
+    · intro hgate
+      rw [hr, h1, sub_self] at hgate
+      exact absurd hgate zero_ne_one
+  · simpa using hz 0
+  · simpa using hz 1
+  · simpa using hz 2
+  · simpa using hz 3
+  · -- RegisterWrite op_a write push: either the populated result (`rd ≠ x0`) or the zero word.
     intro hr
-    rw [hval]
-    exact (AddOperation.spec_populate hA_U h_imm (input_is_real - input_adapter_op_a_0)
-      (by rw [h_op0]; simpa using hr)).1
+    rcases h_op0 with h0 | ⟨_, h1⟩
+    · rw [hval_off h0]
+      exact (AddOperation.spec_populate hA_U h_imm (input_is_real - input_adapter_op_a_0)
+        (by rw [h0]; simpa using hr)).1
+    · rw [hval_on h1]
+      exact Word.isU64_of_cases (by simp) (by simp) (by simp) (by simp)
   · rw [hg0]; ring_nf
   · rw [hg1]; ring_nf
   · rw [hg2]; ring_nf
   · rcases h_iaui with h | h <;> rw [h] <;> simp
-  · rw [h_op0]; simp
+  · exact h_op0_pad
   · rcases h_bin with h | h <;> rw [h] <;> simp
 
 /-- Exact State-channel pair emitted by the composed CPU-state reader. -/
@@ -255,7 +301,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
       dsimp only [Operations.RequirementsChannelsLawful]
       refine ⟨?_, ?_, ?_⟩
       · simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-          witnessVectorNative, subcircuitWithAssertion, assertion, assertZero,
+          witnessVector, witnessVectorIR, subcircuitWithAssertion, assertion, assertZero,
           HasAssertEq.assert_eq, Expression.assertEquals, Operations.localLength]
         simp only [Operations.subcircuitChannelsWithRequirements_append,
           Operations.subcircuitChannelsWithRequirements_witness,
@@ -271,7 +317,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
         tauto
       · intro channel h_channel
         simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-          witnessVectorNative, subcircuitWithAssertion, assertion, assertZero,
+          witnessVector, witnessVectorIR, subcircuitWithAssertion, assertion, assertZero,
           HasAssertEq.assert_eq, Expression.assertEquals, Operations.localLength,
           Operations.shallowChannels_append, Operations.shallowChannels_witness,
           Operations.shallowChannels_subcircuit, Operations.shallowChannels_assert,
@@ -281,7 +327,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
         rw [Operations.inChannelsOrRequirements_iff_forall_mem]
         intro interaction h_interaction
         simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-          witnessVectorNative, subcircuitWithAssertion, assertion, assertZero,
+          witnessVector, witnessVectorIR, subcircuitWithAssertion, assertion, assertZero,
           HasAssertEq.assert_eq, Expression.assertEquals, Operations.localLength,
           Operations.shallowInteractions_append, Operations.shallowInteractions_witness,
           Operations.shallowInteractions_subcircuit, Operations.shallowInteractions_assert,
@@ -299,7 +345,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
         List.mem_append, List.mem_singleton] at exposedMem
       rcases exposedMem with (rfl | rfl) | rfl
       · simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-          witnessVectorNative, subcircuitWithAssertion, assertion, assertZero,
+          witnessVector, witnessVectorIR, subcircuitWithAssertion, assertion, assertZero,
           HasAssertEq.assert_eq, Expression.assertEquals, Operations.localLength]
         simp only [Operations.interactionsWith_append, Operations.interactionsWith_witness,
           Readers.CPUState.interactionsWith_state_subcircuit,
@@ -320,7 +366,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
       · -- Memory branch: compositional — the J-type reader keeps its op_a pull and `RegisterWrite`
         -- its write push via the reader-local `_subcircuit` lemmas; every other child is nil.
         simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-          witnessVectorNative, subcircuitWithAssertion, assertion, assertZero,
+          witnessVector, witnessVectorIR, subcircuitWithAssertion, assertion, assertZero,
           HasAssertEq.assert_eq, Expression.assertEquals, Operations.localLength]
         simp only [Operations.interactionsWith_witness,
           Soundness.jTypeReader_memoryInteractions_subcircuit,
@@ -343,7 +389,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
       · -- Program branch: compositional — the reader subcircuit keeps its fetch via the
         -- reader-local `_subcircuit` lemma; every other child is nil on the Program channel.
         simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-          witnessVectorNative, subcircuitWithAssertion, assertion, assertZero,
+          witnessVector, witnessVectorIR, subcircuitWithAssertion, assertion, assertZero,
           HasAssertEq.assert_eq, Expression.assertEquals, Operations.localLength]
         simp only [Operations.interactionsWith_append, Operations.interactionsWith_witness,
           InteractionRecovery.interactionsWith_assertionSubcircuit_eq_nil,
@@ -531,7 +577,7 @@ private theorem uTypeByteInteractions_exact
       (Gadgets.Equality.circuit field) byteChannel.toRaw n inp ops
       List.not_mem_nil List.not_mem_nil
   simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-    witnessVectorNative, subcircuitWithAssertion, assertion, assertZero,
+    witnessVector, witnessVectorIR, subcircuitWithAssertion, assertion, assertZero,
     HasAssertEq.assert_eq, Expression.assertEquals, Operations.localLength]
   simp only [Operations.interactionsWith_append, Operations.interactionsWith_witness,
     cpuByteInteractions_subcircuit, addByteInteractions_subcircuit,

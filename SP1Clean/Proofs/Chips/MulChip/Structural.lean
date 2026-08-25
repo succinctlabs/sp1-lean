@@ -24,7 +24,7 @@ theorem requirementsChannelsLawful_main (input : Var Inputs (ZMod p)) (offset : 
   dsimp only [Operations.RequirementsChannelsLawful]
   refine ⟨?_, ?_, ?_⟩
   · simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-      witnessVectorNative, CircuitNormalization.witnessNative_apply_eq,
+      witnessVectorIR, Witnessable.witness, witnessIR,
       subcircuitWithAssertion, assertion, assertZero, Operations.localLength]
     simp only [Operations.subcircuitChannelsWithRequirements_append,
       Operations.subcircuitChannelsWithRequirements_witness,
@@ -40,7 +40,7 @@ theorem requirementsChannelsLawful_main (input : Var Inputs (ZMod p)) (offset : 
     tauto
   · intro channel hChannel
     simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-      witnessVectorNative, CircuitNormalization.witnessNative_apply_eq,
+      witnessVectorIR, Witnessable.witness, witnessIR,
       subcircuitWithAssertion, assertion, assertZero, Operations.localLength,
       Operations.shallowChannels_append, Operations.shallowChannels_witness,
       Operations.shallowChannels_subcircuit, Operations.shallowChannels_assert,
@@ -50,7 +50,7 @@ theorem requirementsChannelsLawful_main (input : Var Inputs (ZMod p)) (offset : 
     rw [Operations.inChannelsOrRequirements_iff_forall_mem]
     intro interaction hInteraction
     simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-      witnessVectorNative, CircuitNormalization.witnessNative_apply_eq,
+      witnessVectorIR, Witnessable.witness, witnessIR,
       subcircuitWithAssertion, assertion, assertZero, Operations.localLength,
       Operations.shallowInteractions_append, Operations.shallowInteractions_witness,
       Operations.shallowInteractions_subcircuit, Operations.shallowInteractions_assert,
@@ -64,7 +64,8 @@ theorem rTypeReader_mem (input : Var Inputs (ZMod p)) (offset : ℕ) :
       Readers.RTypeReader.circuit.toSubcircuit (offset + 54) (rTypeReaderInput input offset)⟩ ∈
       ((main input).operations offset).subcircuits := by
   simp only [main, rTypeReaderInput, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-    witnessVectorNative, subcircuitWithAssertion, assertion, assertZero, Operations.localLength,
+    witnessVectorIR, Witnessable.witness, witnessIR,
+    subcircuitWithAssertion, assertion, assertZero, Operations.localLength,
     Operations.subcircuits_witness,
     Operations.subcircuits_subcircuit, Operations.subcircuits_assert,
     Operations.subcircuits_nil, GeneralFormalCircuit.toSubcircuit_localLength,

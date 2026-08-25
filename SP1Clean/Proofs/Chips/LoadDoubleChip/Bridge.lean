@@ -150,7 +150,7 @@ theorem correct_load_double_native
     SailState.isInitialized_insert s hs Register.nextPC (pc + 4#64)
   have hmem_eq : sp.mem = s.mem := rfl
   have hsp_config : SailState.isValidMemConfig sp hsp_init := by
-    obtain ⟨hcp, hmprv, hmsec, hmsecpmm, hhtif, hpma⟩ := hconfig
+    obtain ⟨hcp, hmprv, hmsec, hmsecpmm, hhtif, hpma, hpmp⟩ := hconfig
     -- Every config register survives the `nextPC` insert (it is none of them).
     have key : ∀ (reg : Register) (h : reg ∈ s.regs) (h' : reg ∈ sp.regs),
         reg ≠ Register.nextPC → sp.regs.get reg h' = s.regs.get reg h := by
@@ -163,7 +163,8 @@ theorem correct_load_double_native
         h_mseccfg_disabled := by rwa [key _ (hs _) (hsp_init _) (by decide)]
         h_mseccfg_pmm := by rwa [key _ (hs _) (hsp_init _) (by decide)]
         h_htif_disabled := by rwa [key _ (hs _) (hsp_init _) (by decide)]
-        h_pma_regions := by rwa [key _ (hs _) (hsp_init _) (by decide)] }
+        h_pma_regions := by rwa [key _ (hs _) (hsp_init _) (by decide)]
+        h_pmp_off := by rwa [key _ (hs _) (hsp_init _) (by decide)] }
   -- Register read of `rs1` survives the `nextPC` write.
   have hsp_rs1 : sp.get_reg? rs1_idx = some reg_val := by
     rwa [hsp, SailState.get_reg?_insert_nextPC]

@@ -13,10 +13,10 @@ statements depend only on the Sail `SailState` model (`Model/`), so they live in
 substrate. `LocalStateTruth`/`ProgTruth` are built atop them in `Model/Semantics/Truth.lean` as conclusions of
 the global grounding engine; they are deliberately not row-local channel guarantees.
 
-The trace **arguments** that consume them — `TargetObligations`, `WalkOf`, `RefinesAt`, `RowEffect`, and
-the target theorem `sp1_target_execution` — reference `ChipRow`/`StateAccess` (the Soundness-layer trace
-machinery), so they cannot move below `Soundness` and stay in `Soundness/TargetVm.lean`. (Namespace is
-kept `SP1Clean.Soundness.Target` so `TargetVm` resolves these unchanged after importing this file.) -/
+The trace **arguments** that consume them — `RefinesAt`, `RowEffect`, and the per-chip `ChipKind.advance`
+obligations — reference the Soundness-layer trace machinery (`Trace.RowView`), so they cannot move below
+`Soundness` and live in `Soundness/RowEffectDefs.lean`. (Namespace is kept `SP1Clean.Soundness.Target`
+so those consumers resolve these unchanged after importing this file.) -/
 
 open LeanRV64D.Defs
 namespace SP1Clean.Soundness.Target
@@ -95,12 +95,20 @@ structure SailConfigured (s : SailState) : Prop where
   mseccfg_pmm : BitVec.ofNat 2 ((s.regs.get Register.mseccfg (init _)).toNat >>> 32) = 0#2
   /-- No HTIF tohost device. -/
   htif_disabled : s.regs.get Register.htif_tohost_base (init _) = none
+  /-- Every PMP entry is OFF — SP1 implements no CSR instructions, so none can ever be installed. -/
+  pmp_off : s.regs.get Register.pmpcfg_n (init _) = Vector.replicate 64 0#8
+  /-- `misa.M = 1` — the M extension is enabled at boot (and `misa` is boot-stable: SP1 implements
+  no CSR writes). The generated decoder's MUL/DIV arms guard on `currentlyEnabled Ext_M`, which
+  tests exactly this bit, so without the pin `decodedInROM` is unsatisfiable for every M-family
+  row — the silent-vacuity hazard the external PR110 report's Finding 3 warns about, found real
+  for this family and closed by this field (2026-08-20). -/
+  misa_m : _get_Misa_M (s.regs.get Register.misa (init _)) = 1#1
   /-- The single fixed SP1 PMA region (bare translation) — the fetch/load address decode. -/
   pma_regions : s.regs.get Register.pma_regions (init _) = [SailMem.SP1_PMA_Region]
 
 /-- The SP1 memory configuration (`isValidMemConfig`) the low-level fetch/load/store lemmas consume,
-reconstructed from the flattened `SailConfigured` fields (`h_cur_privilege` derives from `priv`; the other
-four are the inlined memory-config fields — the flatten deduped the `cur_privilege` fact). -/
+reconstructed from the flattened `SailConfigured` fields (`h_cur_privilege` derives from `priv`; the
+other five are the inlined memory-config fields — the flatten deduped the `cur_privilege` fact). -/
 theorem SailConfigured.toValidMemConfig {s : SailState} (cfg : SailConfigured s) :
     SailMem.SailState.isValidMemConfig s cfg.init where
   h_cur_privilege := by
@@ -110,6 +118,7 @@ theorem SailConfigured.toValidMemConfig {s : SailState} (cfg : SailConfigured s)
   h_mseccfg_pmm := cfg.mseccfg_pmm
   h_htif_disabled := cfg.htif_disabled
   h_pma_regions := cfg.pma_regions
+  h_pmp_off := cfg.pmp_off
 
 /-- A Sail state that "loads" the guest program: a *relation*, not a constructed state, so everything
 the execution doesn't touch stays quantified. ELF ingestion (W6b) produces a `GuestProgram` and a
@@ -148,7 +157,7 @@ theorem SailChain.snoc : ∀ {n : ℕ} {a b : SailState}, SailChain n a b →
 /-- Compatibility contract between SP1's immutable trusted-program fetch and the official Sail
 interpreter's unified instruction/data memory.
 
-In SP1 v6.3.1, trusted instruction fetch reads `Program.instructions`, while ordinary loads and
+In SP1 v6.4.0, trusted instruction fetch reads `Program.instructions`, while ordinary loads and
 stores read and write the separate Memory state. The ELF loader initially places executable bytes
 in that Memory image too, but a later data store does not change the instruction selected by the
 Program table. Unmodified Sail instead fetches from the same mutable byte map used by data accesses.

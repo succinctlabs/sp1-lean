@@ -4,6 +4,7 @@ import SP1Clean.Native.Readers.CPUState
 import SP1Clean.Native.Readers.RTypeReader
 import SP1Clean.Native.Readers.RegisterWrite
 import SP1Clean.Model.Channels
+import ToClean.Circuit.WitnessCombinator
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit
 import Clean.Circuit.Channel
@@ -25,15 +26,12 @@ open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- Compose the `CPUState`/`SubOperation`/`RTypeReader` sub-circuits, witness the ALU result word via
-`SubOperation.populate`, gate `is_real`, and assemble the native `Columns` struct. `RTypeReader`
+`SubOperation.populateIR` (the exportable witness IR; `populate` remains its value-level anchor), gate `is_real`, and assemble the native `Columns` struct. `RTypeReader`
 carries opcode `2` and the four `op_a_write_value` limbs. -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p)) := do
   let _ ← Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
-  let value ← witnessVectorNative 4 (fun env =>
-    SubOperation.populate
-      #v[env input.op_b_val[0], env input.op_b_val[1], env input.op_b_val[2], env input.op_b_val[3]]
-      #v[env input.op_c_val[0], env input.op_c_val[1], env input.op_c_val[2], env input.op_c_val[3]])
+  let value ← witnessVectorIR 4 (SubOperation.populateIR input.op_b_val input.op_c_val)
   assertion SubOperation.circuit ⟨input.op_b_val, input.op_c_val, { value := value }, input.is_real⟩
   -- `RTypeReader` is now a `GeneralFormalCircuit` (SC Phase 2pre) — composed via the GFC `CoeFun`
   -- (`subcircuitWithAssertion`), discarding its `unit` output. Its `Spec` (Contracts) is unchanged.
@@ -94,5 +92,32 @@ unfolding the full composed `main`. -/
     (env : Environment F) (input : Inputs (Expression F)) :
     (Eval.eval env input).adapter = Eval.eval env input.adapter := by
   rw [eval_inputs]
+
+/-! ### Operand words, in `circuit_norm`'s own orientation
+
+The `eval_*` lemmas above push evaluation *down* into components, which is the opposite of
+`circuit_norm`'s normal form (it pulls projections *up* out of `eval`), so they are inert under it.
+These two state the operand words the other way round — projection outside, right-hand side inert —
+which is directly usable by any proof holding struct-level input agreement, chiefly
+`ComputableWitnesses`. Vector operands only; a scalar field is already in normal form and restating
+one loops. See `AddChip/Defs.lean` for the full rationale. -/
+
+@[circuit_norm] theorem eval_opBVal {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    (ProvableStruct.eval env input).op_b_val
+      = Vector.map (Expression.eval env) input.op_b_val := by
+  rw [← ProvableStruct.eval_eq_eval]
+  simp only [Inputs.op_b_val, eval_inputs, Readers.RTypeReader.eval_cols,
+    Readers.RTypeReader.eval_registerAccessCols]
+  exact ProvableType.eval_fields env _
+
+@[circuit_norm] theorem eval_opCVal {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    (ProvableStruct.eval env input).op_c_val
+      = Vector.map (Expression.eval env) input.op_c_val := by
+  rw [← ProvableStruct.eval_eq_eval]
+  simp only [Inputs.op_c_val, eval_inputs, Readers.RTypeReader.eval_cols,
+    Readers.RTypeReader.eval_registerAccessCols]
+  exact ProvableType.eval_fields env _
 
 end SP1Clean.SubChip

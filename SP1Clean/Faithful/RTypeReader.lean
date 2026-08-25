@@ -2,7 +2,7 @@ import Mathlib.Tactic
 import Mathlib.Data.ZMod.Basic
 import SP1Clean.Model.SP1Constraint
 import SP1Clean.Model.InteractionProjection
-import SP1Clean.Model.InteractionRecovery
+import ToClean.Circuit.InteractionRecovery
 import SP1Clean.Faithful.ExtractedInteractionModel
 import SP1Clean.Native.Readers.RTypeReader
 import SP1Clean.Extracted.RTypeReader
@@ -111,7 +111,7 @@ theorem rtypereader_interactions_faithful
   tauto
 
 open SP1Clean.Channels (byteChannel memoryChannel MemoryMsg programChannel ProgramMsg)
-open SP1Clean.InteractionRecovery
+open InteractionRecovery
 
 /-- **Faithfulness anchor (RTypeReader fragment) — Memory-bus interactions, SYNTACTIC.** Option B: the
 reader is now a **pure read** — its op_a (`rd`) **write** is factored out into `RegisterWrite` (composed by

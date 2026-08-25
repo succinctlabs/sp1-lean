@@ -4,6 +4,7 @@ import SP1Clean.Native.Readers.CPUState
 import SP1Clean.Native.Readers.RTypeReader
 import SP1Clean.Native.Readers.RegisterWrite
 import SP1Clean.Model.Channels
+import ToClean.Circuit.WitnessCombinator
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit
 import Clean.Circuit.Channel
@@ -42,10 +43,7 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p))
   -- output. Its State pull is structural; reachability is proved only by the global grounding engine.
   let _ ← Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
-  let value ← witnessVectorNative 4 (fun env =>
-    AddOperation.populate
-      #v[env input.op_b_val[0], env input.op_b_val[1], env input.op_b_val[2], env input.op_b_val[3]]
-      #v[env input.op_c_val[0], env input.op_c_val[1], env input.op_c_val[2], env input.op_c_val[3]])
+  let value ← witnessVectorIR 4 (AddOperation.populateIR input.op_b_val input.op_c_val)
   assertion AddOperation.circuit ⟨input.op_b_val, input.op_c_val, { value := value }, input.is_real⟩
   -- `RTypeReader` is now a `GeneralFormalCircuit` (SC Phase 2pre) — composed via the GFC `CoeFun`
   -- (`subcircuitWithAssertion`), discarding its `unit` output. Its `Spec` (Contracts) is unchanged.
@@ -119,5 +117,39 @@ boundary: consumers rewrite this lemma instead of asking unification to unfold t
     (env : Environment F) (input : Inputs (Expression F)) :
     (Eval.eval env input).adapter = Eval.eval env input.adapter := by
   rw [eval_inputs]
+
+/-! ### Operand words, in `circuit_norm`'s own orientation
+
+The `eval_*` lemmas above push evaluation *down* into components. `circuit_norm`'s normal form goes
+the other way — it pulls projections *up* out of `eval` (`ProvableStruct.eval_eq_eval` is `↓ high`,
+and `Clean/Circuit/StructEvalSimprocs.lean`'s lift simprocs rewrite `eval env (s.f)` to
+`(eval env s).f`). Two opposite orientations of one equation cannot both live in a confluent simp
+set, so the lemmas above are inert under `circuit_norm` and a proof that needs them must first undo
+the normalisation with `rw [← ProvableStruct.eval_eq_eval]`.
+
+These two state the operand words in `circuit_norm`'s orientation instead: the projection is already
+on the outside, and the right-hand side is inert (`Expression.eval env` appears unapplied, so no lift
+simproc fires). That makes them safe to tag and directly usable by any proof that has struct-level
+input agreement in hand — chiefly `ComputableWitnesses`, whose hypothesis arrives in exactly that
+form. Only *vector*-valued operands need this; a scalar field is already in normal form as
+`(ProvableStruct.eval env cols).f`, and restating one would loop against the lift simproc. -/
+
+@[circuit_norm] theorem eval_opBVal {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    (ProvableStruct.eval env input).op_b_val
+      = Vector.map (Expression.eval env) input.op_b_val := by
+  rw [← ProvableStruct.eval_eq_eval]
+  simp only [Inputs.op_b_val, eval_inputs, Readers.RTypeReader.eval_cols,
+    Readers.RTypeReader.eval_registerAccessCols]
+  exact ProvableType.eval_fields env _
+
+@[circuit_norm] theorem eval_opCVal {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    (ProvableStruct.eval env input).op_c_val
+      = Vector.map (Expression.eval env) input.op_c_val := by
+  rw [← ProvableStruct.eval_eq_eval]
+  simp only [Inputs.op_c_val, eval_inputs, Readers.RTypeReader.eval_cols,
+    Readers.RTypeReader.eval_registerAccessCols]
+  exact ProvableType.eval_fields env _
 
 end SP1Clean.AddChip

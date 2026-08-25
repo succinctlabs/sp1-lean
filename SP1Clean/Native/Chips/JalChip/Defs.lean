@@ -5,6 +5,7 @@ import SP1Clean.Native.Readers.JTypeReader
 import SP1Clean.Native.Readers.RegisterWrite
 import SP1Clean.Model.Channels
 import SP1Clean.Model.ByteTable
+import ToClean.Circuit.WitnessCombinator
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit
 import Clean.Circuit.Channel
@@ -29,18 +30,17 @@ omit [Fact p.Prime] in
 lemma h14p : (14 : ℕ) < p := by have := Fact.out (p := 2 ^ 17 < p); omega
 
 /-- Witness the two add results (`add_operation.value` = jump target, `op_a_operation.value` = link
-address) via `AddOperation.populate`, then compose as Clean `assertion`s. The `CPUState` reader is fed
+address) via `AddOperation.populateIR`, then compose as Clean `assertion`s. The `CPUState` reader is fed
 the data-dependent `next_pc = add_operation.value`; the link add's gate is `is_real - op_a_0`. -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p)) := do
-  let add_value ← witnessVectorNative 4 (fun env =>
-    AddOperation.populate
-      #v[env input.state.pc[0], env input.state.pc[1], env input.state.pc[2], 0]
-      #v[env input.adapter.op_b_imm[0], env input.adapter.op_b_imm[1],
-         env input.adapter.op_b_imm[2], env input.adapter.op_b_imm[3]])
-  let op_a_value ← witnessVectorNative 4 (fun env =>
-    AddOperation.populate
-      #v[env input.state.pc[0], env input.state.pc[1], env input.state.pc[2], 0]
-      #v[4, 0, 0, 0])
+  let add_value ← witnessVectorIR 4 (AddOperation.populateIR
+    #v[input.state.pc[0], input.state.pc[1], input.state.pc[2], 0]
+    input.adapter.op_b_imm)
+  -- SP1 populates the link word only when `rd ≠ x0` (`jal/trace.rs`: `if !event.op_a_0`);
+  -- the gated IR zeroes these cells on `op_a_0` rows so the derived trace matches byte-for-byte.
+  let op_a_value ← witnessVectorIR 4 (AddOperation.populateIRGated input.adapter.op_a_0
+    #v[input.state.pc[0], input.state.pc[1], input.state.pc[2], 0]
+    #v[4, 0, 0, 0])
   let pcWordV : Word (Expression (ZMod p)) :=
     #v[input.state.pc[0], input.state.pc[1], input.state.pc[2], 0]
   let _ ← Readers.CPUState.circuit
@@ -108,5 +108,37 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main := by
          op_a_operation := Eval.eval env cols.op_a_operation } :
         Columns F) := by
   rw [ProvableStruct.eval_eq_eval]; rfl
+
+/-! ### Operand words, in `circuit_norm`'s own orientation
+
+Projection outside `eval`, inert right-hand side — the form `ComputableWitnesses` hands over; see
+`AddChip/Defs.lean` for the rationale. JAL differs from the ALU chips in that its addends are
+*constructed*: the target add is `pc ++ 0` plus the J-type immediate, and the link add is `pc ++ 0`
+plus the literal `4`. So the pieces to project are the program counter and the immediate, and the
+constant limbs need nothing at all. -/
+
+@[circuit_norm] theorem eval_statePc {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    (ProvableStruct.eval env input).state.pc
+      = Vector.map (Expression.eval env) input.state.pc := by
+  rw [← ProvableStruct.eval_eq_eval]
+  simp only [eval_inputs, Readers.CPUState.eval_cols]
+  exact ProvableType.eval_fields env _
+
+@[circuit_norm] theorem eval_opBImm {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    (ProvableStruct.eval env input).adapter.op_b_imm
+      = Vector.map (Expression.eval env) input.adapter.op_b_imm := by
+  rw [← ProvableStruct.eval_eq_eval]
+  simp only [eval_inputs, Readers.JTypeReader.eval_cols]
+  exact ProvableType.eval_fields env _
+
+@[circuit_norm] theorem eval_opA0 {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    (ProvableStruct.eval env input).adapter.op_a_0
+      = Expression.eval env input.adapter.op_a_0 := by
+  rw [← ProvableStruct.eval_eq_eval]
+  simp only [eval_inputs, Readers.JTypeReader.eval_cols]
+  exact ProvableType.eval_field env _
 
 end SP1Clean.JalChip

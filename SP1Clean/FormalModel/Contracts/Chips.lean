@@ -403,7 +403,16 @@ def CoreSpec (cols : Columns (ZMod p)) : Prop :=
 RV64 shift-left of the operand by the shift amount, with the variant selected by the committed flag
 columns (`cols.is_sll → RV64.sll`, the 64-bit logical left shift; `cols.is_sllw → RV64.sllw`, the
 low-32 left shift sign-extended to 64). Operand order matches the RV64 signature `f rs2_val rs1_val`
-with `rs1 ↦ op_b_val`, `rs2 ↦ op_c_val`. Vacuous on padding. -/
+with `rs1 ↦ op_b_val`, `rs2 ↦ op_c_val`. Vacuous on padding.
+
+**Deliberately narrower than `AddChip.Spec`'s three-conjunct shape** (external report §11
+observation): no reader sub-`Spec` clause and no `is_real`-binarity clause are restated here. Both
+facts are circuit-forced and are *derived where consumed* — the reader/time facts from the chip's
+own channel-push `Requirements` at the trace level (`Soundness/TypedTimeContracts.lean`'s
+`cpuStateTimeContract` family) and binarity from the flag-sum gate — so restating them in the `Spec`
+would only re-index every positional projection in the advance/grounding consumers without changing
+what is proved. The same applies to `ShiftRightChip.Spec` and `BitwiseChip.Spec` (the latter keeps
+its binarity conjunct; only the reader clause is omitted). -/
 def Spec (input : Inputs (ZMod p)) (cols : Columns (ZMod p)) (_ : ProverData (ZMod p)) : Prop :=
   input.is_real = 1 →
     (cols.is_sll = 1 →

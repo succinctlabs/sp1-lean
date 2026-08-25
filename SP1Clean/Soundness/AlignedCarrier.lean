@@ -95,6 +95,264 @@ theorem alignsWith_alignedOf (r_ord : RowFacts p) (touches : List (Touch p))
   obtain ⟨tc, htc, hmsg, hlo, hhi⟩ := hmatch mp hmp
   exact ⟨tc, htc, hmsg, hlo, by rw [hloc, readWindow_reg]; omega⟩
 
+/-! ## Realizing per-location pull rewrites in per-row touch lists (W3)
+
+The refresh elimination rewrites, per location, the multiset of a batch's `(pull, push)` message
+pairs — pushes untouched, pulls replaced by value-equal earlier records.  The walk, however,
+consumes per-row `RowFacts`, so the rewritten multisets must be *realized* as per-row touch lists.
+The three lemmas below do exactly that surgery, generically over any pair relation `R` that
+preserves the push (`hsnd`): first listify a `Multiset.Rel` against a coerced list, then merge the
+per-location rewritten lists back into one positional touch list (read times and pushes kept), and
+finally distribute a whole batch's per-location rewrites row by row. -/
+
+section Realization
+
+omit [Fact p.Prime] [Fact (2 ^ 17 < p)]
+
+variable {R : MemoryMsg (ZMod p) × MemoryMsg (ZMod p) →
+  MemoryMsg (ZMod p) × MemoryMsg (ZMod p) → Prop}
+
+/-- A `Multiset.Rel` whose left side is a coerced list is realized by an order-preserving
+`Forall₂`-related list. -/
+private lemma forall₂_of_rel_coe {α β : Type} {r : α → β → Prop} :
+    ∀ (l : List α) (t : Multiset β), Multiset.Rel r (↑l) t →
+      ∃ l' : List β, t = ↑l' ∧ List.Forall₂ r l l'
+  | [], t, h => by
+      rw [Multiset.coe_nil] at h
+      exact ⟨[], Multiset.rel_zero_left.mp h, List.Forall₂.nil⟩
+  | a :: l, t, h => by
+      rw [← Multiset.cons_coe] at h
+      obtain ⟨b, u, hab, hrest, rfl⟩ := Multiset.rel_cons_left.mp h
+      obtain ⟨l', rfl, hf⟩ := forall₂_of_rel_coe l u hrest
+      exact ⟨b :: l', (Multiset.cons_coe b l').symm, List.Forall₂.cons hab hf⟩
+
+/-- A push-preserving `Multiset.Rel` leaves the pushed-record multiset unchanged. -/
+lemma rel_map_snd_eq (hsnd : ∀ a b, R a b → b.2 = a.2) :
+    ∀ {N N' : Multiset (MemoryMsg (ZMod p) × MemoryMsg (ZMod p))}, Multiset.Rel R N N' →
+      N.map Prod.snd = N'.map Prod.snd := by
+  intro N N' h
+  induction h with
+  | zero => rfl
+  | @cons a b as bs hab _ ih => simp only [Multiset.map_cons, ih, hsnd _ _ hab]
+
+/-- A `Multiset.Rel` against a singleton is a related singleton. -/
+lemma rel_singleton_left {α β : Type} {r : α → β → Prop} {a : α} {t : Multiset β}
+    (h : Multiset.Rel r {a} t) : ∃ b, t = {b} ∧ r a b := by
+  rw [show ({a} : Multiset α) = a ::ₘ 0 from rfl] at h
+  obtain ⟨b, u, hab, hrest, rfl⟩ := Multiset.rel_cons_left.mp h
+  rw [Multiset.rel_zero_left.mp hrest]
+  exact ⟨b, rfl, hab⟩
+
+/-- Right-directional pairing of a `Forall₂`. -/
+lemma forall₂_exists_right {α β : Type} {r : α → β → Prop} :
+    ∀ {l₁ : List α} {l₂ : List β}, List.Forall₂ r l₁ l₂ → ∀ a ∈ l₁, ∃ b ∈ l₂, r a b := by
+  intro l₁ l₂ h
+  induction h with
+  | nil => intro a ha; cases ha
+  | cons hR _ ih =>
+      intro a ha
+      rcases List.mem_cons.mp ha with rfl | ha
+      · exact ⟨_, List.mem_cons_self, hR⟩
+      · obtain ⟨b, hb, hab⟩ := ih a ha
+        exact ⟨b, List.mem_cons_of_mem _ hb, hab⟩
+
+/-- Left-directional pairing of a `Forall₂`. -/
+lemma forall₂_exists_left {α β : Type} {r : α → β → Prop} :
+    ∀ {l₁ : List α} {l₂ : List β}, List.Forall₂ r l₁ l₂ → ∀ b ∈ l₂, ∃ a ∈ l₁, r a b := by
+  intro l₁ l₂ h
+  induction h with
+  | nil => intro b hb; cases hb
+  | cons hR _ ih =>
+      intro b hb
+      rcases List.mem_cons.mp hb with rfl | hb
+      · exact ⟨_, List.mem_cons_self, hR⟩
+      · obtain ⟨a, ha, hab⟩ := ih b hb
+        exact ⟨a, List.mem_cons_of_mem _ ha, hab⟩
+
+/-- Right-directional pairing of a `Forall₂`, realized inside the positional zip. -/
+lemma forall₂_mem_zip_right {α β : Type} {r : α → β → Prop} :
+    ∀ {l₁ : List α} {l₂ : List β}, List.Forall₂ r l₁ l₂ →
+      ∀ a ∈ l₁, ∃ b, (a, b) ∈ l₁.zip l₂ ∧ r a b := by
+  intro l₁ l₂ h
+  induction h with
+  | nil => intro a ha; cases ha
+  | @cons a' b' l₁ l₂ hR _ ih =>
+      intro a ha
+      rcases List.mem_cons.mp ha with rfl | ha
+      · exact ⟨b', by rw [List.zip_cons_cons]; exact List.mem_cons_self, hR⟩
+      · obtain ⟨b, hb, hab⟩ := ih a ha
+        exact ⟨b, by rw [List.zip_cons_cons]; exact List.mem_cons_of_mem _ hb, hab⟩
+
+/-- Mapping a multiset function over a list sum of multisets. -/
+lemma map_listSum {α β : Type} (f : α → β) :
+    ∀ l : List (Multiset α), (l.sum).map f = (l.map (Multiset.map f)).sum
+  | [] => by simp
+  | s :: l => by
+      rw [List.sum_cons, Multiset.map_add, map_listSum f l, List.map_cons, List.sum_cons]
+
+/-- Pointwise second components of a snd-preserving `Forall₂` produce equal `map Prod.snd`
+images. -/
+lemma map_snd_eq_of_forall₂ {α β : Type} {r : α × β → α × β → Prop}
+    (hsnd : ∀ a b, r a b → b.2 = a.2) :
+    ∀ {l l' : List (α × β)}, List.Forall₂ r l l' → l'.map Prod.snd = l.map Prod.snd := by
+  intro l l' h
+  induction h with
+  | nil => rfl
+  | @cons a b _ _ hR _ ih => rw [List.map_cons, List.map_cons, ih, hsnd _ _ hR]
+
+/-- Filters of `Forall₂`-related lists along a relation-invariant predicate stay related. -/
+lemma forall₂_filter_congr {α : Type} {r : α → α → Prop} {P : α → Prop} [DecidablePred P]
+    (hP : ∀ a b, r a b → (P a ↔ P b)) :
+    ∀ {l l' : List α}, List.Forall₂ r l l' →
+      List.Forall₂ r (l.filter fun a => P a) (l'.filter fun a => P a) := by
+  intro l l' h
+  induction h with
+  | nil => exact List.Forall₂.nil
+  | @cons a b _ _ hR _ ih =>
+      by_cases hpa : P a
+      · rw [List.filter_cons_of_pos (by simpa using hpa),
+          List.filter_cons_of_pos (by simpa using (hP a b hR).mp hpa)]
+        exact List.Forall₂.cons hR ih
+      · rw [List.filter_cons_of_neg (by simpa using hpa),
+          List.filter_cons_of_neg (by simpa using fun hb => hpa ((hP a b hR).mpr hb))]
+        exact ih
+
+/-- A push-time chain transfers across a snd-preserving `Forall₂`. -/
+lemma isChain_snd_of_forall₂ {α : Type} {time : α → ℕ} {r : α × α → α × α → Prop}
+    (hsnd : ∀ a b, r a b → b.2 = a.2) :
+    ∀ {l l' : List (α × α)}, List.Forall₂ r l l' →
+      List.IsChain (fun a b : α × α => time a.2 < time b.2) l →
+      List.IsChain (fun a b : α × α => time a.2 < time b.2) l' := by
+  intro l l' h
+  induction h with
+  | nil => intro _; exact List.isChain_nil
+  | @cons a b l l' hR hrest ih =>
+      intro hchain
+      cases hrest with
+      | nil => exact List.isChain_singleton _
+      | @cons a₂ b₂ l₂ l₂' hR₂ hrest₂ =>
+          rw [List.isChain_cons_cons] at hchain ⊢
+          refine ⟨?_, ih hchain.2⟩
+          rw [hsnd _ _ hR, hsnd _ _ hR₂]
+          exact hchain.1
+
+/-- **The filter-partition merge.**  Given per-location `Forall₂`-rewrites of one touch list's
+per-location message pairs, a single rewritten touch list realizes all of them simultaneously:
+read times and pushes are kept positionally, and each location's filtered pair image is exactly
+the given target list. -/
+private lemma exists_touchList_of_filter_rewrites (hsnd : ∀ a b, R a b → b.2 = a.2) :
+    ∀ (l : List (Touch p)) (w : MemLoc → List (MemoryMsg (ZMod p) × MemoryMsg (ZMod p))),
+      (∀ loc, List.Forall₂ R
+        ((l.filter fun pq => MemoryMsg.locOf pq.2 = loc).map fun tc => (tc.1.1, tc.2)) (w loc)) →
+      ∃ l' : List (Touch p),
+        List.Forall₂ (fun tc tc' : Touch p => tc'.1.2 = tc.1.2 ∧ tc'.2 = tc.2 ∧
+          R (tc.1.1, tc.2) (tc'.1.1, tc'.2)) l l' ∧
+        ∀ loc, ((l'.filter fun pq => MemoryMsg.locOf pq.2 = loc).map fun tc => (tc.1.1, tc.2))
+          = w loc
+  | [], w, hw => by
+      refine ⟨[], List.Forall₂.nil, fun loc => ?_⟩
+      have h := hw loc
+      rw [List.filter_nil, List.map_nil] at h ⊢
+      exact (List.forall₂_nil_left_iff.mp h).symm
+  | tc :: rest, w, hw => by
+      classical
+      have hfilterhead : ((tc :: rest).filter fun pq => MemoryMsg.locOf pq.2 =
+            MemoryMsg.locOf tc.2)
+          = tc :: (rest.filter fun pq => MemoryMsg.locOf pq.2 = MemoryMsg.locOf tc.2) :=
+        List.filter_cons_of_pos (by simp)
+      have hwhead := hw (MemoryMsg.locOf tc.2)
+      rw [hfilterhead, List.map_cons] at hwhead
+      obtain ⟨b, wrest, hb, hrest, hweq⟩ := List.forall₂_cons_left_iff.mp hwhead
+      have hb2 : b.2 = tc.2 := hsnd _ _ hb
+      obtain ⟨rest', hrest', hfilters⟩ := exists_touchList_of_filter_rewrites hsnd rest
+        (Function.update w (MemoryMsg.locOf tc.2) wrest) (by
+          intro loc
+          by_cases hcase : loc = MemoryMsg.locOf tc.2
+          · subst hcase
+            rw [Function.update_self]
+            exact hrest
+          · rw [Function.update_of_ne hcase]
+            have hfilter : ((tc :: rest).filter fun pq => MemoryMsg.locOf pq.2 = loc)
+                = rest.filter fun pq => MemoryMsg.locOf pq.2 = loc :=
+              List.filter_cons_of_neg (by simpa using fun h => hcase h.symm)
+            have h := hw loc
+            rwa [hfilter] at h)
+      refine ⟨((b.1, tc.1.2), tc.2) :: rest', ?_, ?_⟩
+      · refine List.Forall₂.cons ⟨rfl, rfl, ?_⟩ hrest'
+        show R (tc.1.1, tc.2) (b.1, tc.2)
+        rw [show ((b.1, tc.2) : MemoryMsg (ZMod p) × MemoryMsg (ZMod p)) = b from by
+          rw [← hb2]]
+        exact hb
+      · intro loc
+        by_cases hcase : loc = MemoryMsg.locOf tc.2
+        · subst hcase
+          rw [show ((((b.1, tc.1.2), tc.2) : Touch p) :: rest').filter
+                (fun pq => MemoryMsg.locOf pq.2 = MemoryMsg.locOf tc.2)
+              = ((b.1, tc.1.2), tc.2) ::
+                (rest'.filter fun pq => MemoryMsg.locOf pq.2 = MemoryMsg.locOf tc.2) from
+            List.filter_cons_of_pos (by simp), List.map_cons, hfilters,
+            Function.update_self, hweq]
+          rw [show ((b.1, tc.2) : MemoryMsg (ZMod p) × MemoryMsg (ZMod p)) = b from by
+            rw [← hb2]]
+        · rw [show ((((b.1, tc.1.2), tc.2) : Touch p) :: rest').filter
+                (fun pq => MemoryMsg.locOf pq.2 = loc)
+              = rest'.filter fun pq => MemoryMsg.locOf pq.2 = loc from
+            List.filter_cons_of_neg (by simpa using fun h => hcase h.symm), hfilters,
+            Function.update_of_ne hcase]
+
+/-- **The batch realization.**  Distribute per-location multiset rewrites of a batch's touch-pair
+sums into per-row rewritten touch lists: pushes and read times survive pointwise (`Forall₂`), and
+the per-location pair sums realize exactly the given targets. -/
+lemma exists_rewrittenTouchLists (hsnd : ∀ a b, R a b → b.2 = a.2) :
+    ∀ (ts : List (List (Touch p)))
+      (N' : MemLoc → Multiset (MemoryMsg (ZMod p) × MemoryMsg (ZMod p))),
+      (∀ loc, Multiset.Rel R
+        ((ts.map fun l =>
+          (↑((l.filter fun pq => MemoryMsg.locOf pq.2 = loc).map fun tc => (tc.1.1, tc.2)) :
+            Multiset (MemoryMsg (ZMod p) × MemoryMsg (ZMod p)))).sum)
+        (N' loc)) →
+      ∃ ts' : List (List (Touch p)),
+        List.Forall₂ (List.Forall₂ (fun tc tc' : Touch p => tc'.1.2 = tc.1.2 ∧ tc'.2 = tc.2 ∧
+          R (tc.1.1, tc.2) (tc'.1.1, tc'.2))) ts ts' ∧
+        ∀ loc, ((ts'.map fun l =>
+          (↑((l.filter fun pq => MemoryMsg.locOf pq.2 = loc).map fun tc => (tc.1.1, tc.2)) :
+            Multiset (MemoryMsg (ZMod p) × MemoryMsg (ZMod p)))).sum) = N' loc
+  | [], N', hrel => by
+      refine ⟨[], List.Forall₂.nil, fun loc => ?_⟩
+      have h := hrel loc
+      rw [List.map_nil, List.sum_nil] at h ⊢
+      exact (Multiset.rel_zero_left.mp h).symm
+  | l :: ts, N', hrel => by
+      classical
+      have hsplit : ∀ loc, ∃ A B,
+          Multiset.Rel R
+            (↑((l.filter fun pq => MemoryMsg.locOf pq.2 = loc).map fun tc => (tc.1.1, tc.2)))
+            A ∧
+          Multiset.Rel R
+            ((ts.map fun l =>
+              (↑((l.filter fun pq => MemoryMsg.locOf pq.2 = loc).map fun tc =>
+                (tc.1.1, tc.2)) :
+                Multiset (MemoryMsg (ZMod p) × MemoryMsg (ZMod p)))).sum)
+            B ∧ N' loc = A + B := by
+        intro loc
+        have h := hrel loc
+        rw [List.map_cons, List.sum_cons] at h
+        obtain ⟨A, B, hA, hB, hAB⟩ := Multiset.rel_add_left.mp h
+        exact ⟨A, B, hA, hB, hAB⟩
+      choose A B hA hB hAB using hsplit
+      have hlist : ∀ loc, ∃ wl : List (MemoryMsg (ZMod p) × MemoryMsg (ZMod p)),
+          A loc = ↑wl ∧ List.Forall₂ R
+          ((l.filter fun pq => MemoryMsg.locOf pq.2 = loc).map fun tc => (tc.1.1, tc.2)) wl :=
+        fun loc => forall₂_of_rel_coe _ (A loc) (hA loc)
+      choose wl hwlA hwl using hlist
+      obtain ⟨l', hl', hl'filters⟩ := exists_touchList_of_filter_rewrites hsnd l wl hwl
+      obtain ⟨ts', hts', hts'sums⟩ := exists_rewrittenTouchLists hsnd ts B hB
+      refine ⟨l' :: ts', List.Forall₂.cons hl' hts', fun loc => ?_⟩
+      rw [List.map_cons, List.sum_cons, hl'filters loc, hts'sums loc, ← hwlA loc]
+      exact (hAB loc).symm
+
+end Realization
+
 omit [Fact p.Prime] [Fact (2 ^ 17 < p)] in
 /-- **Generic `RowOK` for the aligned constructor.**  From the per-touch `TouchOK`, the `+8` clock
 step, the mod-8 window alignment, per-key push-time strict monotonicity, the per-push `ClkBound`, and

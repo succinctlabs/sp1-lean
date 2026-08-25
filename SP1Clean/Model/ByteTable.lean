@@ -15,7 +15,8 @@ generated once independent of the program. It covers the six byte opcodes of `by
 does **not** range-check in-circuit but instead `send_byte(opcode, a, b, c, mult)` into the Byte bus,
 and a preprocessed receiver matches each send with a count multiplicity. The seventh `ByteOpcode`,
 `Range`, is **not** among `byte_table()`'s six ops — its rows are received by SP1's separate
-preprocessed `RangeChip` (`range/air.rs`), mirrored here by the `RangeChip.circuit8/13/14/16` providers
+preprocessed `RangeChip` (`range/air.rs`), mirrored here by the complete indexed
+`RangeChip.circuitFor` family
 (`Proofs/Chips/ByteChip/RangeChip.lean`). This module's `ByteRowSpec` covers all seven opcodes, so
 the one Lean Byte channel backs both preprocessed receivers.
 
@@ -60,7 +61,8 @@ def ByteTable {p : ℕ} [NeZero p] : Table (ZMod p) ByteRow where
 SP1 does not range-check in-circuit; it `send_byte(op, …)` into the Byte bus, so a range check *is*
 a byte-bus lookup — but the two range forms have **different preprocessed receivers**: `U8Range` is
 one of the `ByteChip`'s six `byte_table()` ops, while `Range` rows are received by SP1's separate
-preprocessed `RangeChip` (`range/air.rs`), mirrored here by the `RangeChip.circuit8/13/14/16` providers
+preprocessed `RangeChip` (`range/air.rs`), mirrored here by the complete indexed
+`RangeChip.circuitFor` family
 (`Proofs/Chips/ByteChip/RangeChip.lean`). The readers use two forms
 (`Extracted/{CPUState,RTypeReader}`):
 

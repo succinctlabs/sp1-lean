@@ -2,8 +2,9 @@ import SP1Clean.Model.Semantics.GuestProgram
 
 /-! # W6b — the non-vacuity witness: `IsInitialState` is satisfiable
 
-The target theorem (`Soundness/TargetVm.lean`) is `∀ s0, IsInitialState prog s0 → …`; a vacuous
-`IsInitialState` would make it trivially true. This file exhibits a concrete configured, fully-initialized
+The capstone's boundary bundle (`InitialBoundaryFacts`, `Soundness/ProviderBindings.lean`) demands an
+initial Sail state that loads the program and is configured; a vacuous `IsInitialState` would make every
+such hypothesis unsatisfiable-vacuous. This file exhibits a concrete configured, fully-initialized
 Sail state and a guest program it loads, proving `IsInitialState` is **satisfiable** (axiom-clean).
 
 The reusable machinery is `configuredState pc` — a state with **every** register present
@@ -11,7 +12,7 @@ The reusable machinery is `configuredState pc` — a state with **every** regist
 to `pc` (`cfgState_pc`), `cur_privilege = Machine` (`cfgState_priv`), and the SP1 PMA region set up
 (`pma_regions = [SP1_PMA_Region]`). Built by folding `insert` over `Finset.univ` (`Fintype Register` is
 derived here) with each register's `default` value (every `RegisterType r` is `Inhabited`), overriding
-`PC`/`cur_privilege`/`pma_regions`. Every other register's `default` already satisfies the (strengthened)
+`PC`/`cur_privilege`/`pma_regions`/`misa` (M set). Every other register's `default` already satisfies the (strengthened)
 `SailConfigured` — `hart_state = HART_ACTIVE`, `mstatus.MIE = 0`, `mideleg = zeros`, `htif = none`,
 `elp ≠ LP_EXPECTED`, the `mprv`/`mseccfg` disable bits clear — so only `pma_regions` (default `[]`) needs an
 explicit override. Enriching the witness to a non-empty ROM (real instruction bytes loaded into `mem`, so
@@ -75,13 +76,14 @@ lemma get?_fullRegs (r : Register) : fullRegs.get? r = some (regDefault r) :=
 SP1 PMA region configured (the one non-default the strengthened `SailConfigured` requires). -/
 noncomputable def configuredState (pc : BitVec 64) : SailState :=
   { (default : SailState) with
-    regs := ((fullRegs.insert Register.PC pc).insert Register.cur_privilege Privilege.Machine).insert
+    regs := (((fullRegs.insert Register.misa 4096#64).insert Register.PC pc).insert
+      Register.cur_privilege Privilege.Machine).insert
       Register.pma_regions [SP1_PMA_Region] }
 
 lemma cfgState_init (pc : BitVec 64) : (configuredState pc).isInitialized := by
   intro reg
   simp only [configuredState, Std.ExtDHashMap.mem_insert]
-  exact Or.inr (Or.inr (Or.inr (mem_fullRegs reg)))
+  exact Or.inr (Or.inr (Or.inr (Or.inr (mem_fullRegs reg))))
 
 lemma cfgState_pc (pc : BitVec 64) : (configuredState pc).regs.get? Register.PC = some pc := by
   simp only [configuredState]
@@ -93,29 +95,44 @@ lemma cfgState_priv (pc : BitVec 64) :
   simp only [configuredState]
   rw [Std.ExtDHashMap.get?_insert, dif_neg (by decide), Std.ExtDHashMap.get?_insert_self]
 
-/-- Any register other than the three overridden ones keeps its `fullRegs` default in `configuredState`. -/
+/-- Any register other than the four overridden ones keeps its `fullRegs` default in `configuredState`. -/
 lemma cfgState_get?_other (pc : BitVec 64) (reg : Register)
-    (h1 : reg ≠ Register.PC) (h2 : reg ≠ Register.cur_privilege) (h3 : reg ≠ Register.pma_regions) :
+    (h1 : reg ≠ Register.PC) (h2 : reg ≠ Register.cur_privilege) (h3 : reg ≠ Register.pma_regions)
+    (h4 : reg ≠ Register.misa) :
     (configuredState pc).regs.get? reg = some (regDefault reg) := by
   simp only [configuredState]
   rw [Std.ExtDHashMap.get?_insert, dif_neg (fun hc => h3 (beq_iff_eq.mp hc).symm),
       Std.ExtDHashMap.get?_insert, dif_neg (fun hc => h2 (beq_iff_eq.mp hc).symm),
-      Std.ExtDHashMap.get?_insert, dif_neg (fun hc => h1 (beq_iff_eq.mp hc).symm)]
+      Std.ExtDHashMap.get?_insert, dif_neg (fun hc => h1 (beq_iff_eq.mp hc).symm),
+      Std.ExtDHashMap.get?_insert, dif_neg (fun hc => h4 (beq_iff_eq.mp hc).symm)]
   exact get?_fullRegs reg
 
 /-- The `.get` form of `cfgState_get?_other` (for the `isValidMemConfig`/`mie`/`mideleg` fields, which read
 the value with a membership proof). -/
 lemma cfgState_get_other (pc : BitVec 64) (reg : Register)
     (h1 : reg ≠ Register.PC) (h2 : reg ≠ Register.cur_privilege) (h3 : reg ≠ Register.pma_regions)
+    (h4 : reg ≠ Register.misa)
     (hmem : reg ∈ (configuredState pc).regs) :
     (configuredState pc).regs.get reg hmem = regDefault reg := by
-  have h := cfgState_get?_other pc reg h1 h2 h3
+  have h := cfgState_get?_other pc reg h1 h2 h3 h4
   rwa [Std.ExtDHashMap.get?_eq_some_get hmem, Option.some_inj] at h
 
 lemma cfgState_pma (pc : BitVec 64) (hmem : Register.pma_regions ∈ (configuredState pc).regs) :
     (configuredState pc).regs.get Register.pma_regions hmem = [SP1_PMA_Region] := by
   have h : (configuredState pc).regs.get? Register.pma_regions = some [SP1_PMA_Region] := by
     simp only [configuredState, Std.ExtDHashMap.get?_insert_self]
+  rwa [Std.ExtDHashMap.get?_eq_some_get hmem, Option.some_inj] at h
+
+/-- The overridden `misa` value: M enabled (bit 12), the `SailConfigured.misa_m` residue. Only the
+M bit is read on any proved path (`currentlyEnabled Ext_M`); the other extension bits stay clear. -/
+lemma cfgState_misa (pc : BitVec 64) (hmem : Register.misa ∈ (configuredState pc).regs) :
+    (configuredState pc).regs.get Register.misa hmem = 4096#64 := by
+  have h : (configuredState pc).regs.get? Register.misa = some (4096#64) := by
+    simp only [configuredState]
+    rw [Std.ExtDHashMap.get?_insert, dif_neg (by decide),
+        Std.ExtDHashMap.get?_insert, dif_neg (by decide),
+        Std.ExtDHashMap.get?_insert, dif_neg (by decide),
+        Std.ExtDHashMap.get?_insert_self]
   rwa [Std.ExtDHashMap.get?_eq_some_get hmem, Option.some_inj] at h
 
 /-- A minimal guest program (empty ROM/data, entry pc 0). Enough to exhibit that `IsInitialState` is
@@ -137,32 +154,37 @@ theorem isInitialState_nonvacuous : ∃ s0, IsInitialState emptyProgram s0 :=
        { init := cfgState_init 0
          priv := cfgState_priv 0
          active := by
-           rw [cfgState_get?_other 0 Register.hart_state (by decide) (by decide) (by decide)]; rfl
+           rw [cfgState_get?_other 0 Register.hart_state (by decide) (by decide) (by decide) (by decide)]; rfl
          mie := by
-           rw [cfgState_get_other 0 Register.mstatus (by decide) (by decide) (by decide)]
+           rw [cfgState_get_other 0 Register.mstatus (by decide) (by decide) (by decide) (by decide)]
            exact (by decide : _get_Mstatus_MIE (default : RegisterType Register.mstatus) = 0#1)
          mideleg := by
-           rw [cfgState_get_other 0 Register.mideleg (by decide) (by decide) (by decide)]
+           rw [cfgState_get_other 0 Register.mideleg (by decide) (by decide) (by decide) (by decide)]
            exact (by decide : (default : RegisterType Register.mideleg) = zeros)
          no_landing_pad := by
-           rw [cfgState_get?_other 0 Register.elp (by decide) (by decide) (by decide)]
+           rw [cfgState_get?_other 0 Register.elp (by decide) (by decide) (by decide) (by decide)]
            exact (by decide : ¬ (some (default : RegisterType Register.elp)
              = some (landing_pad_bits_backwards landing_pad_expectation.LP_EXPECTED)))
          mprv_disabled := by
-           rw [cfgState_get_other 0 Register.mstatus (by decide) (by decide) (by decide)]
+           rw [cfgState_get_other 0 Register.mstatus (by decide) (by decide) (by decide) (by decide)]
            exact (by decide :
              BitVec.ofNat 1 ((default : RegisterType Register.mstatus).toNat >>> 17) = 0#1)
          mseccfg_disabled := by
-           rw [cfgState_get_other 0 Register.mseccfg (by decide) (by decide) (by decide)]
+           rw [cfgState_get_other 0 Register.mseccfg (by decide) (by decide) (by decide) (by decide)]
            exact (by decide :
              BitVec.ofNat 1 ((default : RegisterType Register.mseccfg).toNat >>> 10) = 0#1)
          mseccfg_pmm := by
-           rw [cfgState_get_other 0 Register.mseccfg (by decide) (by decide) (by decide)]
+           rw [cfgState_get_other 0 Register.mseccfg (by decide) (by decide) (by decide) (by decide)]
            exact (by decide :
              BitVec.ofNat 2 ((default : RegisterType Register.mseccfg).toNat >>> 32) = 0#2)
          htif_disabled := by
-           rw [cfgState_get_other 0 Register.htif_tohost_base (by decide) (by decide) (by decide)]
+           rw [cfgState_get_other 0 Register.htif_tohost_base (by decide) (by decide) (by decide) (by decide)]
            exact (by decide : (default : RegisterType Register.htif_tohost_base) = none)
+         pmp_off := by
+           rw [cfgState_get_other 0 Register.pmpcfg_n (by decide) (by decide) (by decide) (by decide)]
+           exact (by decide :
+             (default : RegisterType Register.pmpcfg_n) = Vector.replicate 64 0#8)
+         misa_m := by rw [cfgState_misa 0 _]; decide
          pma_regions := cfgState_pma 0 _ } }⟩
 
 end SP1Clean.Soundness.Target

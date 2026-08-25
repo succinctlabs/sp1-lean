@@ -2,8 +2,14 @@ import SP1Clean.FormalModel.Contracts.Chips
 import SP1Clean.Proofs.Operations.AddOperation.Formal
 import SP1Clean.Native.Readers.CPUState
 import SP1Clean.Native.Readers.ITypeReader
+-- for `eval_registerAccessCols`: it is a lemma about the *shared* `Extracted.RegisterAccessCols`
+-- struct (I-type and R-type readers both nest it), but it currently lives in the R-type reader's
+-- namespace. Moving it to `Native/Readers/RegisterAccessCols.lean` would rename it at ~15 call
+-- sites, so it stays put and I-type consumers import it here.
+import SP1Clean.Native.Readers.RTypeReader
 import SP1Clean.Native.Readers.RegisterWrite
 import SP1Clean.Model.Channels
+import ToClean.Circuit.WitnessCombinator
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit
 import Clean.Circuit.Channel
@@ -37,15 +43,12 @@ is trivial. -/
 def InteractSpec (_cols : Columns (ZMod p)) : Prop := True
 
 /-- Compose the `CPUState`/`AddOperation`/`ITypeReader` sub-circuits, witness the ALU result word via
-`AddOperation.populate`, gate `is_real`, and assemble the native `Columns` struct. The `ITypeReader`
+`AddOperation.populateIR` (the exportable witness IR; `populate` remains its value-level anchor), gate `is_real`, and assemble the native `Columns` struct. The `ITypeReader`
 carries opcode `1` and the four `op_a_write_value` limbs. -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p)) := do
   let _ ← Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
-  let value ← witnessVectorNative 4 (fun env =>
-    AddOperation.populate
-      #v[env input.op_b_val[0], env input.op_b_val[1], env input.op_b_val[2], env input.op_b_val[3]]
-      #v[env input.op_c_val[0], env input.op_c_val[1], env input.op_c_val[2], env input.op_c_val[3]])
+  let value ← witnessVectorIR 4 (AddOperation.populateIR input.op_b_val input.op_c_val)
   assertion AddOperation.circuit ⟨input.op_b_val, input.op_c_val, { value := value }, input.is_real⟩
   -- `ITypeReader` is now a `GeneralFormalCircuit` (SC Phase 2pre) — composed via the GFC `CoeFun`
   -- (`subcircuitWithAssertion`), discarding its `unit` output. Its `Spec` (Contracts) is unchanged.
@@ -114,5 +117,31 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main where
     (env : Environment F) (input : Inputs (Expression F)) :
     (Eval.eval env input).adapter = Eval.eval env input.adapter := by
   rw [eval_inputs]
+
+/-! ### Operand words, in `circuit_norm`'s own orientation
+
+Stated with the projection already outside `eval` and an inert right-hand side, which is the form
+`ComputableWitnesses` hands over; the `eval_*` lemmas above are the opposite orientation and are
+inert under `circuit_norm`. Vector operands only — see `AddChip/Defs.lean` for the full rationale.
+
+Addi is I-type, so `op_b_val` is the register read (through `RegisterAccessCols`) while `op_c_val`
+is the immediate, sitting directly on the reader row. -/
+
+@[circuit_norm] theorem eval_opBVal {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    (ProvableStruct.eval env input).op_b_val
+      = Vector.map (Expression.eval env) input.op_b_val := by
+  rw [← ProvableStruct.eval_eq_eval]
+  simp only [Inputs.op_b_val, eval_inputs, Readers.ITypeReader.eval_cols,
+    Readers.RTypeReader.eval_registerAccessCols]
+  exact ProvableType.eval_fields env _
+
+@[circuit_norm] theorem eval_opCVal {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    (ProvableStruct.eval env input).op_c_val
+      = Vector.map (Expression.eval env) input.op_c_val := by
+  rw [← ProvableStruct.eval_eq_eval]
+  simp only [Inputs.op_c_val, eval_inputs, Readers.ITypeReader.eval_cols]
+  exact ProvableType.eval_fields env _
 
 end SP1Clean.AddiChip

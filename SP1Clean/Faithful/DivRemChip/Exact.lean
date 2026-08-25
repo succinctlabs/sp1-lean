@@ -7,7 +7,7 @@ import SP1Clean.Faithful.U16MSBOperation
 /-!
 # Complete whole-chip DivRem faithfulness
 
-This module proves that the native Clean DivRem chip and the complete pinned SP1 v6.3.1
+This module proves that the native Clean DivRem chip and the complete pinned SP1 v6.4.0
 `DivRemCols` AIR have extensionally equivalent row assertions and active interaction multisets.
 The proof is deliberately decomposed into folded arithmetic, reader, and bus blocks so verifier-side
 normalization never unfolds the complete 246-column specification in a parent proof.
@@ -83,8 +83,7 @@ private theorem divRemNativeDecompose
   rw [hpopulateLength]
   simp only [DivRemChip.populateRow,
     Circuit.bind_def, Circuit.pure_def,
-    witnessVectorNative,
-    CircuitNormalization.witnessNative_apply_eq,
+    witnessVectorIR, Witnessable.witness_provable, witnessIR,
     Operations.localLength, Operations.constraints_append,
     Operations.constraints_witness, Operations.constraints_nil,
     List.map_nil, List.nil_append]
@@ -2586,8 +2585,7 @@ private theorem divRemNativeByteDecompose
   rw [hpopulateLength]
   simp only [DivRemChip.populateRow,
     Circuit.bind_def, Circuit.pure_def,
-    witnessVectorNative,
-    CircuitNormalization.witnessNative_apply_eq,
+    witnessVectorIR, Witnessable.witness_provable, witnessIR,
     Operations.localLength, Operations.interactionsWith_append,
     Operations.interactionsWith_witness,
     Operations.interactionsWith_nil, List.nil_append]

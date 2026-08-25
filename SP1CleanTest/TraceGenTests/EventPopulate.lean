@@ -2,9 +2,11 @@ import SP1CleanTest.TraceGenTests.Conformance
 
 /-! # Event → input-column mirrors for the trace-generation conformance layer.
 
-The trace anchors (`TraceGenTests/<Chip>TraceWitness.lean`) derive whole rows from the chip circuits
-(`TraceGenerator.lean`); the *only* hand-written remainder of SP1's `generate_trace` is the
-event → input-column extraction, mirrored here. These are direct ℕ-arithmetic transcriptions of
+Whole rows are derived from the chip circuits (`TraceGenerator.lean`) and checked against SP1's
+real prover by the dump-anchored pipeline (`export/sp1dump/` + the `--testdata` generation-time
+gate in `scripts/witgenExport.lean`), not by a per-chip `native_decide` anchor; the *only*
+hand-written remainder of SP1's `generate_trace` is the event → input-column extraction,
+mirrored here. These are direct ℕ-arithmetic transcriptions of
 SP1's adapter populate functions (read-only references, paths relative to the sibling `sp1`
 checkout):
 

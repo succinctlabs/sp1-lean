@@ -1,5 +1,5 @@
 import SP1Clean.Native.Operations.ShiftLeftOperation.Core
-import SP1Clean.Model.InteractionRecovery
+import ToClean.Circuit.InteractionRecovery
 import Clean.Utils.Tactics
 
 /-! # `ShiftLeftCore` — proof boundary for ShiftLeft's assertion tail

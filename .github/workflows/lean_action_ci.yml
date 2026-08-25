@@ -20,12 +20,18 @@ jobs:
         run: scripts/check_no_native_decide.sh
       - name: Elaboration-budget escape hatches confined to the measured allowlist
         run: scripts/check_option_escapes.sh
+      - name: Witness-generation escape hatches (enforced — the witgen cutover is complete)
+        run: scripts/check_no_witness_native.sh --enforce
+      - name: Committed witgen export is structurally clean
+        run: scripts/check_witgen_export.sh
       - name: Recorded pins match the build graph
         run: scripts/check_pins.sh
       - name: Root index imports every module
         run: scripts/check_root_index.sh
       - name: Doc citations resolve
         run: scripts/check_report_citations.sh
+      - name: Audit-surface index matches the tree
+        run: scripts/check_audit_surface.sh
 
   build:
     runs-on:
@@ -91,8 +97,9 @@ jobs:
         run: lake lint
 
   test:
-    # Conformance tests (`lake test` → the `SP1CleanTest` testDriver: the witness-generation and
-    # whole-trace `native_decide` anchors checked against batteries dumped from SP1's real Rust prover).
+    # Conformance tests (`lake test` → the `SP1CleanTest` testDriver: the exportability battery and
+    # the non-vacuity/real-row satisfiability anchors; whole-trace conformance itself is the separate
+    # dump-anchored pipeline re-run below via `check_witgen_export.sh --regen`).
     # These live in their own library — the ONLY place `native_decide` is allowed — so they are gated
     # here, separately from the `native_decide`-free main build. Split into its own job (in parallel with
     # `lint`) so the trusted-compiler checks are clearly independent in the checks list. `needs: build`
@@ -112,6 +119,11 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        # run_audit.sh verifies the census provenance stamp with
+        # `git merge-base --is-ancestor`, which needs the stamped commit in this clone.
+        # The default shallow fetch would make that check fail for the wrong reason.
+        with:
+          fetch-depth: 0
       - uses: leanprover/lean-action@v1
         with:
           build: "true"
@@ -120,6 +132,11 @@ jobs:
           use-github-cache: "true"
       - name: Conformance tests (lake test)
         run: lake test
+      # The committed export/witgen goldens must match a fresh regeneration byte-for-byte.
+      # This runs here (not in `guards`) because the exporter needs the SP1CleanTest oleans
+      # that `lake test` just built — golden drift on a Clean pin bump is caught automatically.
+      - name: Witgen export matches a fresh regeneration
+        run: scripts/check_witgen_export.sh --regen
       # The test-scope axiom census (scripts/axiom_probe_test.lean) elaborates against the
       # SP1CleanTest oleans that `lake test` just built — the only job where they exist. The
       # main-scope census runs in the `audit` job, which builds only the default SP1Clean target.
@@ -147,6 +164,11 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        # run_audit.sh verifies the census provenance stamp with
+        # `git merge-base --is-ancestor`, which needs the stamped commit in this clone.
+        # The default shallow fetch would make that check fail for the wrong reason.
+        with:
+          fetch-depth: 0
       - uses: leanprover/lean-action@v1
         with:
           build: "true"

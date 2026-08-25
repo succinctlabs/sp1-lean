@@ -15,13 +15,14 @@ theorem. -/
 
 namespace SP1Clean.CoreProfile
 
-/-- Exact Rust checkout used as the current semantic ground truth.  The extraction compiler still
-has its own separately audited provenance until its patches have been rebased and regenerated. -/
-def sp1SemanticRevision : String := "a630089d9ff484ec6f2feade8d0afbb1447eed11"
+/-- Exact Rust checkout used as the current semantic ground truth: the v6.4.0 release tag.  The
+extraction compiler has its own separately audited provenance — a fully committed branch based
+directly on this tag. -/
+def sp1SemanticRevision : String := "f66b4bff51d0ccff51d152e0f7f66b2ffedf3529"
 
 /-- Human-readable description emitted by `git describe --tags --always` at the semantic
 revision. -/
-def sp1SemanticDescription : String := "v6.3.1-8-ga630089d9"
+def sp1SemanticDescription : String := "v6.4.0"
 
 /-- Generated AIR artifacts and the hand-audited profile name the same unmodified Rust source. -/
 theorem checkedIn_semanticRevision :

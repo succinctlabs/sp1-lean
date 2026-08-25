@@ -4,6 +4,7 @@ import SP1Clean.Native.Readers.CPUState
 import SP1Clean.Native.Readers.ALUTypeReader
 import SP1Clean.Native.Readers.RegisterWrite
 import SP1Clean.Model.Channels
+import ToClean.Circuit.WitnessCombinator
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit
 import Clean.Circuit.Channel
@@ -29,21 +30,15 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 /-- Compose the `CPUState`/`AddwOperation`/`ALUTypeReader` column blocks as Clean subcircuits/assertions
 and assemble the native `Columns` struct. The chip witnesses the result low limbs + sign bit via the
-operation's `populate` (`addwValueWitness`/`addwMsbWitness`), then composes the demoted `AddwOperation`
-gadget as a Clean `assertion`. The `ALUTypeReader`'s four `op_a_write_value` limbs are the
+operation's witness IR (`valueIR`/`msbIR`, whose value-level anchors are `addwValueWitness`/
+`addwMsbWitness`), then composes the demoted `AddwOperation` gadget as a Clean `assertion`. The `ALUTypeReader`'s four `op_a_write_value` limbs are the
 **sign-extended** W result `[value[0], value[1], msb·65535, msb·65535]`; the Program-bus opcode is
 `19`. -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p)) := do
   let _ ← Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
-  let value ← witnessVectorNative 2 (fun env =>
-    AddwOperation.addwValueWitness
-      #v[env input.op_b_val[0], env input.op_b_val[1], env input.op_b_val[2], env input.op_b_val[3]]
-      #v[env input.op_c_val[0], env input.op_c_val[1], env input.op_c_val[2], env input.op_c_val[3]])
-  let msb ← witnessVectorNative 1 (fun env =>
-    #v[AddwOperation.addwMsbWitness
-      #v[env input.op_b_val[0], env input.op_b_val[1], env input.op_b_val[2], env input.op_b_val[3]]
-      #v[env input.op_c_val[0], env input.op_c_val[1], env input.op_c_val[2], env input.op_c_val[3]]])
+  let value ← witnessVectorIR 2 (AddwOperation.valueIR input.op_b_val input.op_c_val)
+  let msb ← witnessVectorIR 1 (AddwOperation.msbIR input.op_b_val input.op_c_val)
   assertion AddwOperation.circuit ⟨input.op_b_val, input.op_c_val, ⟨value, ⟨msb[0]⟩⟩, input.is_real⟩
   -- `ALUTypeReader` is now a `GeneralFormalCircuit` (SC Phase 2pre) — composed via the GFC `CoeFun`
   -- (`subcircuitWithAssertion`), discarding its `unit` output. Its `Spec` (Contracts) is unchanged.
@@ -108,5 +103,30 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main where
     (env : Environment F) (input : Inputs (Expression F)) :
     (Eval.eval env input).adapter = Eval.eval env input.adapter := by
   rw [eval_inputs]
+
+/-! ### Operand words, in `circuit_norm`'s own orientation
+
+Projection outside `eval`, inert right-hand side — the form `ComputableWitnesses` hands over, and the
+opposite orientation from the `eval_*` lemmas above (which are inert under `circuit_norm`). Vector
+operands only; see `AddChip/Defs.lean` for the rationale. Addw's adapter is the ALU-type reader, so
+both operands are register reads. -/
+
+@[circuit_norm] theorem eval_opBVal {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    (ProvableStruct.eval env input).op_b_val
+      = Vector.map (Expression.eval env) input.op_b_val := by
+  rw [← ProvableStruct.eval_eq_eval]
+  simp only [Inputs.op_b_val, eval_inputs, Readers.ALUTypeReader.eval_cols,
+    Readers.ALUTypeReader.eval_accessCols]
+  exact ProvableType.eval_fields env _
+
+@[circuit_norm] theorem eval_opCVal {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    (ProvableStruct.eval env input).op_c_val
+      = Vector.map (Expression.eval env) input.op_c_val := by
+  rw [← ProvableStruct.eval_eq_eval]
+  simp only [Inputs.op_c_val, eval_inputs, Readers.ALUTypeReader.eval_cols,
+    Readers.ALUTypeReader.eval_accessCols]
+  exact ProvableType.eval_fields env _
 
 end SP1Clean.AddwChip

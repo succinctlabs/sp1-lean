@@ -10,7 +10,7 @@ import SP1Clean.Proofs.Chips.MulChip.Formal
 # Exact whole-chip faithfulness for SP1 `Mul`
 
 This file relates the native Clean `MulChip` row to the complete Rust-generated row-level oracle
-for pinned SP1 v6.3.1.
+for pinned SP1 v6.4.0.
 -/
 
 namespace SP1Clean.Faithful
@@ -423,7 +423,7 @@ private theorem mul_chip_constraints_decompose
         Expression.eval env (input.is_real * (input.is_real - 1)) = 0) := by
   simp only [nativeAssertZeros, MulChip.main,
     Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-    witnessVectorNative, CircuitNormalization.witnessNative_apply_eq,
+    witnessVectorIR, Witnessable.witness, witnessIR,
     subcircuitWithAssertion, assertion, assertZero,
     Operations.localLength]
   simp only [Operations.constraints_append,
@@ -433,7 +433,6 @@ private theorem mul_chip_constraints_decompose
     constraints_toSubcircuit_formalAssertion,
     GeneralFormalCircuit.toSubcircuit_localLength,
     FormalAssertion.toSubcircuit_localLength,
-    CircuitNormalization.witnessNative_localLength_eq,
     Readers.CPUState.circuit_localLength,
     MulOperation.circuit_localLength,
     Readers.RTypeReader.circuit_localLength,
@@ -2356,7 +2355,7 @@ private theorem eval_sub_mul_const
   simp only [eval_sub, Expression.eval, hx, hy]
 
 open SP1Clean.Channels (byteChannel stateChannel memoryChannel programChannel)
-open SP1Clean.InteractionRecovery
+open InteractionRecovery
 
 theorem mulOperation_interactions_exact
     (env : Environment (ZMod p))
@@ -3739,7 +3738,7 @@ theorem mulChip_interactions_constructive
     Air.Flat.Component.rowOffset_mk,
     MulChip.circuit_main_eq] using hfaithful
 
-/-- Whole-chip faithfulness package for the complete pinned v6.3.1 Mul AIR. -/
+/-- Whole-chip faithfulness package for the complete pinned v6.4.0 Mul AIR. -/
 theorem mulChip_faithful :
     ChipFaithful (p := p) MulChip.Inputs MulChip.Columns
       Extracted.MulOracle.MulCols MulChip.circuit mulChipRowCodec mulChipOracle where

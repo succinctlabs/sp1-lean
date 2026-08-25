@@ -34,6 +34,13 @@ for arg in "$@"; do
     *) echo "unknown flag: $arg (usage: run_audit.sh [--update] [--main-only|--test-only])"; exit 2 ;;
   esac
 done
+if [ "$run_main" -eq 0 ] && [ "$run_test" -eq 0 ]; then
+  echo "--main-only and --test-only cannot be combined"
+  exit 2
+fi
+
+echo "== A-1 axiom probe generation =="
+python3 scripts/gen_axiom_probe.py || { echo "FAIL: probe generation"; exit 1; }
 
 # A0-A2 are pin/source-policy gates over the main library; the test-only mode (the CI `test`
 # job's census step) skips straight to its census scope.
@@ -75,7 +82,15 @@ fi
 
 echo
 echo "== A1 recorded-pin cross-checks (gate) =="
-if scripts/check_pins.sh; then
+if [ "$update" -eq 1 ]; then
+  # A clean census update must be able to replace an intentionally stale raw snapshot after the
+  # generated probe set grows. The authoritative ledger still has to match the probes here; only
+  # the raw-snapshot count check is deferred to A3, which rewrites and validates both files.
+  pin_check=(scripts/check_pins.sh --census-update)
+else
+  pin_check=(scripts/check_pins.sh)
+fi
+if "${pin_check[@]}"; then
   :
 else
   echo "FAIL: a recorded pin value disagrees with the build graph (see above)"; fail=1
@@ -95,6 +110,14 @@ if scripts/check_report_citations.sh; then
   :
 else
   echo "FAIL: a documented citation does not resolve (see above)"; fail=1
+fi
+
+echo
+echo "== A1 audit-surface index (gate) =="
+if scripts/check_audit_surface.sh; then
+  :
+else
+  echo "FAIL: docs/audit-surface.md is out of sync with the tree (see above)"; fail=1
 fi
 
 echo
@@ -139,6 +162,26 @@ echo "the sole sanctioned native_decide; trusts the compiler via generated ._nat
 grep -rn 'native_decide' SP1CleanTest --include='*.lean' | wc -l
 
 echo
+echo "== A2 witness-generation escape-hatch gate (enforced — the witgen cutover is complete) =="
+if scripts/check_no_witness_native.sh --enforce | tail -1; then
+  :
+else
+  echo "FAIL: witness-generation escape hatch reintroduced"
+  fail=1
+fi
+
+echo
+echo "== A2 witgen export structural (gate) =="
+# The committed export/witgen tree (the wire-format artifact the Rust interpreter consumes)
+# must always be well-formed; byte-identity against a fresh regeneration is checked in the
+# CI `test` job (`check_witgen_export.sh --regen`), where the SP1CleanTest oleans are warm.
+if scripts/check_witgen_export.sh; then
+  :
+else
+  echo "FAIL: the committed export/witgen tree is not structurally clean (see above)"; fail=1
+fi
+
+echo
 echo "== A2 elaboration-budget escape-hatch gate (allowlist, not a budget) =="
 if scripts/check_option_escapes.sh; then
   echo "PASS: every maxHeartbeats/maxRecDepth site is allowlisted with a measured ladder"
@@ -150,13 +193,36 @@ fi  # run_main (A0-A2)
 
 echo
 echo "== A3 axiom census (the authoritative oracle) =="
-python3 scripts/gen_axiom_probe.py || { echo "FAIL: probe generation"; exit 1; }
 
 # One census scope: elaborate a probe file, gate its entries, diff against its committed
 # snapshot ignoring only the two `#`-comment header lines (commit stamp + date). A pass leaves
 # the tree untouched; a drift is a FAIL unless --update. With --update the fresh census (and
 # its current-commit stamp) is always installed — a content-identical restamp is hygienic and
 # records the verifying commit.
+#
+# Stamp integrity (Alex Hicks's PR #110 review, F16): --update refuses to stamp from a dirty working tree —
+# a stamp names a commit, and a census generated over uncommitted changes would attribute the
+# wrong tree. (The generated snapshots themselves are exempt from the dirtiness check, so an
+# --update run that only rewrites them is fine.) A content-identical snapshot whose stamp is not
+# an ancestor of HEAD is still stale provenance: without --update that is a hard failure, and a
+# clean --update run repairs it by restamping the snapshot at the verified commit.
+census_stamp_guard() {
+  if [ "$update" -eq 1 ]; then
+    local dirty
+    # Only the census outputs may be dirty during an update.  The generated probe sources are
+    # inputs to the census and must already be committed, or the HEAD stamp would name a tree that
+    # did not contain the declarations actually probed.
+    dirty=$(git status --porcelain=v1 -- . \
+      ':!docs/snapshots/axiom-census.txt' \
+      ':!docs/snapshots/axiom-census-test.txt' || true)
+    if [ -n "$dirty" ]; then
+      echo "FAIL: --update refuses to stamp a census from a dirty working tree:"
+      echo "$dirty" | head -10
+      echo "(commit the changes first — the stamp must name the tree the census describes)"
+      exit 1
+    fi
+  fi
+}
 census_scope() {
   local scope="$1" probe="$2" census="$3"
   echo
@@ -229,6 +295,31 @@ EOF
   fi
   if diff -q <(grep -v '^#' "$census") <(grep -v '^#' "$fresh") >/dev/null 2>&1; then
     echo "PASS: census matches the committed snapshot ($census)"
+    local stamped
+    stamped=$(sed -n 's/^# sp1-lean \([0-9a-f]\{40\}\).*/\1/p' "$census" | head -1)
+    if [ -z "$stamped" ]; then
+      if [ "$update" -eq 0 ]; then
+        echo "FAIL: $census has no valid '# sp1-lean <40-hex>' provenance stamp"
+        echo "(rerun with --update from a clean committed tree to repair it)"
+        fail=1
+      fi
+    elif ! git cat-file -e "${stamped}^{commit}" 2>/dev/null; then
+      # Distinguish "this clone cannot see the stamp" from "the stamp is not an ancestor".
+      # A shallow checkout (actions/checkout's default fetch-depth: 1) has neither the commit
+      # nor the history to decide, and must not be reported as a provenance failure.
+      if [ "$update" -eq 0 ]; then
+        echo "FAIL: the committed census stamp $stamped is not present in this clone"
+        echo "(cannot verify provenance from a shallow checkout; fetch full history, e.g."
+        echo " actions/checkout with 'fetch-depth: 0')"
+        fail=1
+      fi
+    elif ! git merge-base --is-ancestor "$stamped" HEAD; then
+      if [ "$update" -eq 0 ]; then
+        echo "FAIL: the committed census stamp $stamped is not an ancestor of HEAD"
+        echo "(content equality does not repair provenance; rerun with --update from a clean committed tree)"
+        fail=1
+      fi
+    fi
     if [ "$update" -eq 1 ]; then
       cp "$fresh" "$census"
       echo "UPDATED: $census restamped from this run (content unchanged)"
@@ -247,6 +338,7 @@ EOF
   rm -f "$fresh"
 }
 
+census_stamp_guard
 if [ "$run_main" -eq 1 ]; then
   census_scope "main" scripts/axiom_probe.lean docs/snapshots/axiom-census.txt
 fi

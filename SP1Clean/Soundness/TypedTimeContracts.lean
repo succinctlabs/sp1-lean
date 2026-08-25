@@ -1,4 +1,7 @@
 import SP1Clean.Soundness.TypedTime
+import SP1Clean.Soundness.StatePcClass
+import SP1Clean.Soundness.StateCanon
+import SP1Clean.Soundness.GoodnessFilter
 
 /-! # CPUState clock contracts for the supported instruction chips
 
@@ -11,6 +14,7 @@ the chip retains a CPU reader fed by the State columns and active-row selector e
 namespace SP1Clean.Soundness
 
 open Air.Flat Circuit
+open SP1Clean.Channels (StateMsg)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 25 < p)]
 
@@ -378,19 +382,272 @@ theorem witness_realDecodedInstructionRows_time_increases
   rw [witness_realDecodedInstructionRows_timeStep witness constraints balanced decoded decodedMem]
   omega
 
-/-- Physical constraints plus four-bus balance now construct an exhaustive, clock-ordered trail of
-all active decoded instruction rows.  Selector booleanity and strict progress are both derived AIR
-facts; neither remains a capstone premise. -/
-theorem witness_realDecodedState_exhaustiveTrail
+/-! ## The canonicalized State trail (W3, external report Finding 2)
+
+The StateBump table makes the raw decoded edge multiset unrankable — a bump edge carries the same
+semantic time on both sides, so no strict rank exists for it.  The exhaustive trail is therefore
+built over the **canonicalized** edges:
+
+1. start from the with-bump endpoint balance
+   (`realState_endpointBalanced_withBump_of_constraints`);
+2. goodness-filter pass 1 (`clk_high < 2^24`, rank `timeNat`): instruction edges preserve
+   `clk_high` literally and strictly advance the clock, bump pushes are range-checked in-circuit,
+   and the boundary is canonical by the verifier row's own byte pulls
+   (`witness_publicInput_limbBounds`);
+3. goodness-filter pass 2 (`pc1, pc2 < 2^16`): instruction edges split by
+   `witness_realDecodedRows_pcClass` into the limb-preserving and range-checked-target classes;
+4. with every pulled side good, `stateBump_canon_eq` cancels each bump edge as a self-loop of the
+   canonicalized balance (`endpointBalanced_of_cancel_loops`), the boundary endpoints reappear
+   verbatim (`canonState_eq_self`), and the strictly-ranked instruction residue feeds the unchanged
+   `RankedGrounding` engine through `timeNat_canonState`. -/
+
+/-- The witness's boundary-verifier table carries the `sp1StateVerifier` circuit. -/
+theorem witness_verifierTable_component (witness : EnsembleWitness (sp1Ensemble (p := p))) :
+    witness.verifierTable.component = ⟨sp1StateVerifier (p := p)⟩ := rfl
+
+/-- Every committed public-boundary limb is in range: the boundary verifier's `Spec` is
+`SP1StateBoundary.LimbBounds`, extracted through `Component.weakSoundness` from the verifier row's
+constraints, its finished-channel byte pulls, and the State channel's trivial guarantee. -/
+theorem witness_publicInput_limbBounds
+    (witness : EnsembleWitness (sp1Ensemble (p := p)))
+    (constraints : witness.Constraints) (balanced : witness.BalancedChannels) :
+    SP1StateBoundary.LimbBounds witness.publicInput := by
+  have tableConstraints : witness.verifierTable.Constraints :=
+    constraints _ witness.mem_allTables_verifierTable
+  have byteGuarantees := (sp1_finishedChannel_guarantees witness constraints balanced
+    _ witness.mem_allTables_verifierTable).1
+  have rowMem : (toElements witness.publicInput).toArray ∈ witness.verifierTable.table := by
+    rw [EnsembleWitness.verifierTable_table]
+    exact List.mem_singleton_self _
+  have hlist : witness.verifierTable.component.circuit.channelsWithGuarantees =
+      [Channels.stateChannel.toRaw, Channels.byteChannel.toRaw] := rfl
+  have guarantees : witness.verifierTable.component.operations.FullGuarantees
+      (witness.verifierTable.environment (toElements witness.publicInput).toArray) := by
+    simp only [Component.guarantees_iff, Component.rowOperations]
+    rw [GeneralFormalCircuit.guarantees_iff]
+    intro channel channelMem
+    show witness.verifierTable.component.rowOperations.ChannelGuarantees channel
+      (witness.verifierTable.environment (toElements witness.publicInput).toArray)
+    rw [← Component.channelGuarantees_iff]
+    rw [hlist] at channelMem
+    rcases List.mem_cons.mp channelMem with rfl | channelMem
+    · intro i hi hmult
+      exact stateChannel_interaction_guarantees _ hmult
+    · rw [List.mem_singleton.mp channelMem]
+      exact byteGuarantees _ rowMem
+  have spec := (witness.verifierTable.component.weakSoundness
+    (env := witness.verifierTable.environment (toElements witness.publicInput).toArray)
+    (by rw [witness_verifierTable_component]; trivial) (tableConstraints _ rowMem) guarantees).1
+  rw [witness_verifierTable_component] at spec
+  have spec' : SP1StateBoundary.LimbBounds
+      (valueFromOffset SP1PublicIO 0
+        (Environment.fromInput witness.publicInput witness.data)) := spec
+  rwa [ProvableType.valueFromOffset_zero_fromInput_eq] at spec'
+
+/-- The public initial State message's limbs, in the recombined form the State bus carries: the
+boundary `LimbBounds` recombine to a genuine 24-bit clock split and 16-bit pc limbs. -/
+theorem initialBoundaryStateMessage_bounds (pi : SP1PublicIO (ZMod p))
+    (h : SP1StateBoundary.LimbBounds pi) :
+    (initialBoundaryStateMessage pi).clk_high.val < 2 ^ 24 ∧
+      (initialBoundaryStateMessage pi).clk_low.val < 2 ^ 24 ∧
+      (initialBoundaryStateMessage pi).pc0.val < 2 ^ 16 ∧
+      (initialBoundaryStateMessage pi).pc1.val < 2 ^ 16 ∧
+      (initialBoundaryStateMessage pi).pc2.val < 2 ^ 16 := by
+  have hp := Fact.out (p := 2 ^ 25 < p)
+  simp only [SP1StateBoundary.LimbBounds] at h
+  obtain ⟨h016, h1624, h2432, h3248, hpc0, hpc1, hpc2, -, -, -, -, -, -, -⟩ := h
+  have v256 : ((256 : ZMod p)).val = 256 := by
+    rw [show ((256 : ZMod p)) = ((256 : ℕ) : ZMod p) by norm_cast,
+      ZMod.val_natCast_of_lt (by omega)]
+  have v65536 : ((65536 : ZMod p)).val = 65536 := by
+    rw [show ((65536 : ZMod p)) = ((65536 : ℕ) : ZMod p) by norm_cast,
+      ZMod.val_natCast_of_lt (by omega)]
+  refine ⟨?_, ?_, hpc0, hpc1, hpc2⟩
+  · show (pi.init_clk_24_32 + pi.init_clk_32_48 * 256).val < 2 ^ 24
+    rw [val_recombine v256 (by omega)]
+    omega
+  · show (pi.init_clk_0_16 + pi.init_clk_16_24 * 65536).val < 2 ^ 24
+    rw [val_recombine v65536 (by omega)]
+    omega
+
+/-- The public final State message's limbs, as `initialBoundaryStateMessage_bounds`. -/
+theorem finalBoundaryStateMessage_bounds (pi : SP1PublicIO (ZMod p))
+    (h : SP1StateBoundary.LimbBounds pi) :
+    (finalBoundaryStateMessage pi).clk_high.val < 2 ^ 24 ∧
+      (finalBoundaryStateMessage pi).clk_low.val < 2 ^ 24 ∧
+      (finalBoundaryStateMessage pi).pc0.val < 2 ^ 16 ∧
+      (finalBoundaryStateMessage pi).pc1.val < 2 ^ 16 ∧
+      (finalBoundaryStateMessage pi).pc2.val < 2 ^ 16 := by
+  have hp := Fact.out (p := 2 ^ 25 < p)
+  simp only [SP1StateBoundary.LimbBounds] at h
+  obtain ⟨-, -, -, -, -, -, -, h016, h1624, h2432, h3248, hpc0, hpc1, hpc2⟩ := h
+  have v256 : ((256 : ZMod p)).val = 256 := by
+    rw [show ((256 : ZMod p)) = ((256 : ℕ) : ZMod p) by norm_cast,
+      ZMod.val_natCast_of_lt (by omega)]
+  have v65536 : ((65536 : ZMod p)).val = 65536 := by
+    rw [show ((65536 : ZMod p)) = ((65536 : ℕ) : ZMod p) by norm_cast,
+      ZMod.val_natCast_of_lt (by omega)]
+  refine ⟨?_, ?_, hpc0, hpc1, hpc2⟩
+  · show (pi.final_clk_24_32 + pi.final_clk_32_48 * 256).val < 2 ^ 24
+    rw [val_recombine v256 (by omega)]
+    omega
+  · show (pi.final_clk_0_16 + pi.final_clk_16_24 * 65536).val < 2 ^ 24
+    rw [val_recombine v65536 (by omega)]
+    omega
+
+/-- Membership in the active StateBump rows unpacks to physical-table membership plus the live
+selector. -/
+theorem mem_realStateBumpRows (witness : EnsembleWitness (sp1Ensemble (p := p)))
+    {row : Array (ZMod p)} (rowMem : row ∈ realStateBumpRows witness) :
+    row ∈ (stateBumpTable witness).table ∧
+      (stateBumpRow (stateBumpTable witness) row).is_real = 1 := by
+  rw [realStateBumpRows, List.mem_filter] at rowMem
+  simpa only [decide_eq_true_eq] using rowMem
+
+/-- Both endpoints of a decoded State edge read the same physical `clk_high` column, so the first
+goodness pass's preservation condition is definitional. -/
+theorem decodedStateEdge_snd_clk_high (data : ProverData (ZMod p))
+    (decoded : DecodedInstructionRow p) :
+    ((decodedStateEdge data decoded).2).clk_high = ((decodedStateEdge data decoded).1).clk_high :=
+  rfl
+
+/-- The two goodness-filter passes over the with-bump State balance, exported at their raw
+strength: every active instruction edge's endpoints carry a genuine 24-bit `clk_high` and genuine
+16-bit upper pc limbs, and every active StateBump row's edge canonicalizes to a self-loop.  The
+clk facts feed `timeNat_canonState` (the trail's rank transport and the walk's clock telescopes),
+the pc facts feed `pcBits_canonState` (the capstone's `PcWalk` transport), and the loop fact
+cancels the bump edges from the canonicalized balance. -/
+theorem witness_stateEdges_goodness
+    (witness : EnsembleWitness (sp1Ensemble (p := p)))
+    (constraints : witness.Constraints) (balanced : witness.BalancedChannels) :
+    (∀ decoded ∈ realDecodedInstructionRows witness.data witness.tables,
+      ((decodedStateEdge witness.data decoded).1.clk_high.val < 2 ^ 24 ∧
+        (decodedStateEdge witness.data decoded).2.clk_high.val < 2 ^ 24) ∧
+      ((decodedStateEdge witness.data decoded).1.pc1.val < 2 ^ 16 ∧
+        (decodedStateEdge witness.data decoded).1.pc2.val < 2 ^ 16) ∧
+      ((decodedStateEdge witness.data decoded).2.pc1.val < 2 ^ 16 ∧
+        (decodedStateEdge witness.data decoded).2.pc2.val < 2 ^ 16)) ∧
+    ∀ row ∈ realStateBumpRows witness,
+      canonState (StateBumpChip.pulledMessage (stateBumpRow (stateBumpTable witness) row)) =
+        canonState (StateBumpChip.pushedMessage (stateBumpRow (stateBumpTable witness) row)) := by
+  classical
+  obtain ⟨ih, -, -, ip1, ip2⟩ := initialBoundaryStateMessage_bounds witness.publicInput
+    (witness_publicInput_limbBounds witness constraints balanced)
+  obtain ⟨fh, -, -, fp1, fp2⟩ := finalBoundaryStateMessage_bounds witness.publicInput
+    (witness_publicInput_limbBounds witness constraints balanced)
+  have balanced0 := realState_endpointBalanced_withBump_of_constraints witness constraints balanced
+  -- pass 1: `clk_high < 2^24` is preserved by instruction edges and range-checked on bump pushes
+  have pass1 := GoodnessFilter.good_of_endpointBalanced (fun e => e)
+    (fun m : StateMsg (ZMod p) => m.clk_high.val < 2 ^ 24) Semantics.StateMsg.timeNat
+    _ _ _ _ balanced0 ih fh ?pres1 ?cons1
+  case pres1 =>
+    intro e he
+    obtain ⟨decoded, dmem, rfl⟩ := List.mem_map.mp (Multiset.mem_coe.mp he)
+    exact ⟨by rw [decodedStateEdge_snd_clk_high], fun _ =>
+      witness_realDecodedInstructionRows_time_increases witness constraints balanced decoded dmem⟩
+  case cons1 =>
+    intro e he
+    obtain ⟨row, rowMem, rfl⟩ := List.mem_map.mp (Multiset.mem_coe.mp he)
+    obtain ⟨tableMem, real⟩ := mem_realStateBumpRows witness rowMem
+    exact (stateBump_pushedMessage_good
+      (stateBumpTable_spec witness constraints balanced row tableMem) real).1
+  -- pass 2: `pc1, pc2 < 2^16`; instruction edges split by the pc-limb classification
+  rw [← Multiset.filter_add_not
+    (fun e : StateMsg (ZMod p) × StateMsg (ZMod p) => e.2.pc1 = e.1.pc1 ∧ e.2.pc2 = e.1.pc2)
+    (↑((realDecodedInstructionRows witness.data witness.tables).map
+      (decodedStateEdge witness.data)) : Multiset (StateMsg (ZMod p) × StateMsg (ZMod p))),
+    add_assoc] at balanced0
+  have pass2 := GoodnessFilter.good_of_endpointBalanced (fun e => e)
+    (fun m : StateMsg (ZMod p) => m.pc1.val < 2 ^ 16 ∧ m.pc2.val < 2 ^ 16)
+    Semantics.StateMsg.timeNat _ _ _ _ balanced0 ⟨ip1, ip2⟩ ⟨fp1, fp2⟩ ?pres2 ?cons2
+  case pres2 =>
+    intro e he
+    rw [Multiset.mem_filter] at he
+    obtain ⟨he, hq⟩ := he
+    obtain ⟨decoded, dmem, rfl⟩ := List.mem_map.mp (Multiset.mem_coe.mp he)
+    exact ⟨by rw [hq.1, hq.2], fun _ =>
+      witness_realDecodedInstructionRows_time_increases witness constraints balanced decoded dmem⟩
+  case cons2 =>
+    intro e he
+    rcases Multiset.mem_add.mp he with he | he
+    · rw [Multiset.mem_filter] at he
+      obtain ⟨he, hnq⟩ := he
+      obtain ⟨decoded, dmem, rfl⟩ := List.mem_map.mp (Multiset.mem_coe.mp he)
+      rcases witness_realDecodedRows_pcClass witness constraints balanced decoded dmem
+        with hkeep | hbound
+      · exact absurd hkeep hnq
+      · exact hbound
+    · obtain ⟨row, rowMem, rfl⟩ := List.mem_map.mp (Multiset.mem_coe.mp he)
+      obtain ⟨tableMem, real⟩ := mem_realStateBumpRows witness rowMem
+      exact (stateBump_pushedMessage_good
+        (stateBumpTable_spec witness constraints balanced row tableMem) real).2
+  refine ⟨fun decoded dmem => ?_, fun row rowMem => ?_⟩
+  · have emem : decodedStateEdge witness.data decoded ∈
+        (↑((realDecodedInstructionRows witness.data witness.tables).map
+          (decodedStateEdge witness.data)) :
+            Multiset (StateMsg (ZMod p) × StateMsg (ZMod p))) :=
+      Multiset.mem_coe.mpr (List.mem_map_of_mem dmem)
+    refine ⟨pass1.1 _ emem, ?_⟩
+    by_cases hq : ((decodedStateEdge witness.data decoded).2.pc1 =
+          (decodedStateEdge witness.data decoded).1.pc1 ∧
+        (decodedStateEdge witness.data decoded).2.pc2 =
+          (decodedStateEdge witness.data decoded).1.pc2)
+    · exact pass2.1 _ (Multiset.mem_filter.mpr ⟨emem, hq⟩)
+    · refine ⟨pass2.2 _ (Multiset.mem_add.mpr (Or.inl (Multiset.mem_filter.mpr ⟨emem, hq⟩))), ?_⟩
+      rcases witness_realDecodedRows_pcClass witness constraints balanced decoded dmem
+        with hkeep | hbound
+      · exact absurd hkeep hq
+      · exact hbound
+  · obtain ⟨tableMem, real⟩ := mem_realStateBumpRows witness rowMem
+    have h1 := pass1.2 _ (Multiset.mem_coe.mpr (List.mem_map_of_mem rowMem))
+    have h2 := pass2.2 _ (Multiset.mem_add.mpr (Or.inr
+      (Multiset.mem_coe.mpr (List.mem_map_of_mem rowMem))))
+    exact stateBump_canon_eq_of_pulled_good
+      (stateBumpTable_spec witness constraints balanced row tableMem) real h1 h2.1 h2.2
+
+/-- Physical constraints plus four-bus balance construct an exhaustive, clock-ordered trail of all
+active decoded instruction rows over their **canonicalized** State edges.  The StateBump rows'
+re-limbing edges cancel as self-loops of the canonicalized balance, the boundary endpoints are
+canonical by the verifier row's own byte pulls, and selector booleanity, the pc-limb classes, and
+strict clock progress are all derived AIR facts; none remains a capstone premise. -/
+theorem witness_realDecodedState_canonExhaustiveTrail
     (witness : EnsembleWitness (sp1Ensemble (p := p)))
     (constraints : witness.Constraints) (balanced : witness.BalancedChannels) :
     RankedGrounding.ExhaustiveTrail
       (↑(realDecodedInstructionRows witness.data witness.tables) :
         Multiset (DecodedInstructionRow p))
-      (decodedStateEdge witness.data)
+      (fun decoded =>
+        (canonState (decodedStateEdge witness.data decoded).1,
+         canonState (decodedStateEdge witness.data decoded).2))
       (initialBoundaryStateMessage witness.publicInput)
-      (finalBoundaryStateMessage witness.publicInput) :=
-  realDecodedState_exhaustiveTrail_of_constraints witness constraints balanced
-    (witness_realDecodedInstructionRows_time_increases witness constraints balanced)
+      (finalBoundaryStateMessage witness.publicInput) := by
+  classical
+  obtain ⟨instrGood, bumpCanon⟩ := witness_stateEdges_goodness witness constraints balanced
+  obtain ⟨-, il, ip0, ip1, -⟩ := initialBoundaryStateMessage_bounds witness.publicInput
+    (witness_publicInput_limbBounds witness constraints balanced)
+  obtain ⟨-, fl, fp0, fp1, -⟩ := finalBoundaryStateMessage_bounds witness.publicInput
+    (witness_publicInput_limbBounds witness constraints balanced)
+  have cancelled := GoodnessFilter.endpointBalanced_of_cancel_loops _ _ _ _ _ ?loops
+    (GoodnessFilter.endpointBalanced_map canonState _ _ _ _
+      (realState_endpointBalanced_withBump_of_constraints witness constraints balanced))
+  case loops =>
+    intro l hl
+    obtain ⟨row, rowMem, rfl⟩ := List.mem_map.mp (Multiset.mem_coe.mp hl)
+    exact bumpCanon row rowMem
+  rw [canonState_eq_self il ip0 ip1, canonState_eq_self fl fp0 fp1] at cancelled
+  refine RankedGrounding.exists_exhaustiveTrail_of_endpointBalanced _ _
+    Semantics.StateMsg.timeNat _ _ ?_ ?_
+  · exact GoodnessFilter.endpointBalanced_of_map (decodedStateEdge witness.data)
+      (↑(realDecodedInstructionRows witness.data witness.tables))
+      (fun e => (canonState e.1, canonState e.2))
+      (initialBoundaryStateMessage witness.publicInput)
+      (finalBoundaryStateMessage witness.publicInput) cancelled
+  · intro decoded dmem
+    obtain ⟨⟨hclkPull, hclkPush⟩, -, -⟩ := instrGood decoded (Multiset.mem_coe.mp dmem)
+    show Semantics.StateMsg.timeNat (canonState (decodedStateEdge witness.data decoded).1) <
+      Semantics.StateMsg.timeNat (canonState (decodedStateEdge witness.data decoded).2)
+    rw [timeNat_canonState hclkPull, timeNat_canonState hclkPush]
+    exact witness_realDecodedInstructionRows_time_increases witness constraints balanced decoded
+      (Multiset.mem_coe.mp dmem)
 
 end SP1Clean.Soundness

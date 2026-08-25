@@ -6,7 +6,7 @@ import SP1Clean.Native.Operations.AddOperation.RawSpec
 /-! # Exact Branch circuit proof
 
 Soundness and honest-witness completeness for the native Branch circuit whose local columns,
-constraints, and interactions match pinned SP1 v6.3.1.
+constraints, and interactions match pinned SP1 v6.4.0.
 -/
 
 namespace SP1Clean.BranchChip
@@ -257,26 +257,35 @@ theorem completeness :
   simp only [circuit_norm] at h_it h_bt3 h_ft3 hf0 hf1 hf2 hf3 hf4 hf5
   simp only [circuit_norm] at h_realsum h_brbin h_brpad h_dec h_ranges
   obtain ⟨he_flags, he_br, he_np, he_lt, -, _⟩ := h_env
-  simp only [Witgen.WitgenIR.eval_native_apply] at he_flags he_np
   simp +instances only [circuit_norm] at he_br he_lt he_np
+  replace he_br : env.get (i₀ + 6) = SP1Clean.BranchChip.hintBranching env.hint := by
+    have hdefault : (default : Vector (ZMod p) 1) = #v[0] := rfl
+    rw [SP1Clean.BranchChip.hintBranching, ← hdefault]
+    exact he_br
   simp only [SP1Clean.BranchChip.branchTargetWord,
     SP1Clean.BranchChip.fallThroughWord] at h_bt3 h_ft3 h_ranges
   have hg0 : env.get i₀ = (SP1Clean.BranchChip.hintFlags env.hint)[0] := by
+    rw [← SP1Clean.BranchChip.hintFlags_eval_ir env]
     simpa using he_flags 0
   have hg1 : env.get (i₀ + 1) =
       (SP1Clean.BranchChip.hintFlags env.hint)[1] := by
+    rw [← SP1Clean.BranchChip.hintFlags_eval_ir env]
     simpa using he_flags 1
   have hg2 : env.get (i₀ + 2) =
       (SP1Clean.BranchChip.hintFlags env.hint)[2] := by
+    rw [← SP1Clean.BranchChip.hintFlags_eval_ir env]
     simpa using he_flags 2
   have hg3 : env.get (i₀ + 3) =
       (SP1Clean.BranchChip.hintFlags env.hint)[3] := by
+    rw [← SP1Clean.BranchChip.hintFlags_eval_ir env]
     simpa using he_flags 3
   have hg4 : env.get (i₀ + 4) =
       (SP1Clean.BranchChip.hintFlags env.hint)[4] := by
+    rw [← SP1Clean.BranchChip.hintFlags_eval_ir env]
     simpa using he_flags 4
   have hg5 : env.get (i₀ + 5) =
       (SP1Clean.BranchChip.hintFlags env.hint)[5] := by
+    rw [← SP1Clean.BranchChip.hintFlags_eval_ir env]
     simpa using he_flags 5
   have fb0 : env.get i₀ = 0 ∨ env.get i₀ = 1 := hg0 ▸ hf0
   have fb1 : env.get (i₀ + 1) = 0 ∨ env.get (i₀ + 1) = 1 := hg1 ▸ hf1
@@ -505,8 +514,15 @@ theorem completeness :
             (AddOperation.populate
               #v[input_state_pc[0], input_state_pc[1], input_state_pc[2], 0]
               #v[4, 0, 0, 0])[0] := by
-    simpa [h_input.1, ep0, ep1, ep2, hcimmeq] using
-      he_np ⟨0, by omega⟩
+    have hcell := SP1Clean.BranchChip.nextPcIR_eval env
+      #v[input_var_state_pc[0], input_var_state_pc[1], input_var_state_pc[2]]
+      input_var_adapter_op_c_imm (var { index := i₀ + 6 }) input_var_is_real
+      #v[input_state_pc[0], input_state_pc[1], input_state_pc[2]] input_adapter_op_c_imm
+      (by simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+            List.getElem_cons_succ, ep0, ep1, ep2])
+      hcimmeq h_pcU h_imm 0 (by omega)
+    simp only [circuit_norm, h_input.1] at hcell
+    exact (he_np ⟨0, by omega⟩).trans hcell
   have hnp1 :
       env.get (i₀ + 8) =
         env.get (i₀ + 6) *
@@ -517,8 +533,15 @@ theorem completeness :
             (AddOperation.populate
               #v[input_state_pc[0], input_state_pc[1], input_state_pc[2], 0]
               #v[4, 0, 0, 0])[1] := by
-    simpa [h_input.1, ep0, ep1, ep2, hcimmeq] using
-      he_np ⟨1, by omega⟩
+    have hcell := SP1Clean.BranchChip.nextPcIR_eval env
+      #v[input_var_state_pc[0], input_var_state_pc[1], input_var_state_pc[2]]
+      input_var_adapter_op_c_imm (var { index := i₀ + 6 }) input_var_is_real
+      #v[input_state_pc[0], input_state_pc[1], input_state_pc[2]] input_adapter_op_c_imm
+      (by simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+            List.getElem_cons_succ, ep0, ep1, ep2])
+      hcimmeq h_pcU h_imm 1 (by omega)
+    simp only [circuit_norm, h_input.1] at hcell
+    exact (he_np ⟨1, by omega⟩).trans hcell
   have hnp2 :
       env.get (i₀ + 9) =
         env.get (i₀ + 6) *
@@ -529,8 +552,15 @@ theorem completeness :
             (AddOperation.populate
               #v[input_state_pc[0], input_state_pc[1], input_state_pc[2], 0]
               #v[4, 0, 0, 0])[2] := by
-    simpa [h_input.1, ep0, ep1, ep2, hcimmeq] using
-      he_np ⟨2, by omega⟩
+    have hcell := SP1Clean.BranchChip.nextPcIR_eval env
+      #v[input_var_state_pc[0], input_var_state_pc[1], input_var_state_pc[2]]
+      input_var_adapter_op_c_imm (var { index := i₀ + 6 }) input_var_is_real
+      #v[input_state_pc[0], input_state_pc[1], input_state_pc[2]] input_adapter_op_c_imm
+      (by simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+            List.getElem_cons_succ, ep0, ep1, ep2])
+      hcimmeq h_pcU h_imm 2 (by omega)
+    simp only [circuit_norm, h_input.1] at hcell
+    exact (he_np ⟨2, by omega⟩).trans hcell
   have hBranchSemantics :
       Word.isU64
           (AddOperation.populate
@@ -728,9 +758,13 @@ theorem completeness :
               (Vector.mapRange 2 fun i => var { index := i₀ + 16 + i })⟩,
           ⟨env.get (i₀ + 18)⟩, ⟨env.get (i₀ + 19)⟩⟩,
         env.get (i₀ + 2) + env.get (i₀ + 3), input_is_real⟩ := by
-    rw [he_lt, h_input.1]
-    exact LtOperationSigned.spec_populate hrs1U hrs2U h_sig_bin h_bin
-      hbg_gate
+    rw [he_lt, LtOperationSigned.populateFE_eval env
+      #v[input_var_adapter_op_a_memory_prev_value[0], input_var_adapter_op_a_memory_prev_value[1],
+         input_var_adapter_op_a_memory_prev_value[2], input_var_adapter_op_a_memory_prev_value[3]]
+      #v[input_var_adapter_op_b_memory_prev_value[0], input_var_adapter_op_b_memory_prev_value[1],
+         input_var_adapter_op_b_memory_prev_value[2], input_var_adapter_op_b_memory_prev_value[3]]
+      _ _ _ _ rfl rfl hrs1U hrs2U, h_input.1]
+    exact LtOperationSigned.spec_populate hrs1U hrs2U h_sig_bin h_bin hbg_gate
   simp only [SP1Clean.BranchChip.committedNextPc,
     SP1Clean.BranchChip.branchTargetWord,
     SP1Clean.BranchChip.fallThroughWord] at h_ranges

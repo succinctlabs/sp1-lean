@@ -301,7 +301,7 @@ omit [Fact (2 ^ 17 < p)] in
 (`[t, t + readWindow loc]` — `[t, t+3]` for registers, the singleton `t` for RAM) a
 `LocalValueAt` fact moves freely, because that window sits inside the location's pre-effect
 epoch in both cases. -/
-private lemma localValueAt_shift_window {program : GuestProgram} {initial : SailState}
+lemma localValueAt_shift_window {program : GuestProgram} {initial : SailState}
     {initialClock : ℕ} {m : StateMsg (ZMod p)}
     (h_m : LocalStateTruth program initial initialClock m) (loc : MemLoc) {v : Word (ZMod p)}
     {τ τ' : ℕ}
@@ -391,6 +391,227 @@ theorem grounded_ordinary_of_aligned
   refine ⟨hmemtruth, ?_⟩
   rw [h.ordTime mp hmp, ← h.statePull]
   exact localValueAt_shift_window hstateTruth_al _ hlo hhi le_rfl (Nat.le_add_right _ _) hval_al
+
+/-! ## The value-level carrier exchange (W3)
+
+The refresh-eliminated walk carrier replaces a pulled record by its value-equal pre-refresh
+ancestor and re-limbs its state edge canonically, so message-identity transports (`AlignsWith`)
+no longer apply.  `ValueAligned` is the weakened relation that still does: the state edge carries
+the same ℕ time and 64-bit pc image, the pushes are the same records, and every ordinary pull is
+matched by a carrier pull with the same location and value inside the location's pre-effect read
+window.  The ordinary pulls' `ClkBound` is carried as an explicit field — derived once from the
+memory balance — because the carrier's rewritten records cannot return it. -/
+
+omit [Fact p.Prime] [Fact (2 ^ 17 < p)] in
+/-- `LocalStateTruth` is a function of the message's ℕ time and 64-bit pc image. -/
+theorem localStateTruth_congr {program : GuestProgram} {initial : SailState} {initialClock : ℕ}
+    {m m' : StateMsg (ZMod p)}
+    (ht : StateMsg.timeNat m' = StateMsg.timeNat m)
+    (hpc : StateMsg.pcBits m' = StateMsg.pcBits m)
+    (h : LocalStateTruth program initial initialClock m) :
+    LocalStateTruth program initial initialClock m' := by
+  obtain ⟨n, state, chain, htime, hpcEq, hrom, hcfg⟩ := h
+  refine ⟨n, state, chain, by rw [ht]; exact htime, ?_, hrom, hcfg⟩
+  rw [show pcBits m'.pc0 m'.pc1 m'.pc2 = pcBits m.pc0 m.pc1 m.pc2 from hpc]
+  exact hpcEq
+
+/-- The value-level carrier exchange relation.  Compare `AlignsWith`: the state-edge fields are
+related by `timeNat`/`pcBits` preservation instead of message equality, and the matched pull need
+only agree in location and value.  `pullClk` supplies the ordinary pulls' `ClkBound`. -/
+structure ValueAligned (r_new r_ord : RowFacts p) : Prop where
+  pullTime : StateMsg.timeNat r_new.statePull = StateMsg.timeNat r_ord.statePull
+  pullPc : StateMsg.pcBits r_new.statePull = StateMsg.pcBits r_ord.statePull
+  pushTime : StateMsg.timeNat r_new.statePush = StateMsg.timeNat r_ord.statePush
+  pushPc : StateMsg.pcBits r_new.statePush = StateMsg.pcBits r_ord.statePush
+  pushes : r_new.memPushes.Perm r_ord.memPushes
+  ordTime : ∀ mp ∈ r_ord.memPulls, mp.2 = StateMsg.timeNat r_ord.statePull
+  pullClk : ∀ mp ∈ r_ord.memPulls, SP1Clean.Channels.MemoryMsg.ClkBound mp.1
+  match_ : ∀ mp ∈ r_ord.memPulls, ∃ mp' ∈ r_new.memPulls,
+    MemoryMsg.locOf mp'.1 = MemoryMsg.locOf mp.1 ∧ mp'.1.value = mp.1.value ∧
+    StateMsg.timeNat r_new.statePull ≤ mp'.2 ∧
+    mp'.2 ≤ StateMsg.timeNat r_new.statePull + readWindow (MemoryMsg.locOf mp.1)
+
+omit [Fact (2 ^ 17 < p)] in
+/-- The value-level analogue of `ordinaryPullCurrency_of_aligned`: ordinary pull currency from the
+carrier's, shifting each matched pull back to the ordinary window start and transporting `isU64`
+along the value equality; the ordinary record's `ClkBound` is the relation's own field. -/
+theorem ordinaryPullCurrency_of_valueAligned
+    {program : GuestProgram} {initial : SailState} {initialClock : ℕ}
+    {r_new r_ord : RowFacts p} (h : ValueAligned r_new r_ord)
+    (hstateTruth : LocalStateTruth program initial initialClock r_new.statePull)
+    (hcurr_new : ∀ mp ∈ r_new.memPulls, MemoryMsg.isU64 mp.1 ∧
+      MemoryMsg.ClkBound mp.1 ∧
+      LocalValueAt initial initialClock (MemoryMsg.locOf mp.1) mp.2 mp.1.value) :
+    ∀ mp ∈ r_ord.memPulls, MemoryMsg.isU64 mp.1 ∧
+      MemoryMsg.ClkBound mp.1 ∧
+      LocalValueAt initial initialClock (MemoryMsg.locOf mp.1) mp.2 mp.1.value := by
+  intro mp hmp
+  obtain ⟨mp', hmp'_mem, hloc, hval, hlo, hhi⟩ := h.match_ mp hmp
+  obtain ⟨hu64, -, hval_new⟩ := hcurr_new mp' hmp'_mem
+  rw [hloc, hval] at hval_new
+  refine ⟨?_, h.pullClk mp hmp, ?_⟩
+  · unfold SP1Clean.Channels.MemoryMsg.isU64 at hu64 ⊢
+    rwa [hval] at hu64
+  · rw [h.ordTime mp hmp, ← h.pullTime]
+    exact localValueAt_shift_window hstateTruth _ hlo hhi le_rfl (Nat.le_add_right _ _) hval_new
+
+omit [Fact (2 ^ 17 < p)] in
+/-- `LocalStepFact` transports from the ordinary carrier to a value-aligned one. -/
+theorem localStepFact_valueAligned_of_ordinary
+    {program : GuestProgram} {initial : SailState} {initialClock : ℕ}
+    {r_new r_ord : RowFacts p} (h : ValueAligned r_new r_ord)
+    (step_ord : LocalStepFact program initial initialClock r_ord) :
+    LocalStepFact program initial initialClock r_new := by
+  intro hpull hcurr_new
+  have hpull_ord : LocalStateTruth program initial initialClock r_ord.statePull :=
+    localStateTruth_congr h.pullTime.symm h.pullPc.symm hpull
+  have hcurr_ord := ordinaryPullCurrency_of_valueAligned h hpull hcurr_new
+  obtain ⟨hpush_ord, hmem_ord⟩ := step_ord hpull_ord hcurr_ord
+  refine ⟨localStateTruth_congr h.pushTime h.pushPc hpush_ord, ?_⟩
+  intro m hm
+  exact hmem_ord m (h.pushes.mem_iff.mp hm)
+
+omit [Fact (2 ^ 17 < p)] in
+/-- `FrameFact` transports the same way. -/
+theorem frameFact_valueAligned_of_ordinary
+    {program : GuestProgram} {initial : SailState} {initialClock : ℕ}
+    {r_new r_ord : RowFacts p} (h : ValueAligned r_new r_ord)
+    (frame_ord : FrameFact program initial initialClock r_ord) :
+    FrameFact program initial initialClock r_new := by
+  intro hpull hcurr_new loc v hpush hstart
+  have hpull_ord : LocalStateTruth program initial initialClock r_ord.statePull :=
+    localStateTruth_congr h.pullTime.symm h.pullPc.symm hpull
+  have hcurr_ord := ordinaryPullCurrency_of_valueAligned h hpull hcurr_new
+  have hpush_ord : ∀ m ∈ r_ord.memPushes, MemoryMsg.locOf m = loc → m.value = v :=
+    fun m hm => hpush m (h.pushes.mem_iff.mpr hm)
+  have hstart_ord : LocalValueAt initial initialClock loc
+      (StateMsg.timeNat r_ord.statePull) v := by
+    rw [← h.pullTime]; exact hstart
+  have := frame_ord hpull_ord hcurr_ord loc v hpush_ord hstart_ord
+  rw [h.pushTime]
+  exact this
+
+omit [Fact (2 ^ 17 < p)] in
+/-- **The value-aligned→ordinary weak-grounding transport** — the direction the refresh-eliminated
+consumers need.  Full ordinary `Grounded` is unrecoverable (the rewritten record's own-time
+currency does not return the *replaced* record's), but every capstone consumer reads only the
+state-pull truth, the pulls' structural pair (`isU64 ∧ ClkBound`), and the read-time currency —
+exactly this conclusion. -/
+theorem weakGrounded_ordinary_of_valueAligned
+    {program : GuestProgram} {initial : SailState} {initialClock : ℕ}
+    {r_new r_ord : RowFacts p} (h : ValueAligned r_new r_ord)
+    (grounded_new : Grounded program initial initialClock r_new) :
+    LocalStateTruth program initial initialClock r_ord.statePull ∧
+      ∀ mp ∈ r_ord.memPulls, (MemoryMsg.isU64 mp.1 ∧ MemoryMsg.ClkBound mp.1) ∧
+        LocalValueAt initial initialClock (MemoryMsg.locOf mp.1) mp.2 mp.1.value := by
+  obtain ⟨hstate_new, hpulls_new⟩ := grounded_new
+  have hcurr_new : ∀ mp ∈ r_new.memPulls, MemoryMsg.isU64 mp.1 ∧
+      MemoryMsg.ClkBound mp.1 ∧
+      LocalValueAt initial initialClock (MemoryMsg.locOf mp.1) mp.2 mp.1.value :=
+    fun mp hmp => ⟨(hpulls_new mp hmp).1.1, (hpulls_new mp hmp).1.2.1, (hpulls_new mp hmp).2⟩
+  have hord := ordinaryPullCurrency_of_valueAligned h hstate_new hcurr_new
+  exact ⟨localStateTruth_congr h.pullTime.symm h.pullPc.symm hstate_new,
+    fun mp hmp => ⟨⟨(hord mp hmp).1, (hord mp hmp).2.1⟩, (hord mp hmp).2.2⟩⟩
+
+/-! ## State-edge re-spelling (W3)
+
+The canonicalized State trail (`Soundness/StateCanon.lean`) walks the *re-limbed* endpoints
+`canonState (decodedStateEdge …)`, because only there do the StateBump rows' re-limbing edges cancel
+as self-loops.  The engine, however, is fed a carrier built from the physical row's own columns.
+`stateRespell` is the one-field exchange between the two: it replaces a row's State pull/push
+*messages* while keeping the whole memory side, and every fact the timed walk consumes transports
+across it as soon as the two spellings agree on the ℕ time and the 64-bit pc image — which
+`timeNat_canonState`/`pcBits_canonState` supply on goodness-filtered rows. -/
+
+/-- Re-spell a row's State edge, keeping the fetch and the whole memory side. -/
+def stateRespell (r : RowFacts p) (pull push : StateMsg (ZMod p)) : RowFacts p :=
+  { r with statePull := pull, statePush := push }
+
+omit [Fact p.Prime] [Fact (2 ^ 17 < p)] in
+@[simp] theorem stateRespell_memPulls (r : RowFacts p) (pull push : StateMsg (ZMod p)) :
+    (stateRespell r pull push).memPulls = r.memPulls := rfl
+
+omit [Fact p.Prime] [Fact (2 ^ 17 < p)] in
+@[simp] theorem stateRespell_memPushes (r : RowFacts p) (pull push : StateMsg (ZMod p)) :
+    (stateRespell r pull push).memPushes = r.memPushes := rfl
+
+omit [Fact p.Prime] [Fact (2 ^ 17 < p)] in
+@[simp] theorem stateRespell_statePull (r : RowFacts p) (pull push : StateMsg (ZMod p)) :
+    (stateRespell r pull push).statePull = pull := rfl
+
+omit [Fact p.Prime] [Fact (2 ^ 17 < p)] in
+@[simp] theorem stateRespell_statePush (r : RowFacts p) (pull push : StateMsg (ZMod p)) :
+    (stateRespell r pull push).statePush = push := rfl
+
+omit [Fact p.Prime] [Fact (2 ^ 17 < p)] in
+/-- `RowOK` transports across a time-preserving State re-spelling: every field either ignores the
+State messages or reads only their ℕ time. -/
+theorem rowOK_stateRespell {initialClock : ℕ} {r : RowFacts p} {pull push : StateMsg (ZMod p)}
+    (hpull : StateMsg.timeNat pull = StateMsg.timeNat r.statePull)
+    (hpush : StateMsg.timeNat push = StateMsg.timeNat r.statePush)
+    (h : RowOK initialClock r) :
+    RowOK initialClock (stateRespell r pull push) where
+  time8 := by
+    show StateMsg.timeNat push = StateMsg.timeNat pull + 8
+    rw [hpull, hpush]
+    exact h.time8
+  align8 := by
+    show StateMsg.timeNat pull % 8 = initialClock % 8
+    rw [hpull]
+    exact h.align8
+  touches := by
+    show List.Forall₂ (TouchOK (StateMsg.timeNat pull)) r.memPulls r.memPushes
+    rw [hpull]
+    exact h.touches
+  chain_mono := h.chain_mono
+  pushClkBound := h.pushClkBound
+  slotOfClkBound := h.slotOfClkBound
+
+omit [Fact (2 ^ 17 < p)] in
+/-- `LocalStepFact` transports across a State re-spelling that preserves time and pc image. -/
+theorem localStepFact_stateRespell {program : GuestProgram} {initial : SailState}
+    {initialClock : ℕ} {r : RowFacts p} {pull push : StateMsg (ZMod p)}
+    (hpullT : StateMsg.timeNat pull = StateMsg.timeNat r.statePull)
+    (hpullP : StateMsg.pcBits pull = StateMsg.pcBits r.statePull)
+    (hpushT : StateMsg.timeNat push = StateMsg.timeNat r.statePush)
+    (hpushP : StateMsg.pcBits push = StateMsg.pcBits r.statePush)
+    (step : LocalStepFact program initial initialClock r) :
+    LocalStepFact program initial initialClock (stateRespell r pull push) := by
+  intro hpull hcurr
+  have hpull' : LocalStateTruth program initial initialClock r.statePull :=
+    localStateTruth_congr hpullT.symm hpullP.symm hpull
+  obtain ⟨hpush, hmem⟩ := step hpull' hcurr
+  exact ⟨localStateTruth_congr hpushT hpushP hpush, hmem⟩
+
+omit [Fact (2 ^ 17 < p)] in
+/-- `FrameFact` transports across a State re-spelling that preserves time and pc image. -/
+theorem frameFact_stateRespell {program : GuestProgram} {initial : SailState}
+    {initialClock : ℕ} {r : RowFacts p} {pull push : StateMsg (ZMod p)}
+    (hpullT : StateMsg.timeNat pull = StateMsg.timeNat r.statePull)
+    (hpullP : StateMsg.pcBits pull = StateMsg.pcBits r.statePull)
+    (hpushT : StateMsg.timeNat push = StateMsg.timeNat r.statePush)
+    (frame : FrameFact program initial initialClock r) :
+    FrameFact program initial initialClock (stateRespell r pull push) := by
+  intro hpull hcurr loc v hpushes hstart
+  have hpull' : LocalStateTruth program initial initialClock r.statePull :=
+    localStateTruth_congr hpullT.symm hpullP.symm hpull
+  have hstart' : LocalValueAt initial initialClock loc (StateMsg.timeNat r.statePull) v := by
+    rw [← hpullT]
+    exact hstart
+  have hres := frame hpull' hcurr loc v hpushes hstart'
+  show LocalValueAt initial initialClock loc (StateMsg.timeNat push) v
+  rw [hpushT]
+  exact hres
+
+omit [Fact (2 ^ 17 < p)] in
+/-- `Grounded` transports back from a State re-spelling that preserves time and pc image. -/
+theorem grounded_of_stateRespell {program : GuestProgram} {initial : SailState}
+    {initialClock : ℕ} {r : RowFacts p} {pull push : StateMsg (ZMod p)}
+    (hpullT : StateMsg.timeNat pull = StateMsg.timeNat r.statePull)
+    (hpullP : StateMsg.pcBits pull = StateMsg.pcBits r.statePull)
+    (h : Grounded program initial initialClock (stateRespell r pull push)) :
+    Grounded program initial initialClock r :=
+  ⟨localStateTruth_congr hpullT.symm hpullP.symm h.1, h.2⟩
 
 /-- The walk invariant for the **partial** per-key memory frontier `live`: at each key that carries a
 frontier record, that record sits at the key, its own guarantee (`LocalMemTruth`) holds, its value is

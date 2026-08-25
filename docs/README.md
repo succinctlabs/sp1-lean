@@ -12,10 +12,14 @@ Each document has **one role**, so none needs to repeat another:
 | [`overview.md`](overview.md) | ten-minute technical orientation — states, never argues |
 | [`verification-report.md`](verification-report.md) | the long-form external report — argues and evidences each claim |
 | [`release-audit.md`](release-audit.md) | machine-adjacent audit record: pins, gates, census |
+| [`audit-surface.md`](audit-surface.md) | the definitions where a defect is undetectable by the kernel — the short list an auditor must actually read; gated by `scripts/check_audit_surface.sh` |
 | [`audits/2026-08-independent-semantic-audit.md`](audits/2026-08-independent-semantic-audit.md) | point-in-time independent second opinion on semantic foundations and ArkLib/VCVio readiness |
+| [`audits/2026-08-pr110-external-report-disposition.md`](audits/2026-08-pr110-external-report-disposition.md) | finding-by-finding disposition of Alex Hicks's focused PR #110 review; the private PDF is identified there by hash |
 | [`architecture.md`](architecture.md) | module/pillar ownership, design rules, deliberate exceptions |
 | [`roadmap.md`](roadmap.md) | dependency-ordered future work + non-blocking backlog |
 | [`goal-overview.md`](goal-overview.md) | the completed-state contract (never current status) |
+| [`witgen-wire-format.md`](witgen-wire-format.md) | the `version: 1` witness-export wire format the `export/witgen/` artifacts and the Rust interpreter share |
+| [`rust-integration-memo.md`](rust-integration-memo.md) | reader-facing memo for the SP1 team: what the witness-generation export is, how it is checked against the real prover, and the proposed in-SP1 conformance test |
 | [`chip-standardization.md`](chip-standardization.md) | the completed 25/25 `ChipKind.advance` interface record |
 | [`bus-model.md`](bus-model.md) | **HISTORICAL** pre-consolidation bus model, kept only for the section numbers source doc-comments cite |
 | [`proposals/consolidation-progress.md`](proposals/consolidation-progress.md) | compact checkpoint board for the architecture-consolidation work |
@@ -81,6 +85,8 @@ See [`agents/README.md`](agents/README.md) for the full index:
 - [`agents/proof-patterns.md`](agents/proof-patterns.md) — circuit proof recipes and Lean/Clean landmines.
 - [`agents/lean-sail-notes.md`](agents/lean-sail-notes.md) — Lean 4.32.2 dependency pins and Sail
   environment, including the model/runtime pairing rule.
+- [`agents/clean-upstream.md`](agents/clean-upstream.md) — the Clean pin is currently a **fork**: its
+  state and exit condition, the modification-vs-addition split rule, and the upstream PR queue.
 - [`agents/sail-model-provenance.md`](agents/sail-model-provenance.md) — the generated
   `Lean_RV64D` snapshot's provenance: the SP1 platform config, why it is required for the
   memory-bridge lemmas to be true, and the regeneration pipeline.

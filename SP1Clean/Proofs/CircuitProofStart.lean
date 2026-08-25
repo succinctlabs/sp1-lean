@@ -9,50 +9,6 @@ It is intentionally a narrow proof-elaboration optimization, not a second circui
 
 open Lean Elab Tactic
 
-namespace SP1Clean.CircuitNormalization
-
-open Circuit
-
-variable {F : Type} [FiniteField F]
-
-/-!
-Clean already derives the explicit operations, length, and output of `witnessNative`; these three
-lemmas merely expose those existing class fields to `circuit_norm`.  They are candidates for
-upstream Clean and carry no independent witness representation or semantics.
--/
-
-@[circuit_norm] lemma witnessNative_operations_eq
-    {value var : TypeMap} [ProvableType value] [inst : Witnessable F value var]
-    (compute : ProverEnvironment F → value F) (offset : ℕ) :
-    (witnessNative (F := F) (var := var) compute).operations offset =
-      [.witness (size value) (.nativeValue compute)] :=
-  ExplicitCircuits.operations_eq compute offset
-
-@[circuit_norm] lemma witnessNative_localLength_eq
-    {value var : TypeMap} [ProvableType value] [inst : Witnessable F value var]
-    (compute : ProverEnvironment F → value F) (offset : ℕ) :
-    (witnessNative (F := F) (var := var) compute).localLength offset = size value :=
-  ExplicitCircuits.localLength_eq compute offset
-
-@[circuit_norm] lemma witnessNative_output_eq
-    {value var : TypeMap} [ProvableType value] [inst : Witnessable F value var]
-    (compute : ProverEnvironment F → value F) (offset : ℕ) :
-    (witnessNative (F := F) (var := var) compute).output offset =
-      inst.var_eq ▸ varFromOffset value offset :=
-  ExplicitCircuits.output_eq compute offset
-
-/-- Pair form used while reducing monadic binds; assembled from the same explicit-circuit fields. -/
-@[circuit_norm] lemma witnessNative_apply_eq
-    {value var : TypeMap} [ProvableType value] [inst : Witnessable F value var]
-    (compute : ProverEnvironment F → value F) (offset : ℕ) :
-    witnessNative (F := F) (var := var) compute offset =
-      (inst.var_eq ▸ varFromOffset value offset,
-        [.witness (size value) (.nativeValue compute)]) :=
-  Prod.ext (ExplicitCircuits.output_eq compute offset)
-    (ExplicitCircuits.operations_eq compute offset)
-
-end SP1Clean.CircuitNormalization
-
 private def tryTactic (tactic : TSyntax `tactic) : TacticM Unit := do
   try evalTactic tactic catch _ => pure ()
 

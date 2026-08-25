@@ -61,13 +61,14 @@ theorem completeness :
   have hval : (Vector.map (Expression.eval env.toEnvironment)
         (Vector.mapRange 4 fun i => var {index := i₀ + i}) : Word (ZMod p))
       = SubOperation.populate input_adapter_op_b_memory_prev_value input_adapter_op_c_memory_prev_value := by
+    rw [← SubOperation.populateIR_eval env _ _ _ _ hbeq hceq ha hb]
     apply Vector.ext; intro i hi
     simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
     -- `h_env` now bundles the chip's `value` witness-gen equations with the GFC `RTypeReader`
-    -- subcircuit's completeness obligation — the witness equations are `h_env.1`.
-    rw [h_env.2.1 ⟨i, hi⟩]
-    simp only [Inputs.op_b_val, Inputs.op_c_val]
-    simp only [hbeq, hceq]
+    -- subcircuit's completeness obligation — the witness equations are `h_env.1`.  `exact` crosses
+    -- the struct-projection defeq gap between the destructured names and the `Inputs.op_b_val`/
+    -- `op_c_val` spellings inside the folded `populateIR` obligation.
+    exact h_env.2.1 ⟨i, hi⟩
   refine ⟨⟨hbin, h_cpu⟩, ⟨⟨fun _ => ⟨ha, hb⟩, hbin⟩, ?_⟩,
     ⟨⟨hbin, hbin, h_clk⟩,
       ⟨⟨hz _, hz _, hz _, hz _⟩, Or.inl hop_a_0, hrac_a, hrac_b, hrac_c, hdec,
@@ -181,7 +182,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
       · -- Program branch: compositional — the reader subcircuit keeps its fetch via the
         -- reader-local `_subcircuit` lemma; every other child is nil on the Program channel.
         simp only [main, Circuit.operations, Circuit.bind_def,
-          Circuit.pure_def, witnessVectorNative, subcircuitWithAssertion, assertion, assertZero,
+          Circuit.pure_def, witnessVectorIR, subcircuitWithAssertion, assertion, assertZero,
           HasAssertEq.assert_eq, Expression.assertEquals, Operations.localLength]
         simp only [Operations.interactionsWith_append, Operations.interactionsWith_witness,
           InteractionRecovery.interactionsWith_generalSubcircuit_eq_nil,

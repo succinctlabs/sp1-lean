@@ -1013,15 +1013,15 @@ Per gated group, stopping at the first failure:
      extracted helper (§4a) — and for a helper, check it is `private` and does not match a probe glob.
 8. **Commit**, one per batch.
 
-At wave boundaries additionally: `lake lint`, `lake test`, `scripts/run_audit.sh`, and
-`scripts/check_report_citations.sh` — the last is **not** invoked by `run_audit.sh`, so run it
-yourself or the 16 hard-coded file+declaration citations go unchecked for the whole campaign.
+At wave boundaries additionally: `lake lint`, `lake test`, and `scripts/run_audit.sh`. The audit
+harness invokes `scripts/check_report_citations.sh` itself; it can still be run separately for a
+fast documentation-only check.
 
-> **`run_audit.sh` rewrites `docs/snapshots/axiom-census.txt` as a side effect**, so it leaves the
-> tree dirty even on a pass. Inspect the delta before restoring: a *hygienic* change (the
-> auto-generated `bv_decide` `ax_N_M✝` index moving because a proof term changed) is not an axiom
-> change and no axiom entered or left a set. Restore via a scratchpad `cp` — `guardrails.sh` blocks
-> `git checkout --` — and land the refreshed snapshot once, at campaign end, not per wave.
+> A normal `run_audit.sh` is read-only for committed census snapshots and leaves a passing tree
+> unchanged. Use `scripts/run_audit.sh --update` only at campaign end, after committing every probe
+> input; the clean-tree stamp guard then rewrites the snapshots at the exact verified commit. Inspect
+> the update before committing: a changed generated `bv_decide` index can be hygienic even when no
+> axiom entered or left a set.
 
 ---
 

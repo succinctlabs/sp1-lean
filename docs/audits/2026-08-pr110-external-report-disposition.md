@@ -1,0 +1,179 @@
+# Disposition of Alex Hicks's PR #110 review (2026-08-19, rev 2)
+
+Alex Hicks sent the project a focused review of PR #110 on 2026-08-19: *"SP1's Core RISC-V AIR in
+Lean 4: Independent Analysis and Adversarial Audit"* (45 pp; revision 2, after its own adversarial
+review). The PDF is private correspondence and is intentionally not committed or redistributed.
+For reproducibility, the reviewed local artifact's SHA-256 is
+`4c7ca2b679d37018f7490b6b817ccf6ea1a3dbcdd009efeaaf73e4f2d877b679`. Its verdict was that the
+work is real, high-quality, and non-vacuous, with scope materially narrower than "a verification of
+SP1's Core RISC-V AIR" in four checkable ways. This document tracks every numbered finding, the
+confirmed observations, and the report's ranked recommendations to a concrete disposition. Statuses
+below describe the checked repository state, not the aspirational campaign wave in which a fix was
+scheduled.
+
+**Reviewed tree vs. this tree.** The report reviewed commit
+`eb6f44b9e09fa27cf66adca185dd91092081a8d4` on `dtumad/v1.0-release`. This branch contains later
+witness-generation, extraction-pin, grounding, completeness, and transport work. No moving commit
+count is copied here: git history is authoritative, and each row distinguishes what is actually
+closed from what remains conditional.
+
+Wave key: W0 hygiene/honesty · W1 satisfiability evidence · W2 export proved facts ·
+W3 StateBump/MemoryBump soundness · W4–W5 native witness assembly · W6 transport + obligations ·
+W7 final docs/census.
+
+## Findings
+
+| # | Severity | Finding | Disposition | Status |
+|---|---|---|---|---|
+| 1 | HIGH | Rust-faithfulness and Sail-soundness are never composed inside Lean (`Faithful/` is a dependency-graph leaf; 98/433 modules outside the capstone's import closure) | Accepted, with the **complete local ensemble transport now delivered under its named contracts**. `Faithful/Transport/Table.lean` lifts each whole-chip anchor; `Chips.lean` instantiates all 25; and `Extracted.lean` consumes the real exact execution relation. Given valid execution and memory-boundary cluster witnesses, a caller-supplied `CanonicalPreprocessedInventory`, and named preprocessing, memory-boundary, and public-limb transport contracts, `PreprocessedProviders.lean`, `MemoryBoundary.lean`, `SystemTables.lean`, and `ProviderSegment.lean` construct the redistributed 28-table provider tail. `CoreEnsemble.lean` then assembles exactly the native 53 tables plus verifier row and proves their complete local `Constraints`. The remediation audit caught a second interface bug before release: full exact-cluster Byte/Range/Program counts include system/public consumers absent from the native slice, so transport now recounts the actual Clean interaction ledger of the verifier, 25 instruction tables, MemoryInit/MemoryFinalize, and both bumps rather than copying those counts. The raw exact Byte/Range/Program assertion lists are empty. `CoreAIR.PreprocessedBinding` only records the named matrix/PCS-opening premise, to be discharged by ArkLib; it proves neither row-local semantics nor provider selection. `PreprocessedProviderContract` is the explicit caller premise for row-local semantics. Source main multiplicities are not reused, and neither premise implies projected-key uniqueness or native-demand coverage. The caller-supplied inventory selects carriers backed by their matching exact matrix/Range-width block, explicitly carries projected-key `Nodup`, and may omit zero-demand raw keys. The recount contract separately states nonzero Byte/Program-key coverage, skeleton nonpositivity, and `2 * count ≤ p`; `freshRowsByKey` is declarative/regression-only. PCS/program identity, State/Memory balance, and semantic boundary binding remain separate and explicit; no theorem jointly inhabits them with valid exact clusters. `CoreArtifact.lean` uses the recount contract to derive Byte (including Range) and Program integer balance; its global contract retains all-channel count bounds, State/Memory integer balance, and semantic binding. When supplied both, it composes the constructed witness through `supported_core_native_sound` to official Sail for any supplied model satisfying `UsesOrdinarySchedule`. The public Range13-quotient→native Range16 redistribution and raw `Global`→typed `Memory` lowering/cancellation also remain named. `CoreAIRRefinementObligations.executionCase` therefore remains open; its fourteen-field shape is unchanged. | **partial — local ensemble and honest provider recount composed; global exact refinement open** |
+| 2 | HIGH | StateBump omitted: shards capped at ~2²¹ rows / no 64 KiB pc-boundary crossing, and the strict clock-rank argument does not survive adding it | **Closed on the soundness side, open on witness generation.** The native 53-table ensemble now contains proved MemoryBump at physical position 51 and StateBump at 52. Canonicalized State rank makes StateBump edges semantic self-loops; refresh elimination incorporates active MemoryBump rows; and the pulled timestamp bound is derived from the produced side of Memory balance rather than assumed. Thus the native soundness theorem no longer has the reported shard-size/pc-window restriction. However `SupportedCoreTraceWitness` still accepts `stateBumpRows` and `memoryBumpRows` as semantic input-row lists whose `Spec`s are assumptions of `WellFormed`; `Table.build` constructs their physical rows, but no generator derives those inputs at crossings. Large-shard completeness is therefore not closed. | **partial — soundness closed, bump emission open** |
+| 3 | MED | Joint non-vacuity unwitnessed; the only end-to-end decode witness was deleted by the PR; no `Fact (2^25 < p)` instance exists | Closed. Restoring all 18 decode families exposed and fixed the missing `SailConfigured.misa_m` condition, and `Fact (2^25 < SP1Prime)` exists. `SP1CleanTest/Audit/ActiveTraceNonVacuity.lean` hand-assembles a semantic trace record for `JAL x0, 0`; both its instruction-event count and decoded physical instruction-row count are one, and matching native Byte/Range/Program/Memory provider occurrences close all four buses under a concrete semantic boundary. Native completeness circuit-generates its AIR rows, and `activeTrace_yields_localExecution` applies soundness to reach the official Sail relation for any supplied model satisfying `UsesOrdinarySchedule`. This is an active real-row anchor, not a verified/full generator. | **closed** |
+| 4 | MED | The capstone discards `TimedGrounding.walk`'s proved final-State truth and finalize-Memory truth | Fixed. `SupportedCoreGrounding` carries `finalStateTruth` and `memoryFinalizeTruth`, and the public `supported_core_native_grounding` theorem now returns the initial boundary facts together with the complete grounding record. `supported_core_native_sound` is a projection through that reusable endpoint, so downstream shard/exact/ArkLib consumers can retain the two truths without reopening the relation or reconstructing the walk. | **closed — publicly exported** |
+| 5 | MED | No faithfulness anchor for any provider/system table | Fixed at the correct redistributed boundary rather than by inventing false row-wise anchors. StateBump/MemoryBump retain their whole-table anchors. The raw exact Byte/Range/Program assertion lists are empty: `CoreAIR.PreprocessedBinding` only records the named matrix/PCS-opening premise, to be discharged by ArkLib, and proves neither row-local semantics nor a canonical provider selection. A caller-supplied `PreprocessedProviderContract` supplies the local semantics, and a caller-supplied `CanonicalPreprocessedInventory` selects demand-oriented carriers explicitly source-backed by the matching supplied matrix/Range-width block. From those premises `PreprocessedProviders.lean` builds six Byte providers, all 17 fixed Range providers for widths `0..16`, and Program; raw preprocessing alone does not construct this inventory. `MemoryBoundary.lean` constructs MemoryInit/Finalize from the separate exact boundary cluster, and `SystemTables.lean` supplies both bumps. `ProviderSegment.lean` proves the resulting 28 table components equal `sp1ProviderTables` in order, carry shared data, and satisfy all local constraints. Expanding the formerly incomplete Range family closes honest shift-row balance. Inventory projected-key `Nodup`, nonzero-demand coverage, nonpositivity, canonical capacity, PCS/program identity, State/Memory balance, semantic binding, and raw `.global`→typed-Memory lowering remain explicit under F1; zero-demand raw keys may be omitted. | **closed for local provider transport and recount shape; global contracts tracked by F1** |
+| 6 | MED | Upstream `RegisterAccessCols` derives `AlignedBorrow` without `#[repr(C)]` | Confirmed upstream layout defect, currently benign for the name-keyed paths used here but unsafe as a positional-layout contract. `docs/agents/upstream-drafts.md` contains a one-line draft and an optional derive-side guard. There is no patch on the extraction branch and no filed upstream issue/PR yet; describing the defect as “prepared on branch” was incorrect. | **open — draft only, upstream filing required** |
+| 7 | MED | KoalaBear-canonical literals inside field-generic system-table oracles (`Global`, `SyscallInstrs`; curve-seed constants in `PublicValues`) | The instruction oracles/readers and the native StateBump/MemoryBump anchors are literal-free, but the exact system/public-value relation includes KoalaBear-canonical constants. Disclosure alone is not a theorem-scope fix. Any capstone consuming those assertions must either be concrete at SP1's KoalaBear field or separate and prove an explicit literal-interpretation contract; a generic-`p` exact-system theorem would overstate the model. | **open — concrete-field capstone boundary required** |
+| 8 | MED | No CI re-derives either generated artifact | Accepted and implemented for extraction: `.github/workflows/extraction_regen.yml` (W0) re-runs `update_extracted.py` against the pinned SP1 branch weekly + on dispatch and fails on drift — scheduled, never PR-blocking, preserving the no-cargo-in-PR-CI stance. The Sail snapshot still has no regeneration CI (its toolchain-heavy regeneration remains manual); only its generation pins and config hash are PR-gated by `check_pins.sh`. | **partial — extraction CI delivered; Sail regeneration remains manual/open** |
+| 9 | MED | `SailCodeMemoryCompatible` (self-modifying code excluded by assumption) thin in user-facing docs | Accepted. Named with its consequence in `docs/overview.md` § Trust and assumptions (W0); already present in the verification report and the source. | **closed** |
+| 10 | LOW | The single RWX PMA region absent from the release-audit trust table | Accepted. The trust table gains a `SailConfigured` platform-state row (PMA window, PMP-off, MPRV/mseccfg/PMM, HTIF) and a two-key generated-config row; the stale "six platform-value sites" line corrected to the post-PMP-localization four (W0). | **closed** |
+| 11 | LOW | The faithfulness codec covers a codimension-1 slice of the native row space for 6 flag-hinted chips | No code fix. The W6 transport constructs native rows via `deconfigure`, which sets `is_real := flag-sum` by definition — the direction any stated theorem uses; an image-forcing lemma would matter only for a native→Rust direction over arbitrary native solutions, which nothing states. Rationale recorded in `SP1Clean/Faithful/Transport/Table.lean`'s module doc (§ "Why the codec's codimension-1 image needs no repair"): transport runs extracted → native and *constructs* through `deconfigure`, so the slice is where the construction lands, not a restriction; an image-forcing lemma would matter only for a native → Rust direction over arbitrary native solutions, which nothing states. | **closed** |
+| 12 | LOW | Several "native" constraint lists are token-for-token transcriptions of the generated lists (Addw/Subw/LtU own-asserts; DivRem own-assert tail) | Accepted as a framing correction: for those operations `ChipFaithful` is a pin-drift tripwire, not independent cross-validation (soundness content is unaffected — the semantic `Spec` is still proved from the list). The scope is disclosed in the verification report. | **closed — scope disclosed** |
+| 13 | LOW | `ChipFaithfulnessAnchor` did not bind a table to its own theorem (a mispaired anchor would type-check) | Fixed (W0): `FaithfulPropFor : CoreProfile.Table → Prop` dispatches each table to its exact `ChipFaithful` statement and the anchor's `proof` field is typed by it — a mispairing is now a type error. | **closed** |
+| 14 | LOW | Trace-generation conformance covered 10/25 chips, none memory/control-flow | **Already closed before the report was received**, by the witness-generation cutover (2026-08-17/18): conformance is now the dump-anchored pipeline — committed SP1 `generate_trace` dumps for all 25 chips, a fail-closed generation-time gate recomputing every event row cell-for-cell, a 25-chip Rust interpreter differential, and an inverted in-SP1-workspace check. Re-run in CI (`check_witgen_export.sh --regen`). Stale doc/CI wordings purged (W0). | **closed** |
+| 15 | LOW | Machine-level completeness absent; the previous partial scaffold was deleted | Partially fixed. `ToClean/Air/TableBuild.lean` and every `Complete.lean` module prove that circuit-generated rows satisfy local constraints. `supported_core_native_complete` assembles all native tables from a supplied `SupportedCoreTraceWitness` carrying `WellFormed`; `ProviderMultiplicitiesFit` (`2 * m ≤ p`, the canonical nonnegative centered encoding); exact centered-integer per-key `BalancedOn` with a separate interaction-count bound `< p`; public equality; and `SemanticBoundaryBinding`. The Bitwise/Lt/Addw/ShiftLeft/ShiftRight immediate-row and UType/JAL x0 caps are removed. `ActiveTraceNonVacuity.lean` hand-assembles one semantic JAL-x0 trace record whose event and decoded physical instruction-row counts are both one; completeness circuit-generates its physical AIR rows and soundness reaches Sail for any supplied model satisfying `UsesOrdinarySchedule`. This remains **generator-relative assembly completeness**, not semantic completeness: no theorem yet turns every supported Sail execution into such a trace, and large-shard StateBump/MemoryBump inputs are still supplied rather than derived at crossings. | **partial — active assembly proved; Sail→trace and bump generation open** |
+| 16 | LOW | Audit snapshots stamped off-branch; census count mismatch in the PR text | The harness is now hardened: a content-identical snapshot with a missing or non-ancestor commit stamp is a hard failure, and `--update` may repair it only from a clean committed tree. Numeric census claims have been removed from reader docs; the main/test split and total live in one mechanically checked ledger, and `check_pins.sh` also compares both raw snapshot entry counts to their generated probes. The restamp landed in `af6c8b11`: both raw snapshots carry `1ed4890b`, an ancestor of this branch's head, and their 757/65 entry counts match the generated probes exactly. The external PR body was corrected against this head in the same pass. Closing this out exposed a defect in the hardened gate itself: `git merge-base --is-ancestor` cannot tell *"the stamped commit is not an ancestor"* from *"this clone does not have it"*, and CI's default shallow checkout hit the second case — so the gate reported a provenance failure that was not real. The gate now checks object presence first and says which case it is, and the two jobs that run it check out full history. | **closed** |
+| 17 | LOW | mprotect-gated assertions outside the extraction, not gated in the pipeline | Accepted. `update_extracted.py` now runs `verify_no_mprotect` — the extraction fails if the constraint compiler's cargo feature resolution enables `mprotect` — so the profile exclusion is asserted, not incidental (W0). Disclosure already present in the verification report. | **closed** |
+| 18a | LOW | Documented extraction invocation failed on a second run (overlay `Cargo.lock` re-normalization) | **Already closed** by the E1a move from overlay+patches to the committed extraction branch (its lockfile is current-cargo); regeneration has since been re-run repeatedly byte-identically. | **closed** |
+| 18b | LOW | `Extracted.Interaction.toAccess`'s `.byte` arm ignored direction (hard-coded sink sign) — wrong for the system Byte/Range tables' receives | Fixed (W0): the byte arm now negates the direction sign uniformly (`signedVal (-(dir.sign mult))`) — byte-identical on every chip interaction (all sends), correct for provider receives; `toAccess_byte` restated at `.send` with a new `toAccess_byte_receive` twin. | **closed** |
+| 18c | LOW | Opcode→chip routing table hand-mirrored with no extracted tripwire | **Already closed** (2026-08 release-audit wave): `FormalModel/OpcodeTable.lean` + `opcodeTable_matchesExtracted` check the hand mirror against the extracted discriminant table; the routing enum was verified arm-by-arm by the report itself. | **closed** |
+| 18d | LOW | AGENTS.md "axiom-clean" slogan vs the capstone's Sail-extern footprint | The report's own §11 withdraws the documentation-defect claim (AGENTS.md discloses both the platform hooks and the `bv_decide` constants). Its surviving observation — the Prop-valued/data-valued split of the capstone's axiom set — is adopted into the verification report's trust-base framing. | **closed — framing adopted** |
+| 18e | LOW | Part of the ISA-equivalence chain lives in a third-party fork at an unmerged PR head (`riscv-lean`, opencompl PR #59) | Disclosed already (release-audit pin table names it; repoint-on-merge is the standing plan). No action beyond tracking. | **disclosed** |
+| 18f | LOW | A frozen, weaker capstone (`Soundness/GatedVm/`) remained in the tree and in the live capstone's import closure | Fixed (W0): the whole frozen Eulerian-path interface deleted — `GatedVm/` (3 files), `TargetVm.lean`, `AdvanceDispatch.lean`, the `Soundness/Decode.lean` walk half, the `SP1Ensemble.lean` legacy section, the `Walk.lean` legacy-name shims, and the legacy public-values scaffold. Live-path survivors: `Walk.lean`'s graph core, `RowEffectDefs.lean`'s interface, the decode hoists. | **closed** |
+| 18g | LOW | Cold-build cost (one generated Sail module >45 min / >7 GB) and no cached-olean distribution | Acknowledged; a known property of the generated model. No campaign action (CI caches oleans per-SHA; external reproducers bear the cost once). | **acknowledged** |
+| Gap 1 | MED | The bus idealisation: LogUp/GKR → exact balance is not reduced (PCS, Fiat–Shamir, fingerprint injectivity, length side-condition, digest identification) | Out of scope by design — the ArkLib layer (`FormalModel/Verifier.lean` seam). The report itself notes this gap is structural, common to every zkVM formalisation it knows, and correctly named here. | **out of scope — disclosed** |
+
+## Gaps the report tags outside the numbered findings (§7, §8)
+
+The findings table above tracks §10. The report *also* grades gaps inside its bus-layer and
+trust-boundary sections, without giving them finding numbers — so an auditor cross-referencing §7.3
+against this document would previously have found nothing. They are tracked here.
+
+| Report site | Gap | Disposition | Status |
+|---|---|---|---|
+| §7.3 | Program provider: structural bounds proved, **content assumed**. `ProgramProviderChip` range-checks only `op_a`, the three pc limbs, and `op_a_0`; `opcode`, `op_b`, `op_c`, `imm_b`, `imm_c` are pushed unchecked with a free multiplicity, so which instruction sits at which pc is not an AIR fact in this model. *DISCLOSED GAP [MEDIUM]* | Correct, and correctly shaped. This is what the `programProvider` boundary premise (`ProgramProviderBound`) exists to carry; discharging it needs the preprocessed-commitment obligation C1, which is the ArkLib layer, not something a row-local constraint can reach. No change. | **open — by design, carried as a named premise** |
+| §7.3 | **PublicValues absent**: SP1's Core cluster has a public-values AIR emitting ten byte range checks over the shard's timestamp and pc fields; the native `sp1StateVerifier` has `Spec := True` and emits none. Named as the direct cause of the `MemoryPullTimestampHighBound` premise. *UNDISCLOSED GAP [MEDIUM]* | Closed in W3 phase 0. The boundary row now emits fourteen byte-channel range-check pulls over the split init/final clock and pc limbs in SP1's real layout (`Soundness/SP1Ensemble.lean:79-103`), and `sp1StateVerifierProverAssumptions` is the limb-bound obligation rather than `True`. | **closed** |
+| §8.2 | `MemoryPullTimestampHighBound` — the twelfth premise: every pulled prior memory record has `clk_high < 2 ^ 24`. The report spells out the attack it prevents (a non-canonical `prev_high` inverting the ordering to read a stale value — a time-travel read). *DISCLOSED GAP [MEDIUM]* | Closed in W3. The bound is now *derived* from the produced side of the capstone's own per-location Memory balance; the identifier no longer exists anywhere in the tree, and `SupportedCoreNativeRelation` lost its third conjunct. | **closed — premise became a theorem** |
+
+### Consequence: the premise count is eleven, not twelve
+
+The report's §8.2 tabulates **twelve named premises** — eleven `InitialBoundaryFacts` fields plus the
+timestamp bound. With the timestamp bound derived, `InitialBoundaryFacts`
+(`Soundness/ProviderBindings.lean:286`) is the whole semantic boundary and has exactly **eleven**
+fields: `programWellFormed`, `programCommitted`, `initialPc`, `initialClock`, `romLoaded`,
+`configured`, `codeMemoryCompatible`, `programProvider`, `memoryProvider`, `memoryProviderUnique`,
+`memoryFinalizeProviderUnique`.
+
+Seven of the eleven follow from a configured initial state, a committed program, and a canonical
+`ProverData` choice. Four require real construction — `programProvider`, `memoryProvider`, and the
+two uniqueness fields — and the report is right that the uniqueness pair is the sharpest residual:
+Clean balance cannot force it, upstream's mechanism is the MemoryGlobal strictly-increasing-address
+chain that this ensemble deliberately omits, and the premise is stated per `locOf` (8-byte cell)
+while that chain orders exact byte addresses. That granularity gap is recorded on the definitions
+themselves (`ProviderBindings.lean:213-226`, `:233-236`).
+
+The live inventory of these definitions is `docs/audit-surface.md`, gated by
+`scripts/check_audit_surface.sh`.
+
+## Defects found during remediation (not in the report)
+
+Carrying all 25 chips through the W4 witness-assembly layer exercises each chip's
+`ProverAssumptions` against rows a real prover emits, which surfaced three completeness defects.
+The subsequent exact-transport audit found two more provider-interface defects before release.
+R1–R5 are fixed in source and do not weaken the active-row soundness argument. Their targeted
+proofs, the full main-library build, and `lake test` are clean, and the census restamp landed in
+`af6c8b11`.
+
+| # | Where | Defect | Consequence | Status |
+|---|---|---|---|---|
+| R1 | `AddressOperation.Assumptions`, inherited by all five load and four store chips | The non-reserved-address lower bound was ungated, so it also constrained padding rows | The lower bound is now guarded by `is_real = 1` in the operation contract and all nine chip contracts; active rows owe the same bound. `AddressOperation.assumptions_zero` proves the literal zero input satisfies the shared address subcontract. The event-level memory builders remain unpadded and a full-chip zero-row inhabitance battery is not claimed. | fixed at the address seam; full-chip padding construction remains |
+| R2 | `LoadByteChip.ProverAssumptions` | The old overall MSB equivalence contradicted LBU rows whose loaded byte is ≥ 128 | The contract is now branch-correct: LB alone ties `msb` to the selected byte's high bit, while LBU forces `msb = 0`. Completeness accepts both opcodes, and `highBitLbuEvent_proverAssumptions` exercises a concrete address-`0x10000` LBU loading `0xff`. | fixed; full build/test clean |
+| R3 | every provider circuit | The multiplicity was generated by a **constant** witness IR (`witnessField 1`), so local-witness honesty pinned a built row's multiplicity to exactly 1 | Multiplicity is now an explicit row input. Byte/Range/Program builders accept natural counts, so zero padding and aggregated counts are reachable; Memory init/finalize builders accept a `Bool`, retaining the shallow boolean gate needed by signed-memory balance. Machine completeness now adds `ProviderMultiplicitiesFit` (`2 * m ≤ p`) and defines `BalancedOn` by exact centered-integer per-key balance with a separate `< p` interaction-count bound, so aggregate rows are represented canonically and are no longer excluded by a `0/±1` ledger. The canonical-encoding work is carried inside `BalancedOn`'s centered-integer definition; `ProviderMultiplicitiesFit` is stated on the relation but not consumed by `supported_core_native_complete`'s proof, which only narrows the completeness statement. `SP1CleanTest/Audit/ProviderMultiplicity.lean` exercises `Table.build` itself and includes the integration regression: one circuit-built Byte provider push at `+7` closes against seven matching unit pulls in both the integer and Clean balance dialects. It also covers zero padding, Range/Program aggregate counts, and both Boolean Memory branches with constraint theorems. | fixed; aggregate-to-machine regression and full build/test clean |
+| R4 | `sp1ProviderTables` Range family | Only widths 8, 13, 14, and 16 had native Range receivers, while honest shift consumers emit other live widths | The provider suffix now contains one Range table for every width `0..16`, ordered at positions 31–47. Together with six Byte tables, Program, Memory init/final, and the two bumps, this makes 28 provider/system tables and a 53-table ensemble. Memory init/final are positions 49/50, MemoryBump 51, and StateBump 52. Honest shift-row Range requests now have a matching receiver. | fixed — native Range domain complete |
+| R5 | exact Byte/Range/Program provider transport | Copying multiplicities from the full exact 34-table cluster imported demand from system/public consumers that the native 53-table slice omits, so the reconstructed provider tail could not honestly balance its own consumers | Transport now recounts the actual Clean interaction ledger of the verifier, 25 transported instruction tables, MemoryInit/MemoryFinalize, and both bumps. The raw exact Byte/Range/Program assertion lists are empty. `CoreAIR.PreprocessedBinding` only records the named matrix/PCS-opening premise, to be discharged by ArkLib; it proves neither row-local semantics nor provider selection. `PreprocessedProviderContract` is the explicit caller premise for row-local semantics. Neither premise establishes projected-key uniqueness or constructs providers. A caller-supplied `CanonicalPreprocessedInventory` selects matching-block carriers explicitly source-backed by the supplied matrices, requires selected projected-key `Nodup`, and may omit zero-demand raw keys. The recount contract separately states nonzero Byte/Program-key coverage, nonpositive skeleton sums at selected keys, and `2 * count ≤ p`; `freshRowsByKey` is regression/declarative only. PCS/program identity, State and Memory balance, and `SemanticBoundaryBinding` remain explicit integration premises, as do the Range13-quotient→Range16 and raw-Global→typed-Memory transformations. | fixed recount architecture; global exact contract remains open under F1 |
+
+All five are tracked by label (R1–R5) in `docs/verification-report.md` § 12. The branch-wide
+build and test gates pass, and the census restamp landed in `af6c8b11`.
+
+## Scoped follow-up state
+
+These were explicit campaign scope decisions. The table records both work completed after the first
+disposition draft and the genuinely open follow-ups, so neither disappears into commit history.
+
+| Item | Wave | What was planned | Where it stands |
+|---|---|---|---|
+| Completeness-cap widening | W4 | Bitwise/Lt/Addw/ShiftLeft/ShiftRight to accept immediate rows (`imm_c ≠ 0`); UType and JAL to accept `rd = x0` | Delivered and full-build clean. The exact two-form ALU invariant and immediate-copy equations are carried by the prover contracts; UType and JAL have explicit x0-capable event boundaries. The active JAL-x0 audit exercises the widened control-flow path. |
+| Bump-row generation | W5 | The honest generator was to *derive* StateBump/MemoryBump inputs at clock/pc window crossings — exactly what makes shards above ~2²¹ rows witnessable | Not built. `SupportedCoreTraceWitness` carries `stateBumpRows`/`memoryBumpRows` as input-row lists whose only requirement is the chips' `Spec`; `Table.build` constructs their physical rows, but the completeness relation **assumes** those inputs rather than deriving them at crossings. Worth stating plainly: W3 lifted the shard cap on the *soundness* side, and the completeness side does not yet independently produce the bump inputs a large shard needs |
+| Restricted-name decision | W6 | Whether the syscall-free results may be published as `sp1_air_refinement`/`sp1_air_sound`, or must be `…_syscallFree` with the reservation kept | Open owner decision. Moot until `executionCase` closes, but recorded rather than decided silently |
+| `mainWidth` width-guard battery | W6 | A battery linking each chip's `mainWidth` to its column struct's size, once the transport states widths (the one live item from the report's §11.2) | Delivered. `instructionOracleMainWidth` computes each generated Rust oracle column structure's physical field count; `supportedInstructionMainWidths` kernel-checks all 25 tables against the independently extracted manifest `mainWidth` |
+
+## Confirmed observations (report §11.2)
+
+- **Three chips' `advance` never uses the chip Spec** (AluX0/LoadX0 expected; LoadDouble's semantic
+  content rides `advanceReady`) — no action; the report classifies the effect as none.
+- **Shift/Bitwise Specs omit the reader sub-Spec / is_real binarity clause** — resolved by
+  documentation (W2): the shape is deliberate — both facts are circuit-forced and derived where
+  consumed (the reader/time facts from channel-push `Requirements` at the trace level, binarity
+  from the flag-sum gate), and restating them would re-index every positional projection in the
+  advance/grounding consumers for no semantic gain. Recorded on `ShiftLeftChip.Spec`'s docstring
+  (`FormalModel/Contracts/Chips.lean`), covering ShiftRight and Bitwise (which already carries its
+  binarity conjunct).
+- **`EnsembleWitness` constrains neither row counts nor `Table.width`** — no action (the report:
+  truncation only restricts a prover; row counts come from the grounding).
+- **`IntoShape` skips mode-typed fields** — documented directly as the supervisor-mode extraction
+  profile in `docs/agents/extraction.md` and as a target-profile limitation in this repository's
+  verification report. This shape-selection trust seam is independent of F17's cargo-feature
+  `mprotect` gate.
+- **`mainWidth` not linked in Lean to the column struct's size** — now closed in Lean:
+  `instructionOracleMainWidth` computes the generated column-structure sizes and
+  `supportedInstructionMainWidths` proves all 25 equal the independently extracted manifest widths.
+- **The extractor inertness message exempted shape/IR code** — fixed as a reporting and trust-surface
+  defect. `verify_extraction_branch_delta` now distinguishes the 26 line-checked machine AIR files
+  from pinned trusted extractor/`IntoShape`/IR/compiler tooling and explicitly says the latter is
+  *not* proved semantically inert. The verification report no longer claims all exporter changes
+  happen after `air.eval`.
+- **Misaligned accesses made unsatisfiable rather than trapping** — standing scope property of the
+  chip Specs; disclosed in the verification report's coverage section.
+
+## The report's ranked "what would most increase assurance" (§12.3) → campaign waves
+
+1. Compose the two halves in Lean → **W6, partially delivered at the honest boundary**: the real
+   exact execution and memory-boundary rows, plus named preprocessing/boundary/public-limb contracts,
+   now construct the complete local native ensemble and reach Sail for any supplied ordinary-schedule
+   model under caller-supplied recount and `ExactNativeGlobalContract` premises. The remediation audit
+   closed the native Range-domain hole and replaced cross-universe exact-count copying with a
+   native-consumer recount plus a visible, caller-supplied `CanonicalPreprocessedInventory`.
+   Constructing/authenticating its matching-block source-backed carriers and projected-key `Nodup`,
+   then proving nonzero-demand coverage, consumer nonpositivity, canonical capacity, PCS/program identity,
+   State/Memory balance, the explicit loader/platform/code-memory/memory-boundary/handler premises
+   needed by `SemanticBoundaryBinding`, and joint inhabitance with valid exact clusters remain open
+   (F1).
+2. Restore an end-to-end decode witness → **closed**: 18/18 decode families plus the hand-assembled,
+   balanced JAL-x0 semantic trace whose circuit-generated physical instruction-row count is one (F3).
+3. Export the facts already proved → **closed**: `supported_core_native_grounding` publicly returns
+   the boundary facts and complete grounding record, retaining final-State and finalize-Memory truth
+   (F4).
+4. Extend trace conformance to the 15 uncovered chips → **already closed** (witgen cutover).
+5. State the Sail configuration deviations in one auditable place, PMA included → **closed in W0**
+   (release-audit trust table).
+
+## Not adopted
+
+- **Reverting the native providers to upstream's preprocessed-table shape** (implicit in a maximal
+  reading of Finding 5): the in-circuit re-proof of Byte/Range content is strictly stronger than a
+  trusted preprocessed table, as the report's §7.3 itself concludes. The delivered constructive
+  redistribution proves the correspondence under the explicit source-backed inventory and recount
+  contracts without changing the native proof-oriented shape (F5).
+- **Building the Global/Syscall*/MemoryGlobal* cluster natively**: `docs/roadmap.md` (2026-08-19)
+  records that SP1's internal line has replaced that cluster with a Merkle-tree architecture; the
+  campaign targets the drift-stable core (owner decision, 2026-08-20) and keeps the exact lists in
+  the list-level model with the memory-boundary premises named rather than derived from tables
+  upstream has already dropped.

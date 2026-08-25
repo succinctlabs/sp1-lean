@@ -1,7 +1,7 @@
 import Clean.Circuit.Basic
 import Clean.Utils.Field
 import Mathlib.Tactic.LinearCombination
-import SP1Clean.Math.GetElemFastPath
+import ToClean.Tactic.GetElemFastPath
 
 /-! # Minimal numeric foundations
 

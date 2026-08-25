@@ -1,0 +1,60 @@
+# F8 (external PR110 report): independently re-derive the generated `SP1Clean/Extracted/` layer
+# from the pinned SP1 extraction branch and fail on any drift from the committed tree.
+#
+# Deliberately a SCHEDULED job, never PR-blocking: the repo's PR CI runs no cargo (rust/README.md);
+# this workflow is the standing cross-check that the committed artifacts are exactly what the pin
+# generates. The Sail snapshot half of F8 stays manual (regeneration needs the sail toolchain);
+# its pins and config hash are gated on every PR by scripts/check_pins.sh instead.
+name: extraction-regen
+
+on:
+  schedule:
+    - cron: "17 5 * * 1" # weekly, Monday 05:17 UTC
+  workflow_dispatch:
+
+jobs:
+  regen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout sp1-lean
+        uses: actions/checkout@v4
+
+      - name: Read the extraction pin
+        id: pin
+        run: |
+          PIN=$(python3 - <<'EOF'
+          import re
+          src = open("update_extracted.py").read()
+          print(re.search(r'SP1_PINNED_COMMIT = "([0-9a-f]{40})"', src).group(1))
+          EOF
+          )
+          echo "sha=$PIN" >> "$GITHUB_OUTPUT"
+          echo "extraction pin: $PIN"
+
+      - name: Checkout SP1 at the pin
+        run: |
+          git clone --filter=blob:none https://github.com/succinctlabs/sp1.git ../sp1
+          git -C ../sp1 fetch origin ${{ steps.pin.outputs.sha }}
+          git -C ../sp1 checkout --detach ${{ steps.pin.outputs.sha }}
+
+      - name: Rust toolchain (sp1's own rust-toolchain file applies)
+        run: rustup show
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "../sp1"
+          key: extraction-${{ steps.pin.outputs.sha }}
+
+      - name: Regenerate SP1Clean/Extracted/
+        run: SP1_DIR=../sp1 python3 update_extracted.py
+
+      - name: Committed tree matches the regeneration
+        run: |
+          git diff --exit-code -- SP1Clean/Extracted/
+          UNTRACKED=$(git status --porcelain -- SP1Clean/Extracted/)
+          if [ -n "$UNTRACKED" ]; then
+            echo "regeneration produced files not in the committed tree:"; echo "$UNTRACKED"; exit 1
+          fi
+          echo "PASS: SP1Clean/Extracted/ is byte-identical to a fresh regeneration at the pin"

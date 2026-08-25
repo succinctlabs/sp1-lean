@@ -68,8 +68,8 @@ structure ChipKind (p : ℕ) [Fact p.Prime] [Fact (2 ^ 17 < p)] where
   refining this row (`SailConfigured`, ROM loaded, the committed pc, and the operand-value bound) with the
   program-bus decode (`decodedInROM`) and the chip's `advanceReady` bundle, one real Sail `try_step`
   produces the row's committed `RowEffect` (the PC write + the `op_a` register write + ROM/config
-  preservation). This is `TargetObligations.lift` restricted to one chip's rows; the dispatcher
-  (`chipRows_advance_sound`) assembles the per-chip `advance`s into the whole-trace `lift`. `Option (PLift …)`
+  preservation). The grounding engine fires it at every real decoded row (`RowWiring.advance_at` →
+  `stepFact_of_advance`, `Soundness/GroundingAdapter.lean`). `Option (PLift …)`
   retained from the incremental migration. Every member of the current 25-chip registry is `some`, proved
   by `allChipKinds_migrated`; there is no fallback semantic path. `PLift` lifts the obligation `Prop` into
   a `Type` that `Option` accepts. -/

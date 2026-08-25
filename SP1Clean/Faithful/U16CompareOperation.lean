@@ -4,7 +4,7 @@ import SP1Clean.Native.Operations.U16CompareOperation.RawSpec
 import SP1Clean.Native.Operations.U16CompareOperation.Defs
 import SP1Clean.Model.SP1Constraint
 import SP1Clean.Model.InteractionProjection
-import SP1Clean.Model.InteractionRecovery
+import ToClean.Circuit.InteractionRecovery
 import SP1Clean.Faithful.ExtractedInteractionModel
 import SP1Clean.Extracted.U16CompareOperation
 import SP1Clean.Faithful.ChipTactics
@@ -80,7 +80,7 @@ theorem u16compare_assertions_exact
     ProvableType.eval_field]
 
 open SP1Clean.Channels (byteChannel)
-open SP1Clean.InteractionRecovery
+open InteractionRecovery
 
 /-- **Faithfulness anchor — interaction half, SYNTACTIC.** SP1's extracted `U16CompareOperation.interactions`
 and the Clean circuit's emitted byte interaction project to the **same** `LookupAccess` — the single

@@ -14,13 +14,14 @@
 # with SAIL_GEN_DIR). Generation takes ~10 minutes after the one-time --deps (~20-40 minutes).
 #
 # Pins — the provenance record. Verified 2026-08-06: a --stock run under these pins reproduces
-# opencompl 11d8fa21 byte-identically, and --sp1 differs from it in exactly the six platform-value
-# sites. Update all four together when re-pinning, and re-run both verifications.
+# opencompl 11d8fa21 byte-identically, and --sp1 differs from it in exactly four generated
+# platform-value sites controlled by two config keys. Update all four pins together when re-pinning,
+# and re-run both verifications.
 SAIL_SHA=41694abd58b27b687af5db275810dfeb8a88cfc0        # rems-project/sail, branch sail2
 SAIL_RISCV_SHA=61266bd4dede6c7dd6e903e52dc80bcbf644b1b8  # riscv/sail-riscv, master
 OCAML_VERSION=5.2.1                                       # the opencompl nightly's version
 BASE_SNAPSHOT=11d8fa212a60c05dcc9fe5db925dd4d06dad65b5    # opencompl/sail-riscv-lean main
-SP1_SNAPSHOT=df1acf579f8daf97c4dc3248565dec5a123079ef     # succinctlabs branch sp1/config-generated-4.32.2
+SP1_SNAPSHOT=befc6976ef53c592b637dc897f61b4e71467c239     # succinctlabs branch sp1/config-generated-4.32.2
 
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -116,8 +117,9 @@ diff_against() { # rev label
 if [ "$MODE" = --stock ]; then
   diff_against "$BASE_SNAPSHOT" "opencompl base" || verdict=1
 else
-  # Six value sites vs the base are EXPECTED; identity vs the published SP1 snapshot is the gate.
-  diff_against "$BASE_SNAPSHOT" "opencompl base (six value sites expected)" || true
+  # Four generated value sites vs the base are EXPECTED; identity vs the published SP1 snapshot
+  # is the gate.
+  diff_against "$BASE_SNAPSHOT" "opencompl base (four value sites expected)" || true
   diff_against "$SP1_SNAPSHOT" "published SP1 snapshot" || verdict=1
 fi
 echo "config sha256: $H1"

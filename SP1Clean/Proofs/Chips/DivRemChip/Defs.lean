@@ -5,6 +5,8 @@ import SP1Clean.Proofs.Operations.DivRemOperation.Core
 import SP1Clean.Native.Operations.DivRemOperation.OwnAsserts
 import SP1Clean.Native.Operations.DivRemOperation.AssertZeros
 import SP1Clean.Proofs.Chips.DivRemChip.Populate
+import SP1Clean.Proofs.Chips.DivRemChip.Populate.FE
+import ToClean.Circuit.WitnessCombinator
 import SP1Clean.Native.Readers.CPUState
 import SP1Clean.Native.Readers.RTypeReader
 import SP1Clean.Native.Readers.RegisterWrite
@@ -68,7 +70,8 @@ def ProverAssumptions (input : Inputs (ZMod p)) (_data : ProverData (ZMod p))
   (input.is_real = 0 ∨ input.is_real = 1) ∧
   (f[0] = 0 ∨ f[0] = 1) ∧ (f[1] = 0 ∨ f[1] = 1) ∧ (f[2] = 0 ∨ f[2] = 1) ∧ (f[3] = 0 ∨ f[3] = 1) ∧
   (f[4] = 0 ∨ f[4] = 1) ∧ (f[5] = 0 ∨ f[5] = 1) ∧ (f[6] = 0 ∨ f[6] = 1) ∧ (f[7] = 0 ∨ f[7] = 1) ∧
-  f[0] + f[1] + f[2] + f[3] + f[4] + f[5] + f[6] + f[7] = 1 ∧
+  -- (the one-hot sum `Σ f = 1` used to be assumed here; since `is_divu` became a derived slot it is
+  -- an identity, `Populate.hintFlags_sum_eq_one`, so assuming it would only weaken this contract)
   (input.is_real = 0 →
     input.op_b_val = #v[0, 0, 0, 0] ∧ input.op_c_val = #v[1, 0, 0, 0] ∧
     f = #v[0, 1, 0, 0, 0, 0, 0, 0]) ∧
@@ -116,130 +119,70 @@ def populateRow (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (Z
   let cpv := input.adapter.op_c_memory.prev_value
   -- The honest variant flags from the `"div_rem_flags"` `ProverHint` (one-hot on real rows;
   -- the key's absence defaults to the `is_divu = 1` padding template — `Populate.hintFlags`).
-  let flags ← witnessVectorNative 8 (fun env => hintFlags env.hint)
+  let flags ← witnessVectorIR 8 (.ofFExprs flagsFE)
   let is_div := flags[0]; let is_divu := flags[1]; let is_rem := flags[2]; let is_remu := flags[3]
   let is_divw := flags[4]; let is_remw := flags[5]; let is_divuw := flags[6]; let is_remuw := flags[7]
-  let quotient_comp ← witnessVectorNative 4 (fun env =>
-    populateQuotComp #v[env bpv[0], env bpv[1], env bpv[2], env bpv[3]]
-      #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint))
-  let a ← witnessVectorNative 4 (fun env =>
-    populateA #v[env bpv[0], env bpv[1], env bpv[2], env bpv[3]]
-      #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint))
+  let quotient_comp ← witnessVectorIR 4 (.ofFExprs (quotCompFE bpv cpv))
+  let a ← witnessVectorIR 4 (.ofFExprs (aFE bpv cpv))
   -- The arithmetic **operands** `b`/`c` — committed columns distinct from the raw register reads
   -- (`adapter.op_b/c_memory.prev_value`). The chip's own-asserts E20–E47 tie them to the reads: equal to the
   -- read for the 64-bit variants, the sign/zero-extension of the low 32 bits for the W-variants (`b[i] =
   -- read[i]·(1-isword) + b_neg·isword·0xFFFF`). Witnessed here (before the `MulOperation`s, which multiply by
   -- `c`); populated honestly (`bComp`/`cComp` compute the flag-dependent extension). Soundness does not
   -- depend on the populate value (E20–E47 pin the columns).
-  let b ← witnessVectorNative 4 (fun env =>
-    bComp #v[env bpv[0], env bpv[1], env bpv[2], env bpv[3]] (hintFlags env.hint))
-  let c ← witnessVectorNative 4 (fun env =>
-    cComp #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint))
+  let b ← witnessVectorIR 4 (.ofFExprs (compF bpv))
+  let c ← witnessVectorIR 4 (.ofFExprs (compF cpv))
   -- (1,2) The two `c_times_quotient` product structs of `quotient_comp × c`, witnessed via the
   -- gated populates (`mul_lower` on real rows only; `mul_upper` only on the 64-bit variants —
   -- SP1's word rows and padding leave them all-zero). Their `MulOperation` product constraints
   -- (and the limb glue tying them to `c_times_quotient`) are asserted by `DivRemCore.circuit`
   -- over the assembled row below.
-  let mul_lower ← witnessNative (var := Var Extracted.MulOperation) (fun env =>
-    populateMulLower (env input.is_real)
-      #v[env bpv[0], env bpv[1], env bpv[2], env bpv[3]]
-      #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint))
-  let mul_upper ← witnessNative (var := Var Extracted.MulOperation) (fun env =>
-    populateMulUpper (env input.is_real)
-      #v[env bpv[0], env bpv[1], env bpv[2], env bpv[3]]
-      #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint))
+  let mul_lower ← witness (var := Var Extracted.MulOperation)
+    (mulLowerFE input.is_real bpv cpv)
+  let mul_upper ← witness (var := Var Extracted.MulOperation)
+    (mulUpperFE input.is_real bpv cpv)
   -- Witnessed scalar sign/gate columns + the `c_times_quotient`/`carry` u16-limb vectors, all
   -- honestly populated (`populateScal`/`populateCtq`/`populateCarry`); the own-asserts
   -- `E13/E15/…` and the carry chain `E121…E151` pin them.
-  let scal ← witnessVectorNative 7 (fun env =>
-    populateScal (env input.is_real)
-      #v[env bpv[0], env bpv[1], env bpv[2], env bpv[3]]
-      #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint))
+  let scal ← witnessVectorIR 7 (.ofFExprs (scalFE input.is_real bpv cpv))
   let is_overflow := scal[0]; let b_neg := scal[1]; let b_neg_not_overflow := scal[2]
   let b_not_neg_not_overflow := scal[3]; let is_real_not_word := scal[4]
   let rem_neg := scal[5]; let c_neg := scal[6]
-  let c_times_quotient ← witnessVectorNative 8 (fun env =>
-    populateCtq #v[env bpv[0], env bpv[1], env bpv[2], env bpv[3]]
-      #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint))
-  let carry ← witnessVectorNative 8 (fun env =>
-    populateCarry #v[env bpv[0], env bpv[1], env bpv[2], env bpv[3]]
-      #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint))
+  let c_times_quotient ← witnessVectorIR 8 (.ofFExprs (ctqFE bpv cpv))
+  let carry ← witnessVectorIR 8 (.ofFExprs (carryFE bpv cpv))
   -- The `IsEqualWordOperation`/`IsZeroWordOperation` nested cols, witnessed flat via
   -- `fromElements (F := …)`; their overflow/divide-by-zero assertions live in
   -- `DivRemCompare.circuit` below.
-  let w_ovb ← witnessVectorNative 11 (fun env =>
-    (ProvableType.toElements (ovbWitness (env input.is_real)
-      #v[env bpv[0], env bpv[1], env bpv[2], env bpv[3]] (hintFlags env.hint))).cast
-        (show size Extracted.IsEqualWordOperation = 11 from rfl))
-  let w_ovc ← witnessVectorNative 11 (fun env =>
-    (ProvableType.toElements (ovcWitness (env input.is_real)
-      #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint))).cast
-        (show size Extracted.IsEqualWordOperation = 11 from rfl))
-  let w_is_c_0 ← witnessVectorNative 11 (fun env =>
-    (ProvableType.toElements (isC0Witness
-      #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint))).cast
-        (show size Extracted.IsZeroWordOperation = 11 from rfl))
+  let w_ovb ← witnessVectorIR 11 (.ofFExprs ((toElements (ovbFE input.is_real bpv)).cast
+    (show size Extracted.IsEqualWordOperation = 11 from rfl)))
+  let w_ovc ← witnessVectorIR 11 (.ofFExprs ((toElements (ovcFE input.is_real cpv)).cast
+    (show size Extracted.IsEqualWordOperation = 11 from rfl)))
+  let w_is_c_0 ← witnessVectorIR 11 (.ofFExprs (isC0FE cpv))
   -- The negation/comparison witness columns (`|c|`, `|remainder|`, `max(|c|,1)`, the two
   -- `AddOperation` nested cols, the `LtOperationUnsigned` comparison columns) via `populate_*`;
   -- the `AddOperation`×2 / `LtOperationUnsigned` assertions live in `DivRemCompare.circuit` below.
-  let abs_c ← witnessVectorNative 4 (fun env =>
-    populateAbsC #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint))
-  let abs_remainder ← witnessVectorNative 4 (fun env =>
-    populateAbsRem #v[env bpv[0], env bpv[1], env bpv[2], env bpv[3]]
-      #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint))
-  let remainder_comp ← witnessVectorNative 4 (fun env =>
-    populateRemComp #v[env bpv[0], env bpv[1], env bpv[2], env bpv[3]]
-      #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint))
-  let max_abs_c_or_1 ← witnessVectorNative 4 (fun env =>
-    populateMaxAbsCOr1 #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint))
-  let w_cneg ← witnessVectorNative 4 (fun env =>
-    wCnegWitness (env input.is_real)
-      #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint))
-  let w_rneg ← witnessVectorNative 4 (fun env =>
-    wRnegWitness (env input.is_real)
-      #v[env bpv[0], env bpv[1], env bpv[2], env bpv[3]]
-      #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint))
-  let misc ← witnessVectorNative 3 (fun env =>
-    populateMisc (env input.is_real)
-      #v[env bpv[0], env bpv[1], env bpv[2], env bpv[3]]
-      #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint))
+  let abs_c ← witnessVectorIR 4 (.ofFExprs (absCFE cpv))
+  let abs_remainder ← witnessVectorIR 4 (.ofFExprs (absRemFE bpv cpv))
+  let remainder_comp ← witnessVectorIR 4 (.ofFExprs (remCompFE bpv cpv))
+  let max_abs_c_or_1 ← witnessVectorIR 4 (.ofFExprs (maxAbsFE cpv))
+  let w_cneg ← witnessVectorIR 4 (.ofFExprs (wCnegFE input.is_real cpv))
+  let w_rneg ← witnessVectorIR 4 (.ofFExprs (wRnegFE input.is_real bpv cpv))
+  let misc ← witnessVectorIR 3 (.ofFExprs (miscFE input.is_real bpv cpv))
   let abs_c_alu_event := misc[0]; let abs_rem_alu_event := misc[1]
   let remainder_check_multiplicity := misc[2]
-  let cl ← witnessVectorNative 2 (fun env =>
-    ltClWitness (env input.is_real)
-      #v[env bpv[0], env bpv[1], env bpv[2], env bpv[3]]
-      #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint))
-  let f ← witnessVectorNative 4 (fun env =>
-    ltFlagsWitness (env input.is_real)
-      #v[env bpv[0], env bpv[1], env bpv[2], env bpv[3]]
-      #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint))
-  let not_eq_inv ← witnessVectorNative 1 (fun env =>
-    ltNotEqInvWitness (env input.is_real)
-      #v[env bpv[0], env bpv[1], env bpv[2], env bpv[3]]
-      #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint))
-  let bit ← witnessVectorNative 1 (fun env =>
-    ltBitWitness (env input.is_real)
-      #v[env bpv[0], env bpv[1], env bpv[2], env bpv[3]]
-      #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint))
+  let cl ← witnessVectorIR 2 (.ofFExprs (clFE input.is_real bpv cpv))
+  let f ← witnessVectorIR 4 (.ofFExprs (ltfFE input.is_real bpv cpv))
+  let not_eq_inv ← witnessVectorIR 1 (.ofFExprs (neiFE input.is_real bpv cpv))
+  let bit ← witnessVectorIR 1 (.ofFExprs (bitFE input.is_real bpv cpv))
   let lt_out : Var Extracted.LtOperationUnsigned (ZMod p) := ⟨⟨bit[0]⟩, f, not_eq_inv[0], cl⟩
   -- The remainder/quotient result words and the four `U16MSBOperation` sign-bit cells; the seven
   -- MSB assertions live in `DivRemCompare.circuit` below.
-  let remainder ← witnessVectorNative 4 (fun env =>
-    populateRemainder #v[env bpv[0], env bpv[1], env bpv[2], env bpv[3]]
-      #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint))
-  let quotient ← witnessVectorNative 4 (fun env =>
-    populateQuotient #v[env bpv[0], env bpv[1], env bpv[2], env bpv[3]]
-      #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint))
-  let w_bmsb ← witnessVectorNative 1 (fun env =>
-    #v[bMsbCell #v[env bpv[0], env bpv[1], env bpv[2], env bpv[3]] (hintFlags env.hint)])
-  let w_cmsb ← witnessVectorNative 1 (fun env =>
-    #v[cMsbCell #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint)])
-  let w_remmsb ← witnessVectorNative 1 (fun env =>
-    #v[remMsbCell #v[env bpv[0], env bpv[1], env bpv[2], env bpv[3]]
-      #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint)])
-  let w_quotmsb ← witnessVectorNative 1 (fun env =>
-    #v[quotMsbCell #v[env bpv[0], env bpv[1], env bpv[2], env bpv[3]]
-      #v[env cpv[0], env cpv[1], env cpv[2], env cpv[3]] (hintFlags env.hint)])
+  let remainder ← witnessVectorIR 4 (.ofFExprs (remFE bpv cpv))
+  let quotient ← witnessVectorIR 4 (.ofFExprs (quotFE bpv cpv))
+  let w_bmsb ← witnessVectorIR 1 (.ofFExprs #v[bMsbFE bpv])
+  let w_cmsb ← witnessVectorIR 1 (.ofFExprs #v[cMsbFE cpv])
+  let w_remmsb ← witnessVectorIR 1 (.ofFExprs #v[remMsbFE bpv cpv])
+  let w_quotmsb ← witnessVectorIR 1 (.ofFExprs #v[quotMsbFE bpv cpv])
   return ⟨input.state, input.adapter, a, b, c,
     quotient, quotient_comp, remainder_comp, remainder, abs_remainder, abs_c,
     max_abs_c_or_1, c_times_quotient, mul_lower, mul_upper, ⟨w_cneg⟩, ⟨w_rneg⟩, lt_out,
@@ -1063,13 +1006,12 @@ theorem eval_populatedRowAt_remNeg (env : ProverEnvironment (ZMod p))
 
 end
 
+omit [Fact (2 ^ 24 < p)] in
 /-- `populatedRowAt` is exactly the output layout of the witness-only prefix. The proof is kept
 opaque so consumers rewrite one small theorem constant instead of reducing the populate program. -/
 theorem populateRow_output_eq (input : Var Inputs (ZMod p)) (offset : ℕ) :
     (populateRow input).output offset = populatedRowAt input offset := by
-  simp only [populateRow, populatedRowAt, Circuit.output, Circuit.bind_def, Circuit.pure_def,
-    witnessVectorNative, CircuitNormalization.witnessNative_apply_eq, Operations.localLength,
-    Nat.add_zero, show size Extracted.MulOperation = 45 from rfl]
+  simp only [circuit_norm, populateRow, populatedRowAt]
 
 /-- The constraint-only suffix of `main`. Its five calls are the public proof boundaries of the
 chip: the two readers, the comparison cluster, the arithmetic core, and the destination write. -/

@@ -4,7 +4,7 @@ import SP1Clean.Native.Operations.IsEqualWordOperation.RawSpec
 import SP1Clean.Native.Operations.IsEqualWordOperation.Defs
 import SP1Clean.Model.SP1Constraint
 import SP1Clean.Model.InteractionProjection
-import SP1Clean.Model.InteractionRecovery
+import ToClean.Circuit.InteractionRecovery
 import SP1Clean.Faithful.ExtractedInteractionModel
 import SP1Clean.Extracted.IsEqualWordOperation
 import SP1Clean.Faithful.IsZeroWordOperation
@@ -123,7 +123,7 @@ theorem isEqualWord_assertions_exact
   simp only [eval_sub, Expression.eval]
 
 open SP1Clean.Channels (byteChannel)
-open SP1Clean.InteractionRecovery
+open InteractionRecovery
 
 omit [Fact (2 ^ 17 < p)] in
 /-- **Faithfulness anchor — interaction half, SYNTACTIC.** `IsEqualWordOperation` composes one

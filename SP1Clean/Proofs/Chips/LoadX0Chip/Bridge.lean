@@ -62,7 +62,7 @@ private lemma persist_nextPC (rs1_idx : BitVec 5) (reg_val pc : BitVec 64)
   have hsp_init : SailState.isInitialized sp :=
     SailState.isInitialized_insert s hs Register.nextPC (pc + 4#64)
   refine ⟨hsp_init, ?_, ?_, rfl⟩
-  · obtain ⟨hcp, hmprv, hmsec, hmsecpmm, hhtif, hpma⟩ := hconfig
+  · obtain ⟨hcp, hmprv, hmsec, hmsecpmm, hhtif, hpma, hpmp⟩ := hconfig
     have key : ∀ (reg : Register) (h : reg ∈ s.regs) (h' : reg ∈ sp.regs),
         reg ≠ Register.nextPC → sp.regs.get reg h' = s.regs.get reg h := by
       intro reg h h' hne
@@ -74,7 +74,8 @@ private lemma persist_nextPC (rs1_idx : BitVec 5) (reg_val pc : BitVec 64)
         h_mseccfg_disabled := by rwa [key _ (hs _) (hsp_init _) (by decide)]
         h_mseccfg_pmm := by rwa [key _ (hs _) (hsp_init _) (by decide)]
         h_htif_disabled := by rwa [key _ (hs _) (hsp_init _) (by decide)]
-        h_pma_regions := by rwa [key _ (hs _) (hsp_init _) (by decide)] }
+        h_pma_regions := by rwa [key _ (hs _) (hsp_init _) (by decide)]
+        h_pmp_off := by rwa [key _ (hs _) (hsp_init _) (by decide)] }
   · rwa [SailState.get_reg?_insert_nextPC]
 
 /-! ## The four width-core lemmas

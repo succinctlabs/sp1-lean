@@ -3,7 +3,7 @@ import SP1Clean.Extracted.ChipOracle.Bitwise
 import SP1Clean.Faithful.CPUState
 import SP1Clean.Faithful.ALUTypeReader
 import SP1Clean.Proofs.Chips.BitwiseChip.Formal
-import SP1Clean.Model.InteractionRecovery
+import ToClean.Circuit.InteractionRecovery
 
 /-! # Whole-chip faithfulness — native Bitwise row ↔ pinned SP1 Rust AIR
 

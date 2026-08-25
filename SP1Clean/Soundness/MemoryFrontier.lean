@@ -319,16 +319,27 @@ theorem memoryFrontierBalance (witness : EnsembleWitness (sp1Ensemble (p := p)))
         decoded.producedMemoryMessages witness.data = [] ∧
           decoded.consumedMemoryMessages witness.data = [])
     (loc : MemLoc) :
-    optMS (memoryInitFrontier witness loc) + pushesAt (memoryFrontierRows witness) loc =
-      optMS (memoryFinalizeFrontier witness loc) + pullsAt (memoryFrontierRows witness) loc := by
+    optMS (memoryInitFrontier witness loc) + pushesAt (memoryFrontierRows witness) loc +
+        Multiset.filter (fun m => Semantics.MemoryMsg.locOf m = loc)
+          (↑(producedMessages (typedTableInteractionsWith (memoryBumpTable witness)
+            memoryChannel))) =
+      optMS (memoryFinalizeFrontier witness loc) + pullsAt (memoryFrontierRows witness) loc +
+        Multiset.filter (fun m => Semantics.MemoryMsg.locOf m = loc)
+          (↑(consumedMessages (typedTableInteractionsWith (memoryBumpTable witness)
+            memoryChannel))) := by
   have hbal := realDecodedMemory_perlocBalance witness balanced memBinary loc
   simp only [filter_coe_append, initPure, finPure, Multiset.coe_nil, Multiset.filter_zero,
-    add_zero, zero_add] at hbal
+    zero_add] at hbal
   rw [optMS_memoryInitFrontier witness initUnique,
     optMS_memoryFinalizeFrontier witness finalizeUnique,
     pushesAt_memoryFrontierRows witness paddingEmpty,
-    pullsAt_memoryFrontierRows witness paddingEmpty,
-    add_comm, hbal, add_comm]
+    pullsAt_memoryFrontierRows witness paddingEmpty]
+  classical
+  apply Multiset.ext.mpr
+  intro m
+  have hc := congrArg (Multiset.count m) hbal
+  simp only [Multiset.count_add] at hc ⊢
+  omega
 
 /-! ## The genesis `LiveOK` invariant -/
 

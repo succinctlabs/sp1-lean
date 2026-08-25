@@ -1,6 +1,6 @@
 import SP1Clean.Math.Word
 import SP1Clean.Model.Channels
-import SP1Clean.Model.InteractionRecovery
+import ToClean.Circuit.InteractionRecovery
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit
 import Clean.Circuit.Channel

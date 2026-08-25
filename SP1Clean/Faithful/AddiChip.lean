@@ -386,7 +386,7 @@ theorem addiChip_constraints_constructive
       assignment.environment addiChip_lookups_empty).symm
 
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
-open SP1Clean.InteractionRecovery
+open InteractionRecovery
 
 set_option linter.unusedSimpArgs false in
 private theorem addicols_state_interactions_faithful_syntactic

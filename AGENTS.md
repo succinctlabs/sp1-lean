@@ -34,12 +34,13 @@ This project is **independent** of `sp1-lean`. It does **not** import `SP1Founda
 theorem must be proof-complete: no `sorryAx`. Pure chip/AIR proofs should normally show only
 `[propext, Classical.choice, Quot.sound]`; selected `bv_decide` lemmas and the generated Sail target's
 platform hooks are separately disclosed by the axiom census.
-`update_extracted.py` does invoke SP1's constraint compiler and witness-dump tooling as a trusted,
-pin-checked Rust oracle; generated outputs are never treated as self-authenticating.
+`update_extracted.py` and `scripts/update_sp1_dumps.sh` do invoke SP1's constraint compiler and
+trace-dump tooling as trusted, pin-checked Rust oracles; generated outputs are never treated as
+self-authenticating.
 
-The unmodified SP1 Rust semantic source lives in a sibling `sp1` checkout. Regeneration points `SP1_DIR`
-at the separately hash-checked extraction overlay described in `docs/agents/extraction.md`; do not modify
-the semantic checkout merely to run the exporter. The 4.29 `sp1-lean` repo is a read-only reference for porting (a sibling
+The SP1 Rust source lives in a sibling `sp1` checkout. Regeneration points `SP1_DIR` at a clean
+checkout of the pinned extraction branch described in `docs/agents/extraction.md` (a committed
+descendant of the unmodified semantic tag; no uncommitted-patch mechanism). The 4.29 `sp1-lean` repo is a read-only reference for porting (a sibling
 `sp1-lean` checkout); its arithmetic/Sail proofs are the thing we re-derive natively here, not import.
 
 ### Larger verified-verifier program
@@ -60,10 +61,10 @@ These layers are parallel workstreams and may be owned by different developers. 
 Plonk, and Groth16 are separate verifier targets; pin **Core** first. Parsing may initially be delegated
 to a canonical Rust exporter so it does not obscure the verifier/refinement boundary.
 
-**This workstream's current priority:** instantiate the exact v6.3.1 Core AIR refinement bundle. Native
+**This workstream's current priority:** instantiate the exact v6.4.0 Core AIR refinement bundle. Native
 timed grounding, every one of the 25 chip contracts, and `supported_core_native_sound` are closed. The
 34-table execution and 6-table memory-boundary relations exist, but full upstream soundness remains open
-until the six Core system tables derive the native boundary/timestamp facts and
+until the six Core system tables derive the native boundary facts and
 `CoreAIRRefinementObligations` has a closed construction. Until then only
 `sp1_air_refinement_of_obligations`/`sp1_air_sound_of_obligations` are declared; the unqualified names
 remain reserved. See `docs/roadmap.md` and `docs/architecture.md`.
@@ -73,9 +74,11 @@ remain reserved. See `docs/roadmap.md` and `docs/architecture.md`.
 - Full build: `lake build SP1Clean` (the default target). Passing = **0 errors AND 0 warnings**, and
   **no stray `info:` notes** — leave the build output clean (see the `ring` note below). This builds
   **only the main library** — it carries no `native_decide` (gated by `scripts/check_no_native_decide.sh`).
-- Tests: `lake test` (the `SP1CleanTest` `testDriver`). Builds/elaborates the witness- and trace-conformance
-  anchors — the project's **only** `native_decide` — checked against batteries dumped from SP1's real Rust
-  prover. Runs on top of the cached main-library oleans (the test lib imports `SP1Clean`, never vice-versa).
+- Tests: `lake test` (the `SP1CleanTest` `testDriver`). Builds/elaborates the exportability battery and
+  the non-vacuity/real-row satisfiability anchors — the project's **only** `native_decide`. Runs on top
+  of the cached main-library oleans (the test lib imports `SP1Clean`, never vice-versa). Trace
+  conformance against SP1's real prover is the separate dump-anchored pipeline
+  (`export/sp1dump/` + the `--testdata` generation-time gate + `scripts/run_interp_diff.sh`).
 - Single file: `lake env lean SP1Clean/Proofs/Chips/AddChip/Formal.lean` (elaborates against the
   **already-built** oleans). ⚠ `lake env` only sets the environment — **it does not build anything**.
   If you have edited a dependency, its olean is stale and this command silently checks against the
@@ -114,7 +117,7 @@ Mirror-rust layout under `SP1Clean/`:
 
 - **`Math/`** — general math, no SP1/Sail deps: `Word.lean` (`Word`, `toBitVec64`, `isU64`, `val_65536_*`,
   `limb_lift`), `Bitwise.lean` (`byteOp`, `reassemble_byteOp`, …), `Misc.lean`, `MulCarryChain.lean`,
-  `HWord.lean`, `GetElemFastPath.lean` (the upstreaming candidate).
+  `HWord.lean`. (`GetElemFastPath.lean` moved out to `ToClean/Tactic/`; its upstream is Lean core/Std.)
 - **`Model/`** — the SP1 substrate (Sail + buses): `Register.lean`, `SailWrap.lean`, `SailMemory.lean`,
   `BusMessages.lean` (the State/Memory/Program message structs + their structural per-row predicates —
   incl. `MemoryMsg.ClkBound` and the reader-level `Readers.ClkDiscipline`, the memory-clock discipline),
@@ -170,7 +173,7 @@ Mirror-rust layout under `SP1Clean/`:
   `Proofs/Chips/DivRemChip/Cases.lean` proves circuit-independent evidence-to-ISA lemmas, and the sole
   heavy arithmetic seam is the whole-chip `evidenceSoundness` theorem in `Formal.lean`.
 - **`Faithful/`** — the "proven faithful" pillar: `ChipOracle.lean` plus the 25 whole-chip
-  native↔Rust anchors (reconfigure-based oracles; the whole-trace conformance anchors audit the
+  native↔Rust anchors (reconfigure-based oracles; the dump-anchored trace gate audits the
   reconfigure maps cell-for-cell). The per-operation/reader anchor files that remain are shared
   substrate: their lemmas are the canonical statements the chip anchors cite via namespace
   bridges (each has ≥2 live importers — verified in the 2026-07 retirement sweep).
@@ -179,22 +182,43 @@ Mirror-rust layout under `SP1Clean/`:
   is never imported by it, so the default `lake build SP1Clean` stays `native_decide`-free (enforced by
   `scripts/check_no_native_decide.sh`; `native_decide` trusts the whole compiler — at v4.32.2 the census
   shows this as generated `._native.native_decide.ax_*` constants, the successors of the named
-  `Lean.ofReduceBool`/`Lean.trustCompiler` axioms). Two layers, namespaces preserved (`SP1Clean.WitnessTests` /
-  `SP1Clean.TraceGenTests`, decoupled from the new module paths):
-  - `WitnessTests/` — the `<Op>Witness.lean` witness-generation conformance anchors +
-    `WitnessConformance.lean` scaffold; auto-gen vectors under `WitnessTests/Vectors/`.
-  - `TraceGenTests/` — the **circuit-as-trace-generator** full-trace layer (`TraceGenerator.lean` +
-    `EventPopulate.lean` + `Conformance.lean` + `<Chip>ChipTrace{Vectors,Witness}.lean`): whole chip
-    traces derived from the chips' own `main` witness closures + output struct, `native_decide`-checked
-    against SP1's real `generate_trace`. 10 chips, **all unmasked**: Add/Sub/Subw/Addw fixed-witness;
-    Mul/DivRem/Bitwise/Lt/ShiftLeft/ShiftRight hint-driven flags (per-event `ProverHint` from the dumped
-    executor opcode).
-  Both vector batteries are regenerated by `update_extracted.py` (the `WITNESS_DIR`/`TRACEGEN_DIR` writers).
+  `Lean.ofReduceBool`/`Lean.trustCompiler` axioms). Contents: `Exportable.lean` (the
+  `#assert_exportable` battery + the canonical test-scope `SP1Prime`), `NonVacuity.lean` /
+  `NonVacuityReal.lean` (satisfiability anchors for the chip `Assumptions` — the real-row battery
+  builds rows through `TraceGenTests/EventPopulate.lean`), `Audit/` (the joint-premise regression),
+  and `TraceGenTests/{TraceGenerator,EventPopulate,Conformance}.lean` — the
+  **circuit-as-trace-generator** substrate (`circuitTraceRow(Mapped)`, the event mirrors, the shared
+  prime), consumed by the anchors above and by the exporter's per-chip spot check.
+  **Trace conformance against SP1's real prover is the dump-anchored pipeline, not a `native_decide`
+  battery** (2026-08 retirement of the legacy 21 anchors): committed SP1 dumps (`export/sp1dump/`,
+  sole writer `scripts/update_sp1_dumps.sh` at the extraction pin) + the fail-closed generation-time
+  gate in `scripts/witgenExport.lean --testdata` (every event row recomputed via
+  `FlatOperation.witgen` + the symbolic row map and matched cell-for-cell, all 25 chips) + the Rust
+  reference-interpreter differential (`scripts/run_interp_diff.sh`). The gate re-runs in CI
+  (`check_witgen_export.sh --regen` in the test job).
 - **`Soundness/`** — the whole-machine layer: per-bus `{State,Byte,Program,Memory}Consistency.lean`;
   `ChipRow.lean` (the `ChipKind` structure-of-functions — each chip registers one `kind`, carrying a
-  `name` = its SP1 `MachineAir::name`) + `ChipRegistry.lean` (`allChipKinds`); the gated execution capstone
-  `GatedVm/` (the legacy-but-proved Eulerian-trail machinery) + `SP1Ensemble.lean` (`sp1Ensemble` — a
-  plain Clean `Ensemble`, 25 chips + 13 boundary/provider tables); the timed/ranked grounding engine;
+  `name` = its SP1 `MachineAir::name`) + `ChipRegistry.lean` (`allChipKinds`); `SP1Ensemble.lean`
+  (`sp1Ensemble` — a plain Clean `Ensemble`, 25 chips + 28 boundary/provider tables: six Byte
+  providers at positions 25–30, all 17 fixed Range widths `0..16` at 31–47, Program at 48, Memory
+  init/final at 49/50, and the W3 system tables MemoryBump (51) and StateBump (52)); the full native
+  ensemble therefore has 53 tables,
+  plus the separate state-boundary verifier. Exact transport recounts Byte/Range/Program
+  multiplicities from the actual Clean interaction ledger of every non-preprocessing native table;
+  it does not copy the full exact cluster's multiplicities. The raw exact Byte/Range/Program
+  assertion lists are empty: `CoreAIR.PreprocessedBinding` only records the named matrix/PCS-opening
+  premise, to be discharged by ArkLib; it proves neither row-local meaning nor provider selection.
+  `PreprocessedProviderContract` is the
+  explicit caller-supplied per-row local-semantics premise. A caller-supplied
+  `CanonicalPreprocessedInventory` selects carriers
+  source-backed by their matching exact matrix/Range-width block and separately supplies projected-key
+  `Nodup`; zero-demand raw keys may be omitted. The recount contract states nonzero-demand
+  Byte/Program coverage, nonpositivity, and canonical capacity. `freshRowsByKey` is a
+  declarative/regression helper, not the construction path. PCS/program identity, State/Memory
+  balance, and semantic binding stay separate and explicit. The recount derives Byte (including
+  Range) and Program integer balance; the global contract retains all-channel count bounds and
+  State/Memory integer balance. The timed/ranked
+  grounding engine;
   `WitnessDecode.lean` (the deterministic typed row decoder), `LocalExecution.lean` (grounded ordered
   rows → a genuine shard-local Sail chain), and `AIR.lean` (the honest native witness relation plus
   proved `supported_core_witness_grounding` and `supported_core_native_sound`); the
@@ -212,10 +236,12 @@ Mirror-rust layout under `SP1Clean/`:
   row-routing shadow and `Completeness.lean` routing scaffold were retired in favor of witness decoding,
   timed grounding, and the relation-level completeness boundary in `AIR.lean`. The bespoke
   `MachineSoundness`/`MachineConsistency` `TraceValid` capstone was retired 2026-06-05.
-  `Soundness/CoreAIR.lean` is the exact v6.3.1 deterministic boundary: its `_of_obligations`
+  `Soundness/CoreAIR.lean` is the exact v6.4.0 deterministic boundary: its `_of_obligations`
   combinators consume the `.execution` cluster only and expose the unclosed field-by-field proof bundle.
-  `TargetVm.lean` retains the proved conditional trail-to-Sail walk; it is an intermediate lemma, not
-  the headline zkVM theorem. Audit harness: `scripts/run_audit.sh`
+  The frozen Eulerian-path interface (`GatedVm/`, `TargetVm.lean`, `AdvanceDispatch.lean`, the
+  `Soundness/Decode.lean` walk half) was deleted 2026-08 — its scheduled post-seam retirement; the
+  live-path survivors are `Walk.lean`'s graph core, `RowEffectDefs.lean`'s `RefinesAt`/`RowEffect`
+  interface, and `Soundness/Decode.lean`'s hoist/evidence half. Audit harness: `scripts/run_audit.sh`
   (pins + sorry gates + the `#print axioms` census via `scripts/gen_axiom_probe.py`).
 - `Soundness/RowView.lean` (the reader-agnostic `RowView`/`AdapterView` row-view infra the bus layer reads —
   formerly the top-level `Trace.lean`). The design rationale for the whole-chip semantic boundary is in
@@ -230,11 +256,25 @@ the whole **main** library, so `lake build` builds all of it) plus per-pillar bu
 `SP1Model` / `SP1Extracted` / `SP1FormalModel` / `SP1Native` / `SP1Proofs` (selected by submodule globs, e.g.
 `"SP1Clean.Math.+"`; `SP1Proofs` groups `Proofs` + `Faithful` + `Soundness`). `lake build SP1Extracted`
 builds just that layer. Separately, the top-level **test** library `SP1CleanTest` (glob `"SP1CleanTest.+"`,
-the `testDriver` → `lake test`) holds the witness/trace conformance anchors; it imports `SP1Clean` but is
-**not** part of the umbrella, so `lake build SP1Clean` never compiles it (keeping the main build
-`native_decide`-free). Isolation is **by convention** — Lake does not forbid cross-layer
-imports within one package; the auto-gen guard is the `Extracted/` + `SP1CleanTest/**/Vectors`/`*TraceVectors`
-"do not hand-edit" headers + the sole writer `update_extracted.py`.
+the `testDriver` → `lake test`) holds the exportability/non-vacuity anchors and trace-generator
+substrate; it imports `SP1Clean` but is **not** part of the umbrella, so `lake build SP1Clean` never
+compiles it (keeping the main build `native_decide`-free). Isolation is **by convention** — Lake does
+not forbid cross-layer imports within one package; the auto-gen guard is the `Extracted/`
+"do not hand-edit" headers + the sole writer `update_extracted.py` (and, for the export trees, the
+sole writers `scripts/witgenExport.lean` / `scripts/update_sp1_dumps.sh` + their byte-identity gates).
+
+- **`ToClean/`** and **`ToMathlib/`** (top-level, own `lean_lib`s, in `defaultTargets`) — the
+  **upstream-destined** libraries, modelled on VCVio's `ToMathlib/`. `ToClean` holds material bound
+  for the Clean DSL; `ToMathlib` holds material bound for Mathlib. **Import rule (load-bearing):
+  `ToMathlib` imports only Mathlib; `ToClean` imports Clean (and may import `ToMathlib`); NEITHER
+  may import `SP1Clean`.** That is what keeps them genuinely contributable and makes the terminal
+  step of an accepted PR a plain deletion plus a repoint of importers to `Clean.*`/`Mathlib.*`.
+  Declare things in the namespace they would occupy **upstream** (e.g. `witnessVectorIR` lives in
+  `namespace Circuit` with a matching `export`, beside Clean's own `witnessVector`), so acceptance
+  changes no call site. Each file's docstring must state the **gap against upstream** — what exists
+  there, what is missing, and why — because that text becomes the PR description. Both libraries
+  carry the same eight `-D linter.*` flags as the core pillars (material heading upstream gets no
+  relaxation), are covered by every source guard, and are gated by `scripts/check_root_index.sh`.
 
 **Restructure status (updated 2026-07-27; whole-chip oracle migration completed the same day).**
 Landed in the 2026-07 release-readiness campaign: the full 25-chip `Extracted/ChipOracle/`
@@ -250,7 +290,7 @@ the ALU chips' `Assumptions`/`ProverAssumptions`), the `Native/`+`Proofs/` five-
 `Chips`/`Operations`/`Readers`/`WitnessTests`, and all six per-pillar layer libraries. Every registered
 chip soundness/completeness theorem, DivRem evidence theorem, structural circuit law, grounding
 contract, and whole-chip faithfulness proof is closed. `scripts/run_audit.sh` gates zero proof
-deferrals. The exact v6.3.1 Core relation and conditional `_of_obligations` combinators are landed;
+deferrals. The exact v6.4.0 Core relation and conditional `_of_obligations` combinators are landed;
 their explicit refinement bundle is not yet instantiated. The obsolete nine DivRem per-op soundness files and
 their shared tail were retired in favor of the four-family evidence contract. A large proof-cleanup
 campaign (2026-06-22 / 06-23) golfed ~109
@@ -266,11 +306,11 @@ Native-resident pending the "Spec homing" backlog item (see the ChipAssumptions 
 `docs/architecture.md` § deliberate layering exceptions). The same pass renamed the ten suffix-less
 `Faithful/` anchors to `<X>Chip.lean`, named the micro-time window constants with their Rust provenance,
 and completed the root index (now gated by `scripts/check_root_index.sh`). The trace *arguments*
-(TargetObligations / target theorem / routing / Emits) are `ChipRow`-dependent
-and so remain in `Soundness/` — their natural layer — rather than being forced below it.
-The bespoke `Soundness/GatedVm/` → Clean `VmTables` migration (roadmap W11) was investigated and **deferred**
-— Clean's VM engine yields verifier-guarantees with no explicit execution walk, while SP1's spec is a
-balance-derived `GatedExecution` with an Eulerian trail, so re-basing adds obligations without removing the
+(`RefinesAt`/`RowEffect`/routing) are `ChipRow`/`RowView`-dependent and so remain in `Soundness/` —
+their natural layer — rather than being forced below it.
+A bespoke-trail → Clean `VmTables` migration (roadmap W11) was investigated and **rejected**
+— Clean's VM engine yields verifier-guarantees with no explicit execution walk, while the SP1 argument
+needs a balance-derived ordered trail, so re-basing adds obligations without removing the
 SP1-specific trail machinery (see roadmap W11).
 
 **Structural-bus grounding program (closed for the native slice, 2026-07).** Channels communicate the field tuples and
@@ -281,11 +321,16 @@ carries `isU64 ∧ ClkBound` (value + a bounded 24-bit access timestamp), and By
 grounding engine from bus balance, boundary/provider facts, program commitment, strict schedule rank, and
 the 25 chip `advance` lemmas. No chip `ProverAssumptions` threads either global truth. The current capstone
 layers distinguish native supported-machine refinement, extracted AIR faithfulness, full SP1 AIR
-soundness, and the eventual ArkLib verifier theorem; see `docs/roadmap.md` W12.
+soundness, and the eventual ArkLib verifier theorem; see `docs/roadmap.md` (P0–P2).
 The memory-bus closed forms, `GroundingAdapter`, all 25 `ChipGroundingContracts`, aligned-carrier
 transports, RAM/same-location grounding, and per-position assumptions/readiness are proved. Remaining
-work is to derive this native relation's semantic boundary and timestamp premises from the exact
-upstream system tables.
+work is to derive this native relation's semantic boundary premise from the exact upstream system
+tables. `SupportedCoreNativeRelation` is exactly **two** conjuncts — the ensemble algebra and that
+boundary binding. The former third conjunct (`SupportedCoreMemoryTimestampRangeRelation`, the
+pulled-record `clk_high < 2 ^ 24` bound) was deleted in the 2026-08 W3 wave: it is now derived from
+the produced side of the capstone's own per-location Memory balance, unblocked by moving the bound
+out of `ChipGroundingContracts.rowAligned`'s premises and into the per-touch antecedent of its slot
+conjunct.
 
 Everything is **field-generic** over a prime field — the standard variable block is:
 ```lean
@@ -301,9 +346,18 @@ feels ad-hoc, the general rule is in Clean's docs.
 *Where to find them.* Browse upstream at **<https://github.com/Verified-zkEVM/clean>** (the `doc/` folder +
 `Clean/Air/README.md` + the repo-root `AGENTS.md`), or read the copy Lake installs in-tree under
 **`.lake/packages/Clean/`** (e.g. `.lake/packages/Clean/doc/performance-problems.md`). Prefer these over any
-local checkout: Clean is a pinned **git** dependency (`0e53b9f2`, v4.32.2), and a local sibling path must
-never be baked into permanent docs or into `lakefile.toml`. (The pin can still lag upstream `main`; if a doc
-named below is missing from `.lake/packages/Clean`, read it on GitHub.)
+local checkout: Clean is a pinned **git** dependency, and a local sibling path must never be baked into
+permanent docs or into `lakefile.toml`. (The pin can still lag upstream `main`; if a doc named below is
+missing from `.lake/packages/Clean`, read it on GitHub.)
+
+⚠ **The Clean pin is currently a fork** — `dtumad/clean` branch `sp1-integration`
+(`2dad7788d58b09eabeb3898506e4cb896e5d3e9d`), whose base
+is upstream `0e53b9f2` (v4.32.2). The **standing split**: a change that MODIFIES an existing Clean
+declaration goes in the fork, one branch per upstream PR, because downstream Clean theorems refer to
+Clean's declaration and not ours — that is why it cannot be shimmed in `ToClean/`. A **pure addition**
+stays in `ToClean/` (no pin bump; acceptance is a plain deletion + repoint). Fork state, the PR queue, and
+the exit condition are in `docs/agents/clean-upstream.md`; the trust consequence is disclosed in
+`docs/release-audit.md`. Re-pin to upstream as each PR merges.
 
 Read, in priority order (paths relative to the Clean repo root — i.e. `.lake/packages/Clean/<path>` in-tree,
 or `<path>` on GitHub):
@@ -499,8 +553,11 @@ after installing or toggling.
   as gates, so none need a separate invocation.
 - `docs/agents/lean-sail-notes.md` — the v4.32.2 environment, the git dependency pins, the Sail
   code-generation workaround, and the `lake update` trap.
+- `docs/agents/clean-upstream.md` — **the Clean pin is currently a fork.** Its state and exit
+  condition, the modification-vs-addition split rule (what may go in the fork versus `ToClean/`),
+  and the upstream PR queue with the measurement behind each entry.
 - `docs/agents/sail-model-provenance.md` — the generated `Lean_RV64D` snapshot's provenance: the
-  four-key SP1 config and its six generated sites, why stock upstream makes the memory-bridge
+  two-key SP1 config and its four generated sites, why stock upstream makes the memory-bridge
   lemmas false, the regeneration pipeline, and the re-pinning procedure.
 - `docs/agents/proof-patterns.md` — the witnessed-`FormalCircuit` soundness/completeness recipe + concrete
   landmines + the **Golf & cleanup discipline** section (how to golf/clean proofs safely).

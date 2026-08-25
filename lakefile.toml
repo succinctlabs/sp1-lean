@@ -1,5 +1,8 @@
 name = "sp1-clean-native"
-defaultTargets = ["SP1Clean"]
+# All three hand-written libraries build by default: the upstream-destined `ToClean`/`ToMathlib`
+# roots are listed explicitly so every module in those trees is compiled (and linted) even
+# before an `SP1Clean` module happens to import it.
+defaultTargets = ["SP1Clean", "ToClean", "ToMathlib"]
 
 moreLeanArgs = ["--tstack=400000"]
 
@@ -32,11 +35,26 @@ name = "mathlib"
 git = "https://github.com/leanprover-community/mathlib4"
 rev = "v4.32.2"
 
-# Clean at v4.32.2 (`main`, post PR #443 "bump-lean-4.32.2").
+# Clean, pinned to a FORK — the one dependency here that is not upstream. Base is upstream
+# `0e53b9f2` (v4.32.2 `main`, post PR #443 "bump-lean-4.32.2"); the fork's `sp1-integration` branch
+# carries changes that MODIFY existing Clean declarations and therefore cannot live in our additive
+# `ToClean` library, because downstream Clean theorems refer to Clean's declaration, not ours.
+# Delta at this pin — two changes, one branch per upstream PR:
+#   `agreesbelow-data-hint`:
+#     f5ae8e17  `ProverEnvironment.AgreesBelow` constrains `data`/`hint`, not just `get`
+#     8301b77a  `Clean/Examples/DataWitness.lean`, the worked example + falseness witness
+#   `witgen-share`:
+#     410ffba8  `WitgenIR.share` subterm sharing into let-steps + `Operations.witgenJsonShared?`
+#               (without it, tree-expanding serialization makes SP1's DivRem witgen payload 1.22 GB)
+#     4a9c2c7b  the eval-preservation proof `WitgenIR.eval_share` (axiom-clean), making the pass a
+#               proven transformation the serializer applies unconditionally
+# Rationale, the PR queue, and the exit condition are in `docs/agents/clean-upstream.md`; the trust
+# consequence is disclosed in `docs/release-audit.md`. **Re-pin to upstream as the PRs merge.**
+# NB `sp1-integration` must keep this rev reachable (see the PolyFun note below) — never force-push it.
 [[require]]
 name = "Clean"
-git = "https://github.com/Verified-zkEVM/clean"
-rev = "0e53b9f2d05f06defa2aa0a859f549b611583f10"
+git = "https://github.com/dtumad/clean"
+rev = "2dad7788d58b09eabeb3898506e4cb896e5d3e9d"
 
 # Sail RV64 model. Package name is `Lean_RV64D` (opencompl upstream naming); it exposes the
 # `LeanRV64D` library the project imports. Requiring by the real package name dedups with
@@ -45,8 +63,9 @@ rev = "0e53b9f2d05f06defa2aa0a859f549b611583f10"
 # sources with the SP1 platform config `scripts/sail-config/sp1_rv64d_cfg.json` (regenerate and
 # verify with `scripts/sail-config/generate_lean_rv64d.sh`; provenance in the snapshot's commit
 # message and docs/agents/sail-model-provenance.md). It equals the opencompl base `11d8fa21` (the
-# snapshot riscv-lean PR #59 pins, generated against lean-sail v5) except the six platform-value
-# sites the config sets. Stock upstream is not usable: its CLINT and signature windows lie inside
+# snapshot riscv-lean PR #59 pins, generated against lean-sail v5) except the four generated
+# platform-value sites controlled by two config keys. Stock upstream is not usable: its CLINT and
+# signature windows lie inside
 # the address range SP1's chips bound accesses to, which makes the memory-bridge lemmas false as
 # stated, not merely unproved.
 # NB the generated model and the Sail runtime must move together: a v4-generated snapshot against
@@ -54,7 +73,7 @@ rev = "0e53b9f2d05f06defa2aa0a859f549b611583f10"
 [[require]]
 name = "Lean_RV64D"
 git = "https://github.com/succinctlabs/sail-riscv-lean"
-rev = "df1acf579f8daf97c4dc3248565dec5a123079ef"
+rev = "befc6976ef53c592b637dc897f61b4e71467c239"
 
 # Lightweight ISA fns. Pinned to the succinctlabs fork head, which is the head of the open
 # opencompl/riscv-lean PR #59 ("chore: update to v4.32.2"); repoint to opencompl once that merges.
@@ -88,6 +107,31 @@ name = "sp1Lint"
 srcDir = "scripts"
 supportInterpreter = true
 
+# Upstream-destined libraries, at the BOTTOM of the import DAG: `ToMathlib` imports only Mathlib;
+# `ToClean` imports Clean (and may import `ToMathlib`); NEITHER may import `SP1Clean`. That rule is
+# what keeps them genuinely contributable — and what makes the terminal step of an accepted upstream
+# PR a plain deletion plus a repoint of the importers to `Mathlib.*`/`Clean.*`. Both carry the same
+# eight-flag linter set as the core pillars: material heading upstream gets no relaxation.
+# Root indices `ToMathlib.lean`/`ToClean.lean` are hand-maintained (this project has no `mk_all`),
+# and `scripts/check_root_index.sh` gates all three trees.
+[[lean_lib]]
+name = "ToMathlib"
+moreLeanArgs = [
+  "-Dlinter.style.lambdaSyntax=true", "-Dlinter.style.dollarSyntax=true",
+  "-Dlinter.style.refine=true", "-Dlinter.style.cases=true",
+  "-Dlinter.style.induction=true", "-Dlinter.style.admit=true",
+  "-Dlinter.oldObtain=true", "-Dlinter.style.cdot=true",
+]
+
+[[lean_lib]]
+name = "ToClean"
+moreLeanArgs = [
+  "-Dlinter.style.lambdaSyntax=true", "-Dlinter.style.dollarSyntax=true",
+  "-Dlinter.style.refine=true", "-Dlinter.style.cases=true",
+  "-Dlinter.style.induction=true", "-Dlinter.style.admit=true",
+  "-Dlinter.oldObtain=true", "-Dlinter.style.cdot=true",
+]
+
 # Umbrella library — root module `SP1Clean.lean` imports every module; `lake build` (the default
 # target) builds everything through it. Package-level `moreLeanArgs`/`[leanOptions]` above apply to
 # all libraries, so the layer libraries below inherit `--tstack`/heartbeats with no duplication.
@@ -106,7 +150,8 @@ name = "SP1Clean"
 # violations. `linter.style.longLine` is the remaining candidate (real fallout, concentrated in
 # Native/FormalModel) — see `docs/roadmap.md` § "Cleanup / polish backlog". The auto-gen `SP1Extracted` library is
 # deliberately left OUT (it carries per-file `set_option linter.all false` instead), as are the
-# auto-gen `*Vectors` modules inside `SP1CleanTest` (same per-file suppression). KEEP THE SIX COPIES IN SYNC.
+# auto-gen `*Vectors` modules inside `SP1CleanTest` (same per-file suppression). The two
+# upstream-destined libraries above carry the same set. KEEP THE EIGHT COPIES IN SYNC.
 [[lean_lib]]
 name = "SP1Math"
 globs = ["SP1Clean.Math.+"]
@@ -164,14 +209,15 @@ moreLeanArgs = [
   "-Dlinter.oldObtain=true", "-Dlinter.style.cdot=true",
 ]
 
-# The test pillar (the `lake test` driver, see `testDriver` above) — the witness-generation and
-# whole-trace conformance anchors (`SP1CleanTest.{WitnessTests,TraceGenTests}.*`), which import the
-# main `SP1Clean` library and check it against batteries dumped from SP1's real Rust prover. This is
-# the ONLY library that may use `native_decide`; it is NOT imported by the umbrella `SP1Clean`, so the
-# default `lake build` stays `native_decide`-free. Same syntactic linter set as the core pillars; the
-# auto-gen `SP1CleanTest.WitnessTests.Vectors.*` / `*TraceVectors` modules self-suppress with their own
-# `set_option linter.all false`. (The `lake lint` env-linter pass skips this lib too — `sp1Lint` keeps
-# only `SP1Clean`-prefixed declarations, and `SP1CleanTest` is not such a prefix.)
+# The test pillar (the `lake test` driver, see `testDriver` above) — the exportability battery,
+# the non-vacuity/real-row satisfiability anchors, and the circuit-as-trace-generator substrate
+# (`SP1CleanTest.{Exportable,NonVacuity,NonVacuityReal,Audit,TraceGenTests}.*`), which import the
+# main `SP1Clean` library. This is the ONLY library that may use `native_decide`; it is NOT
+# imported by the umbrella `SP1Clean`, so the default `lake build` stays `native_decide`-free.
+# Same syntactic linter set as the core pillars. (The `lake lint` env-linter pass skips this lib
+# too — `sp1Lint` keeps only `SP1Clean`-prefixed declarations, and `SP1CleanTest` is not such a
+# prefix.) Trace conformance against SP1's real prover lives in the dump-anchored pipeline
+# (`export/sp1dump/` + the `--testdata` generation-time gate + the Rust differential).
 [[lean_lib]]
 name = "SP1CleanTest"
 globs = ["SP1CleanTest.+"]

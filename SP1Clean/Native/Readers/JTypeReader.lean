@@ -1,7 +1,7 @@
 import SP1Clean.FormalModel.Contracts.Readers
 import SP1Clean.Math.Word
 import SP1Clean.Model.Channels
-import SP1Clean.Model.InteractionRecovery
+import ToClean.Circuit.InteractionRecovery
 import SP1Clean.Native.Readers.RegisterAccessCols
 import SP1Clean.Extracted.JTypeReader
 import Clean.Circuit.Basic
@@ -34,6 +34,21 @@ open Circuit
 open SP1Clean.Channels (byteChannel memoryChannel MemoryMsg programChannel ProgramMsg)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+
+/-- Component-wise evaluation of the folded J-type reader row — the counterpart of
+`RTypeReader.eval_cols` / `ITypeReader.eval_cols` / `ALUTypeReader.eval_cols`, which J-type lacked.
+Consumers rewrite this instead of asking unification to unfold the derived `ProvableStruct`
+evaluator through the nested register-access block. -/
+@[circuit_norm] theorem eval_cols {F : Type} [FiniteField F]
+    (env : Environment F) (cols : Extracted.JTypeReader (Expression F)) :
+    Eval.eval env cols =
+      ({ op_a := Eval.eval env cols.op_a,
+         op_a_memory := Eval.eval env cols.op_a_memory,
+         op_a_0 := Eval.eval env cols.op_a_0,
+         op_b_imm := Eval.eval env cols.op_b_imm,
+         op_c_imm := Eval.eval env cols.op_c_imm } : Extracted.JTypeReader F) := by
+  rw [ProvableStruct.eval_eq_eval]
+  rfl
 
 /-- Compose a single `RegisterAccessCols` for op_a (write at `clk_low + 4`) for the timestamp byte checks;
 impose the four zeroing gates; emit the Program bus (`imm_b = imm_c = 1`, op_b/op_c the immediate words)

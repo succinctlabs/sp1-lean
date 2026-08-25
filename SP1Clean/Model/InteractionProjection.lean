@@ -34,6 +34,15 @@ the trace-level `*Lookups` use `±(is_real.val : ℤ)`, so this is what reconcil
 def signedVal (x : ZMod p) : ℤ :=
   if 2 * x.val ≤ p then (x.val : ℤ) else (x.val : ℤ) - (p : ℤ)
 
+/-- A natural in the nonnegative half of the field is recovered exactly by the centered integer
+projection.  This is the generic capacity lemma used by aggregate provider counts: it rules out
+modular aliases and prevents a natural count from being interpreted as a negative multiplicity. -/
+lemma signedVal_natCast_of_twice_le (m : ℕ) (hsmall : 2 * m ≤ p) :
+    signedVal (m : ZMod p) = (m : ℤ) := by
+  have hp : 0 < p := Nat.pos_of_ne_zero (NeZero.out)
+  have hm : m < p := by omega
+  rw [signedVal, ZMod.val_natCast_of_lt hm, if_pos hsmall]
+
 omit [NeZero p] in
 /-- The `ZMod.val` of a binary `is_real` is `0` or `1`. -/
 lemma val_of_binary (hp : 2 < p) {is_real : ZMod p} (h : is_real = 0 ∨ is_real = 1) :
@@ -326,6 +335,21 @@ private lemma byteRow_toList {T : Type} (msg : ByteRow T) :
     (#v[] : Vector T 0))))).toList = _
   simp only [Vector.toList_append, Vector.toList_mk, List.append_nil, List.cons_append,
     List.nil_append]
+
+omit [NeZero p] in
+/-- **Kernel of the Byte provider projection.** The `toAccess` image of a gated
+`byteChannel` push keeps the four `ByteRow` fields and the positive gate multiplicity. This is the
+provider-side counterpart of `toAccess_pullIf_byte`. -/
+lemma toAccess_pushIf_byte (env : Environment (ZMod p)) (gate : Expression (ZMod p))
+    (msg : ByteRow (Expression (ZMod p))) :
+    AbstractInteraction.toAccess env (pushedIf (channel := byteChannel) gate msg).toRaw =
+      (InteractionKind.Byte, "SP1Byte",
+        [(Expression.eval env msg.opcode).val, (Expression.eval env msg.a).val,
+         (Expression.eval env msg.b).val, (Expression.eval env msg.c).val],
+        signedVal (Expression.eval env gate)) := by
+  simp only [toAccess_toRaw, pushedIf, byteChannel, kindOf, byteRow_toList, List.map_cons,
+    List.map_nil]
+  rfl
 
 omit [NeZero p] in
 /-- **Kernel of the Byte "received = projection".** The `toAccess`-image of a pulled `byteChannel` row

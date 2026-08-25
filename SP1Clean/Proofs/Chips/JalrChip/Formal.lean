@@ -1,5 +1,5 @@
 import SP1Clean.Native.Chips.JalrChip.Defs
-import SP1Clean.Model.InteractionRecovery
+import ToClean.Circuit.InteractionRecovery
 import SP1Clean.Math.EvalVec
 import Clean.Air.Circuit
 
@@ -24,12 +24,17 @@ local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
 -- 2.16M *raw* heartbeats (≈2.2k budget units), a 1000x drop, and it destructures exactly the same
 -- variables, because destructuring is driven by `h_input`/`h_assumptions`, not by `h_holds`.
 --
--- The one thing the hoist gives up is that `provable_struct_simp`'s struct-eval set — which is
+-- The apparent cost of the hoist is that `provable_struct_simp`'s struct-eval set — which is
 -- deliberately *not* a subset of `circuit_norm` (its `getElem` lemmas loop against `circuit_norm`'s
--- element-map spelling) — no longer reaches the unfolded `h_holds`. That is restored by the single
--- scoped pass below, which mirrors Clean's `ProvableStructSimp.structEvalSimpLemmas` verbatim and is
--- applied only `at h_holds ⊢` rather than `at *`. With that, both proof bodies go through byte for
--- byte. Keep the list in sync with Clean if that set changes.
+-- element-map spelling) — no longer reaches the unfolded `h_holds`. This macro therefore used to
+-- carry a scoped replacement pass: Clean's 27 `structEvalSimpLemmas` transcribed by hand, applied
+-- `at h_holds ⊢`, under a comment asking the reader to keep the copy in sync with Clean.
+--
+-- Measured 2026-08-13, when replacing that copy with a tactic reading Clean's list directly: the
+-- pass is **dead**. `simp` reports "made no progress" in `soundness`, and `completeness` has no
+-- `h_holds` at all (its own note below already said the macro is a no-op there) — the enclosing
+-- `try` had been swallowing both. Both proofs elaborate identically without it (5.3s vs 5.4s), so
+-- the step is deleted rather than reworded. The hoist is the whole of what this macro buys.
 --
 -- `hygiene false` is required: the step list names the hypotheses `circuit_proof_start_core`
 -- introduces (`h_input`, `h_holds`, `h_env`, …), exactly as Clean's own `circuit_proof_start` elab
@@ -51,21 +56,7 @@ local macro "jalr_proof_start" : tactic => `(tactic| (
   try provable_struct_simp
   try dsimp +instances only [elaborated] at *
   try dsimp +instances only [main] at *
-  -- the scoped replacement for what the hoist gave up (mirrors Clean's `structEvalSimpLemmas`)
-  try simp +instances only [ProvableStruct.eval_eq_eval, ProvableStruct.eval_eq_eval_prover,
-    ProvableStruct.eval_var_eq_eval, ProvableStruct.eval_var_eq_eval_prover,
-    ProvableStruct.eval_field_var_eq_eval, ProvableStruct.eval_field_var_eq_eval_prover,
-    ProvableStruct.structEvalLiteralProc, ProvableStruct.structEvalProjectionProc,
-    ProvableStruct.structEvalProjectionEvalProc, ProvableStruct.structEvalProjectionExpr,
-    ProvableStruct.structEqSplit, ProvableStruct.components,
-    ProvableType.eval_field, ProvableType.getElem_eval_fields,
-    ProvableType.getElem_eval_fields_prover, getElem_eval_vector,
-    CircuitType.eval_var_prover_to_verifier,
-    CircuitType.eval_var_field, CircuitType.eval_var_field_prover,
-    CircuitType.eval_expr, CircuitType.eval_expr_prover,
-    CircuitType.value_of_provableType, CircuitType.proverValue_of_provableType,
-    DerivedCircuitType.eval_verifier, DerivedCircuitType.eval_prover,
-    CircuitType.evalVerifier, CircuitType.evalProver] at h_holds ⊢
+  -- (a scoped struct-eval pass used to sit here; measured dead — see the note above)
   try simp +instances only [circuit_norm] at h_input
   try simp +instances only [circuit_norm] at h_assumptions
   try simp +instances only [circuit_norm, h_input] at h_holds
@@ -276,7 +267,7 @@ theorem completeness :
   -- subcircuit's completeness obligation (4th conjunct, discarded — the reader slot is discharged below).
   obtain ⟨he_av, he_oav, he_lsb, -, _⟩ := h_env
   obtain ⟨_h_ir, ⟨_h_clkh, _h_clk1, _h_clk0, hpc⟩, _h_a, ⟨_h_amem_pv, _h_amem_pl, _h_amem_dl⟩,
-    _h_a0, _h_b, ⟨h_bmem_pv, _h_bmem_pl, _h_bmem_dl⟩, hcimm⟩ := h_input
+    h_a0, _h_b, ⟨h_bmem_pv, _h_bmem_pl, _h_bmem_dl⟩, hcimm⟩ := h_input
   have erb : ∀ i (hi : i < 4),
       Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[i]
       = input_adapter_op_b_memory_prev_value[i] :=
@@ -313,17 +304,23 @@ theorem completeness :
           Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[2],
           Expression.eval env.toEnvironment input_var_adapter_op_b_memory_prev_value[3]]
           input_adapter_op_c_imm := by
+    rw [← AddOperation.populateIR_eval env input_var_adapter_op_b_memory_prev_value
+      input_var_adapter_op_c_imm _ _ rfl hcimm_eq hrs1U h_imm]
     apply Vector.ext; intro i hi
     simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
-    simp only [he_av ⟨i, hi⟩, hcimm_eq]
+    exact he_av ⟨i, hi⟩
   have hval2 : (Vector.map (Expression.eval env.toEnvironment)
         (Vector.mapRange 4 fun i => var {index := i₀ + 4 + i}) : Word (ZMod p))
       = AddOperation.populate #v[Expression.eval env.toEnvironment input_var_state_pc[0],
           Expression.eval env.toEnvironment input_var_state_pc[1],
           Expression.eval env.toEnvironment input_var_state_pc[2], 0] #v[4, 0, 0, 0] := by
+    rw [← AddOperation.populateIRGated_eval_off env input_var_adapter_op_a_0
+      #v[input_var_state_pc[0], input_var_state_pc[1], input_var_state_pc[2], 0]
+      #v[4, 0, 0, 0] _ _ (by simp [circuit_norm]) (by simp [circuit_norm]) (hpceq ▸ h_pcU) h4U
+      (h_a0.trans h_op_a_0)]
     apply Vector.ext; intro i hi
     simp only [Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]
-    rw [he_oav ⟨i, hi⟩]
+    exact he_oav ⟨i, hi⟩
   have hav0 : env.get i₀
       = (AddOperation.populate #v[input_adapter_op_b_memory_prev_value[0],
           input_adapter_op_b_memory_prev_value[1], input_adapter_op_b_memory_prev_value[2],
@@ -341,9 +338,25 @@ theorem completeness :
           #v[4, 0, 0, 0])[3] := by
     have := congrArg (·[3]) hval2
     simpa only [Vector.getElem_map, Vector.getElem_mapRange, hpceq, circuit_norm] using this
+  -- The lsb witness is u64-sorted, so its evaluation carries a `% 2 ^ 64` truncation. Binarity
+  -- survives it untouched; the two places that need the *value* strip it via `hlsb_val` below.
   have hlsb_bin : env.get (i₀ + 4 + 4) = 0 ∨ env.get (i₀ + 4 + 4) = 1 := by
     rw [he_lsb]
-    rcases Nat.mod_two_eq_zero_or_one (env.get i₀).val with h | h <;> rw [h] <;> simp
+    rcases Nat.mod_two_eq_zero_or_one ((env.get i₀).val % 2 ^ 64) with h | h <;> rw [h] <;> simp
+  -- On a real row the add result is a `Word`, so its low limb is far below `2 ^ 64` and the
+  -- truncation is the identity.
+  have hlsb_val : input_is_real = 1 →
+      env.get (i₀ + 4 + 4) = (((env.get i₀).val % 2 : ℕ) : ZMod p) := by
+    intro hr1
+    have hisu : Word.isU64 (AddOperation.populate
+        #v[input_adapter_op_b_memory_prev_value[0], input_adapter_op_b_memory_prev_value[1],
+           input_adapter_op_b_memory_prev_value[2], input_adapter_op_b_memory_prev_value[3]]
+        input_adapter_op_c_imm) :=
+      hrs1eq ▸ (AddOperation.spec_populate hrs1U h_imm input_is_real hr1).1
+    have h0 := (Word.lt_cases_of_isU64 hisu).1
+    rw [he_lsb, hav0]
+    congr 1
+    omega
   have h_gate2 : input_is_real - input_adapter_op_a_0 = 0 ∨ input_is_real - input_adapter_op_a_0 = 1 := by
     rw [h_op_a_0]; simpa using h_bin
   have hz : ∀ w : ZMod p, input_adapter_op_a_0 * w = 0 := fun w => by rw [h_op_a_0, zero_mul]
@@ -365,7 +378,7 @@ theorem completeness :
   · intro hneg
     have hr1 : input_is_real = 1 := neg_inj.mp hneg
     have c14 : ((14 : ℕ) : ZMod p) = (14 : ZMod p) := Nat.cast_ofNat
-    simp only [byteChannel, hav0, he_lsb]
+    simp only [byteChannel, hlsb_val hr1, hav0]
     rw [← c14]
     exact (byteRowSpec_range _ h14p).mpr (h_align_pa hr1)
   · rw [h_op_a_0]
@@ -502,7 +515,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
       dsimp only [Operations.RequirementsChannelsLawful]
       refine ⟨?_, ?_, ?_⟩
       · simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-          witnessVectorNative, witnessNative, Witnessable.witnessIR_field,
+          witnessVectorIR, witnessField,
           subcircuitWithAssertion, assertion, assertZero, Channel.pullIf,
           HasAssertEq.assert_eq, Expression.assertEquals, Operations.localLength]
         simp only [Operations.subcircuitChannelsWithRequirements_append,
@@ -520,7 +533,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
         tauto
       · intro channel h_channel
         simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-          witnessVectorNative, witnessNative, Witnessable.witnessIR_field,
+          witnessVectorIR, witnessField,
           subcircuitWithAssertion, assertion, assertZero, Channel.pullIf,
           HasAssertEq.assert_eq, Expression.assertEquals, Operations.localLength,
           Operations.shallowChannels_append, Operations.shallowChannels_witness,
@@ -533,7 +546,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
       · intro env h_constraints
         have hshallow := h_constraints
         simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-          witnessVectorNative, witnessNative, Witnessable.witnessIR_field,
+          witnessVectorIR, witnessField,
           subcircuitWithAssertion, assertion, assertZero, Channel.pullIf,
           HasAssertEq.assert_eq, Expression.assertEquals, Operations.localLength,
           ConstraintsHold.Shallow, Operations.forAllNoOffset_append,
@@ -549,7 +562,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
         rw [Operations.inChannelsOrRequirements_iff_forall_mem]
         intro interaction h_interaction
         simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-          witnessVectorNative, witnessNative, Witnessable.witnessIR_field,
+          witnessVectorIR, witnessField,
           subcircuitWithAssertion, assertion, assertZero, Channel.pullIf,
           HasAssertEq.assert_eq, Expression.assertEquals, Operations.localLength,
           Operations.shallowInteractions_append, Operations.shallowInteractions_witness,
@@ -581,7 +594,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
         List.mem_append, List.mem_singleton] at exposedMem
       rcases exposedMem with (rfl | rfl) | rfl
       · simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-          witnessVectorNative, witnessNative, subcircuitWithAssertion, assertion, assertZero,
+          witnessVectorIR, witnessField, subcircuitWithAssertion, assertion, assertZero,
           HasAssertEq.assert_eq, Expression.assertEquals, Channel.pullIf, Operations.localLength]
         simp only [Operations.interactionsWith_append, Operations.interactionsWith_witness,
           Readers.CPUState.interactionsWith_state_subcircuit,
@@ -605,9 +618,9 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
         -- `RegisterWrite` its write push via the reader-local `_subcircuit` lemmas; every other
         -- child is nil.
         simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-          witnessVectorNative, witnessNative, subcircuitWithAssertion, assertion, assertZero,
+          witnessVectorIR, witnessField, subcircuitWithAssertion, assertion, assertZero,
           HasAssertEq.assert_eq, Expression.assertEquals, Channel.pullIf, Operations.localLength]
-        simp only [Operations.interactionsWith_append, Operations.interactionsWith_witness,
+        simp only [Operations.interactionsWith_witness,
           Soundness.iTypeReader_memoryInteractions_subcircuit,
           Soundness.registerWrite_memoryInteractions_subcircuit,
           InteractionRecovery.interactionsWith_assertionSubcircuit_eq_nil,
@@ -629,7 +642,7 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
       · -- Program branch: compositional — the reader subcircuit keeps its fetch via the
         -- reader-local `_subcircuit` lemma; every other child is nil on the Program channel.
         simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-          witnessVectorNative, witnessNative, subcircuitWithAssertion, assertion, assertZero,
+          witnessVectorIR, witnessField, subcircuitWithAssertion, assertion, assertZero,
           HasAssertEq.assert_eq, Expression.assertEquals, Channel.pullIf, Operations.localLength]
         simp only [Operations.interactionsWith_append, Operations.interactionsWith_witness,
           InteractionRecovery.interactionsWith_assertionSubcircuit_eq_nil,
@@ -845,7 +858,7 @@ private theorem jalrByteInteractions_exact
       (Gadgets.Equality.circuit field) byteChannel.toRaw n inp ops
       List.not_mem_nil List.not_mem_nil
   simp only [main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-    witnessVectorNative, witnessNative, Witnessable.witnessIR_field,
+    witnessVectorIR, witnessField,
     subcircuitWithAssertion, assertion, assertZero,
     HasAssertEq.assert_eq, Expression.assertEquals,
     Operations.localLength]

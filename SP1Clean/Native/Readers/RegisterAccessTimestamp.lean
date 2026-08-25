@@ -68,8 +68,10 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
   localLength _ := 0
   output _ _ := ()
-  -- the two timestamp byte checks are gated receives (mult `-is_real`): they give the `ByteRowSpec`
-  -- guarantee on real rows AND impose a padding requirement, so `byteChannel` is in BOTH lists.
+  -- The two timestamp byte checks are gated receives (mult `-is_real`). They derive `ByteRowSpec`
+  -- on real rows. Their off-gate obligations are discharged from the inline boolean assertion, so
+  -- this elaborated circuit advertises the guarantee channel only; the formal assertion below has
+  -- an empty requirements list.
   channelsWithGuarantees := [byteChannel.toRaw]
   channelsLawful := by
     dsimp only [ElaboratedCircuit.ChannelsLawful]
@@ -132,7 +134,8 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
 def circuit : FormalAssertion (ZMod p) Inputs :=
   -- `byteChannel` dropped (W11 Phase 0c): the off-gate byte-pull `Requirements` are now discharged by the
   -- inline `is_real` boolean gate in `main`, so `channelsWithRequirements` is empty (this leaf reader emits
-  -- only on `byteChannel`, which moves to a Clean `SoundEnsemble` byte provider later).
+  -- only on `byteChannel`; Byte soundness is recovered globally from the plain `sp1Ensemble`
+  -- balance against its complete provider family).
   { main, elaborated,
     Assumptions := Assumptions, Spec := Spec,
     soundness := soundness, completeness := completeness,

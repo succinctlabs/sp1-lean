@@ -628,7 +628,7 @@ private theorem AddwChip.aluReaderConstraints
         (AddwChip.aluReaderInput input offset)⟩ ∈
       ((AddwChip.main input).operations offset).subcircuits := by
     simp only [AddwChip.main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-      witnessVectorNative, subcircuitWithAssertion, assertion, assertZero,
+      witnessVectorIR, subcircuitWithAssertion, assertion, assertZero,
       Operations.localLength]
     simp only [GeneralFormalCircuit.toSubcircuit_localLength,
       FormalAssertion.toSubcircuit_localLength, FormalCircuitBase.localLength_def,

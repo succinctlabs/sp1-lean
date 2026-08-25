@@ -163,8 +163,10 @@ and was stopped; that proof style is unsuitable as a routine regression. This is
 at the generated decoder seam, not evidence that the Add circuit or projection is wrong.
 
 The promising upstream route is [sail-riscv PR #1861](https://github.com/riscv/sail-riscv/pull/1861),
-currently open at `f12b3ec`, which permits overriding the formal-backend configuration through
-`SAIL_FORMAL_CONFIG`. The generated snapshot remains an appropriate interim pin.
+which permits overriding the formal-backend configuration by a plain `-D` flag. (Rewritten
+2026-08-19 to a per-arch `SAIL_FORMAL_CONFIG_<ARCH>` override that composes with the competing
+#1879; the `DEPENDS` half split out as #1885. See `../agents/sail-model-provenance.md`.) The
+generated snapshot remains an appropriate interim pin.
 
 Acceptance criterion: restore at least one kernel-checked concrete `decodedInROM` witness using a
 proof-friendly generated interface, then scale it by instruction family rather than by normalizing

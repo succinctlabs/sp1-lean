@@ -4,7 +4,7 @@ import SP1Clean.Faithful.ChipOracle
 import SP1Clean.Extracted.ChipOracle.Sub
 import SP1Clean.Native.Chips.SubChip.Defs
 import SP1Clean.Proofs.Chips.SubChip.Formal
-import SP1Clean.Model.InteractionRecovery
+import ToClean.Circuit.InteractionRecovery
 
 /-! # Whole-chip faithfulness anchor — native Sub row ↔ SP1 Rust Sub AIR
 
@@ -154,7 +154,7 @@ theorem subChip_lookups_empty :
     SubOperation.circuit, SubOperation.main, Gadgets.Equality.main, circuit_norm]
 
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel StateMsg)
-open SP1Clean.InteractionRecovery
+open InteractionRecovery
 
 set_option linter.unusedSimpArgs false in
 /-- **Chip-level faithfulness anchor — State-bus interactions, SYNTACTIC.** The State interactions the

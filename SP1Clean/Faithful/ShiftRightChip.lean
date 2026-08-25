@@ -5,7 +5,7 @@ import SP1Clean.Proofs.Chips.ShiftRightChip.Formal
 /-! # Whole-chip faithfulness — ShiftRight
 
 This module compares the complete native Clean ShiftRight row with the complete constraint and
-interaction system extracted from the pinned SP1 v6.3.1 `ShiftRightChip`. The comparison is
+interaction system extracted from the pinned SP1 v6.4.0 `ShiftRightChip`. The comparison is
 whole-chip: the native proof-oriented decomposition may differ from Rust's internal operation
 layout, while the decoded row, all `assertZero`s, and the full bus-interaction multiset agree
 exactly.
@@ -1560,7 +1560,7 @@ theorem shiftRightChip_constraints_constructive
 
 open SP1Clean.Channels
   (stateChannel byteChannel memoryChannel programChannel)
-open SP1Clean.InteractionRecovery
+open InteractionRecovery
 
 omit [Fact (2 ^ 17 < p)] in
 private theorem shiftRightRealEval

@@ -14,12 +14,16 @@ project in the two ways the stock `runLinter` exe cannot do:
   elaboration; they do nothing against these *environment* linters, which run post-import over the built
   environment. `nolints.json` / `@[nolint]` are the only env-linter suppressions.
 
-  INVARIANT: `getHandwrittenDecls` keeps only `SP1Clean.*` declarations, minus the auto-gen ones —
-  the `SP1Clean.Extracted` prefix (the constraint structs + the main-lib `Circuit/` forms) and any
-  module ending in "Vectors". The whole top-level **test** library `SP1CleanTest.*` (the witness/trace
-  conformance anchors + their `update_extracted.py`-written `…Vectors`/`Vectors.*` modules) is excluded
-  automatically, since `SP1Clean` is not a prefix of `SP1CleanTest` — so `lake lint` covers the main
-  library only (matching mathlib/batteries, which don't env-lint their test libs).
+  INVARIANT: `getHandwrittenDecls` keeps the hand-written declarations of this project — the
+  `SP1Clean.*` tree minus the auto-gen ones (the `SP1Clean.Extracted` prefix: the constraint structs
+  + the main-lib `Circuit/` forms; and any module ending in "Vectors") — plus the two
+  upstream-destined libraries `ToClean.*` / `ToMathlib.*`, which are hand-written and deliberately
+  get no linter relaxation (material heading upstream should meet the same bar). Those two are
+  imported only if their oleans exist, so this driver runs before and after they are created.
+  The whole top-level **test** library `SP1CleanTest.*` (the witness/trace conformance anchors +
+  their `update_extracted.py`-written `…Vectors`/`Vectors.*` modules) is excluded automatically,
+  since none of the three kept prefixes is a prefix of `SP1CleanTest` — so `lake lint` covers the
+  main + upstream libraries only (matching mathlib/batteries, which don't env-lint their test libs).
 
 * **Curated linter set.** We run a low-noise subset via `runOnly`, omitting the doc-coverage linters
   (`docBlame`/`docBlameThm`/`tacticDocs`) that would swamp a proofs project. See `curatedLinters`
@@ -63,13 +67,15 @@ def readJsonFile (α) [FromJson α] (path : FilePath) : IO α := do
 def writeJsonFile [ToJson α] (path : FilePath) (a : α) : IO Unit :=
   IO.FS.writeFile path <| toJson a |>.pretty.push '\n'
 
-/-- Hand-written `SP1Clean.*` declarations only: drops `SP1Clean.Extracted.*` and the `*Vectors`
-auto-gen batteries. Mirrors `Batteries.Tactic.Lint.getDeclsInPackage`, but filters on the full module
-path instead of just the namespace root. -/
+/-- Hand-written declarations of this project only: everything under `SP1Clean.*` (minus the
+auto-gen `SP1Clean.Extracted.*` and `*Vectors` batteries) plus the two upstream-destined libraries
+`ToClean.*` / `ToMathlib.*`, which are hand-written and get no linter relaxation. Mirrors
+`Batteries.Tactic.Lint.getDeclsInPackage`, but filters on the full module path instead of just the
+namespace root. -/
 def getHandwrittenDecls : CoreM (Array Name) := do
   let env ← getEnv
   let keep := env.header.moduleNames.map fun m =>
-    (`SP1Clean).isPrefixOf m
+    ((`SP1Clean).isPrefixOf m || (`ToClean).isPrefixOf m || (`ToMathlib).isPrefixOf m)
       && !(`SP1Clean.Extracted).isPrefixOf m
       && !m.toString.endsWith "Vectors"
   return env.constants.map₁.fold (init := #[]) fun decls declName _ =>
@@ -99,10 +105,17 @@ unsafe def main (args : List String) : IO Unit := do
       IO.eprintln s!"sp1Lint: missing olean for `{m}` at:\n  {olean}\n\
         Run `lake build SP1Clean` first."
       IO.Process.exit 1
+  -- The upstream-destined libraries are linted on the same terms, but they are optional: this
+  -- script must run both before and after they exist on disk.
+  let mut extraModules := #[]
+  for m in [`ToClean, `ToMathlib] do
+    if ← (← findOLean m).pathExists then extraModules := extraModules.push m
   let nolintsFile : FilePath := "scripts/nolints.json"
   let nolints ← if ← nolintsFile.pathExists then readJsonFile NoLints nolintsFile else pure #[]
   unsafe Lean.enableInitializersExecution
-  let env ← importModules #[projectModule, lintModule] {} (trustLevel := 1024) (loadExts := true)
+  let imports : Array Import :=
+    (#[projectModule, lintModule] ++ extraModules).map fun m => { module := m }
+  let env ← importModules imports {} (trustLevel := 1024) (loadExts := true)
   let opts : Options := if verbose then ({} : Options).setBool `trace.Batteries.Lint true else {}
   let ctx := { fileName := "", fileMap := default, options := opts }
   let state := { env }

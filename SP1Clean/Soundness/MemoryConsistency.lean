@@ -2,7 +2,7 @@ import SP1Clean.Soundness.RowView
 import SP1Clean.Native.Readers.RTypeReader
 import SP1Clean.Model.InteractionBus
 import SP1Clean.Model.InteractionProjection
-import SP1Clean.Model.InteractionRecovery
+import ToClean.Circuit.InteractionRecovery
 import SP1Clean.Native.Readers.MemoryAccess
 import Clean.Utils.OfflineMemory
 
@@ -159,7 +159,7 @@ theorem memoryLookups_padding [NeZero p] (r : Trace.RowView (ZMod p)) (h : r.is_
   simp only [memoryLookups, multiplicitySum_cons, multiplicitySum_nil, multOf, h, zero_mul,
     ZMod.val_zero, Nat.cast_zero, neg_zero, ite_self, add_zero]
 
-open Circuit SP1Clean.InteractionRecovery
+open Circuit InteractionRecovery
 open SP1Clean.Channels (memoryChannel MemoryMsg)
 
 /-- The **five** Memory-bus contributions `Readers/RTypeReader.main` actually emits after the W11 polarity

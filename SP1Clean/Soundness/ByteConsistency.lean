@@ -75,10 +75,10 @@ def byteAccessValid (r : Trace.RowView (ZMod p)) : Prop :=
 structure TraceByteValid (rows : List (Trace.RowView (ZMod p))) : Prop where
   rows_valid : ∀ r ∈ rows, byteAccessValid r
 
-/-- **The crux (threaded).** Every byte row each chip `send`s is `receive`d by the preprocessed
-`ByteChip`, whose constraints force its rows to be valid — so a multiset-balanced Byte bus makes every
-sent row a valid `ByteRowSpec`. Deriving this needs the (absent) native `ByteChip` provider + the
-balance; `StateConsistency` likewise threads its `TraceStateLink`. -/
+/-- **The trace-shape interface.** Every byte row each chip `send`s is `receive`d by a provider whose
+constraints force its rows to be valid, so a multiset-balanced Byte bus makes every sent row a valid
+`ByteRowSpec`. `byteAccessValid_of_balance` below discharges this interface from the native
+`ByteProvider` plus balance; keeping the predicate named makes that proof boundary reusable. -/
 def TraceByteLink (rows : List (Trace.RowView (ZMod p))) : Prop :=
   ∀ r ∈ rows, byteAccessValid r
 
@@ -87,8 +87,8 @@ theorem traceByteValid_of_byteLink (rows : List (Trace.RowView (ZMod p)))
     (h_link : TraceByteLink rows) : TraceByteValid rows :=
   ⟨h_link⟩
 
-/-- The trace-level claim a future `ByteChip`-aware soundness discharges: the aggregated per-row byte
-contributions form a balanced bus. -/
+/-- The trace-level Byte-balance predicate consumed by `byteAccessValid_of_balance`: the aggregated
+per-row byte contributions form a balanced bus. -/
 def TraceByteConsistent (rows : List (Trace.RowView (ZMod p))) : Prop :=
   (aggregateChipRows rows byteLookups).isConsistentOnline
 

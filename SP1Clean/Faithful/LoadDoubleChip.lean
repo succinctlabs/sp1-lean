@@ -6,7 +6,7 @@ import SP1Clean.Proofs.Chips.LoadDoubleChip.Formal
 # Exact whole-chip faithfulness for SP1 `LoadDouble`
 
 This file relates the native Clean `LoadDoubleChip` row to the complete generated row-level oracle
-for pinned SP1 v6.3.1. The `ChipFaithful` theorem at the bottom covers every `assertZero` expression and the
+for pinned SP1 v6.4.0. The `ChipFaithful` theorem at the bottom covers every `assertZero` expression and the
 entire interaction multiset, including inactive rows.
 -/
 
@@ -1017,7 +1017,7 @@ theorem loadDoubleChipConstraintsConstructive
 
 open SP1Clean.Channels
   (stateChannel byteChannel memoryChannel programChannel)
-open SP1Clean.InteractionRecovery
+open InteractionRecovery
 
 private def loadDoubleStateInteractions
     (input : Var LoadDoubleChip.Inputs (ZMod p)) :

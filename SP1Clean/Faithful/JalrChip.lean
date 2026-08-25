@@ -5,7 +5,7 @@ import SP1Clean.Proofs.Chips.JalrChip.Formal
 /-! # Whole-chip faithfulness — native Jalr row ↔ pinned SP1 Rust AIR
 
 `jalrChip_faithful` compares the complete native Clean JALR circuit with the
-v6.3.1 Rust `JalrOracle.JalrColumns` assertion system and interaction multiset
+v6.4.0 Rust `JalrOracle.JalrColumns` assertion system and interaction multiset
 (after one explicit row reconfiguration) on real, `jalr x0`, and padding rows.
 Rust redundantly zeroes the first three link limbs at chip level in addition to
 the I-type adapter's four-limb zeroing; the assertion proof preserves that
@@ -387,7 +387,7 @@ private theorem nativeConstraintsDecompose
     nativeLinkAddMeaning nativeITypeMeaning nativeWriteMeaning
   simp only [nativeAssertZeros, JalrChip.main,
     Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-    witnessVectorNative, witnessNative, Witnessable.witnessIR_field,
+    witnessVectorIR, witnessField,
     subcircuitWithAssertion, assertion,
     assertZero, HasAssertEq.assert_eq, Expression.assertEquals,
     Channel.pullIf, Operations.localLength]
@@ -877,7 +877,7 @@ theorem jalrChipConstraintsConstructive
 
 open SP1Clean.Channels
   (stateChannel byteChannel memoryChannel programChannel)
-open SP1Clean.InteractionRecovery
+open InteractionRecovery
 
 private theorem stateInteractionsFaithful
     (env : Environment (ZMod p))
@@ -982,7 +982,7 @@ private theorem byteInteractionsFaithful
     ← ProvableType.getElem_eval_fields,
     Vector.getElem_mapRange, ProvableType.eval_field,
     Expression.eval, h6, h3,
-    Extracted.Interaction.toAccess, Nat.add_assoc]
+    Extracted.Interaction.toAccess, Extracted.Dir.sign, Nat.add_assoc]
   simp only [← ProvableStruct.eval_eq_eval,
     JalrChip.eval_inputs, eval_cpuState, evalITypeReader,
     eval_registerAccessCols,

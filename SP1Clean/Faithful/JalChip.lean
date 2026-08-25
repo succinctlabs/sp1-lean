@@ -5,7 +5,7 @@ import SP1Clean.Proofs.Chips.JalChip.Formal
 /-! # Whole-chip faithfulness — native Jal row ↔ pinned SP1 Rust AIR
 
 `jalChip_faithful` compares the complete native Clean JAL circuit with the
-v6.3.1 Rust `JalOracle.JalColumns` assertion system and interaction multiset
+v6.4.0 Rust `JalOracle.JalColumns` assertion system and interaction multiset
 (after one explicit row reconfiguration) on real, `jal x0`, and padding rows.
 Rust redundantly zeroes the first three link limbs at chip level in addition to
 the J-type adapter's four-limb zeroing; the assertion proof preserves that
@@ -369,7 +369,7 @@ private theorem nativeConstraintsDecompose
     nativeLinkAddMeaning nativeJTypeMeaning nativeWriteMeaning
   simp only [nativeAssertZeros, JalChip.main,
     Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-    witnessVectorNative, subcircuitWithAssertion, assertion,
+    witnessVectorIR, subcircuitWithAssertion, assertion,
     assertZero, HasAssertEq.assert_eq, Expression.assertEquals,
     Channel.pullIf, Operations.localLength]
   simp only [Operations.constraints_append,
@@ -827,7 +827,7 @@ theorem jalChipConstraintsConstructive
 
 open SP1Clean.Channels
   (stateChannel byteChannel memoryChannel programChannel)
-open SP1Clean.InteractionRecovery
+open InteractionRecovery
 
 private theorem stateInteractionsFaithful
     (env : Environment (ZMod p))

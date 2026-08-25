@@ -19,10 +19,18 @@ reader-facing docs one level up (start with [`../architecture.md`](../architectu
 - [proof-patterns.md](proof-patterns.md) — the witnessed-`FormalCircuit` soundness/completeness skeleton; `ZMod p` / `Word` / `circuit_proof_start` landmines; the fold recipes that keep proofs inside the default elaboration budget; the `ElaboratedCircuit` field-obligation recipe; the **Golf & cleanup discipline** section (how to golf/clean proofs safely).
 - [lean-sail-notes.md](lean-sail-notes.md) — the Lean 4.32.2 dependency environment: the immutable git
   pins, the generated-model/runtime pairing rule, and the `lake update` toolchain-bump trap.
+- [clean-upstream.md](clean-upstream.md) — **the Clean pin is currently a fork.** Its state and exit
+  condition, the rule for what may go in the fork versus `ToClean/` (modification vs addition), and the
+  upstream PR queue with the measurement behind each entry.
+- [sp1-upstream-draft.md](sp1-upstream-draft.md) — the prepared SP1-side draft PR: the 5-commit
+  `v6.4.0`-based series, why it is not rebased onto `sp1-private/main`, and the PR body.
+  **Prepared only — nothing pushed.**
+- [upstream-drafts.md](upstream-drafts.md) — ready-to-file Clean issue/PR texts for the queue
+  (U11 first). **Prepared only — posting requires the owner's explicit approval.**
 - [sail-model-provenance.md](sail-model-provenance.md) — the generated `Lean_RV64D` snapshot's
-  provenance: the four-key SP1 config and its six generated sites (CLINT/signature/PMP off), why it
-  is load-bearing for the memory-bridge lemmas, its `rfl` disclosure lemmas, the generation
-  pipeline, and the re-pinning procedure.
+  provenance: the two-key SP1 config and its four generated sites (CLINT/interrupt-generator off;
+  PMP-off is a Lean-side hypothesis since 2026-08), why it is load-bearing for the memory-bridge
+  lemmas, its `rfl` disclosure lemmas, the generation pipeline, and the re-pinning procedure.
 - [extraction.md](extraction.md) — the constraint-extraction pipeline (`sp1-constraint-compiler` → `update_extracted.py` → Lean) and the DSL contract.
 - [cleanup-profile.md](cleanup-profile.md) — binding house rules for `/cleanup` and `/cleanup-all`; overrides the `mathlib-quality` plugin wherever they conflict.
 - [perf-findings.md](perf-findings.md) — how to avoid an elaboration budget: **the rule** (extract over opaque arguments), the folded-vs-unfolded predictor, the cause classes with their fixes, the diagnostic instrument and measurement traps, and the bar a site must clear before it may be allowlisted.

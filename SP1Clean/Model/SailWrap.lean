@@ -2,7 +2,7 @@ import Mathlib.Tactic
 import Mathlib.Data.ZMod.Basic
 import Batteries.Lean.EStateM
 import LeanRV64D
-import SP1Clean.Math.Misc
+import ToMathlib.General
 import SP1Clean.Model.Register
 set_option linter.unusedSimpArgs false
 

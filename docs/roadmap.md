@@ -11,10 +11,18 @@ Completed:
 - 25 native instruction circuits with soundness and completeness;
 - 25 Sail bridges and `ChipKind.advance` registrations;
 - 25 whole-chip `ChipFaithful` proofs;
-- deterministic typed row decoding and exhaustive ranked State ordering;
-- Program and Memory timed grounding for the native 38-table ensemble;
+- a kernel-checked 25-table oracle-column-size ↔ independent-manifest `mainWidth` battery;
+- deterministic typed row decoding and exhaustive ranked State ordering, with the public
+  `supported_core_native_grounding` endpoint retaining final-State and memory-finalize truth;
+- Program and Memory timed grounding for the native 53-table ensemble;
 - `supported_core_native_sound`;
 - exact list-level 34-table execution and 6-table memory-boundary relations;
+- constructive exact-row assembly of all 53 native tables plus the verifier row, with local
+  constraints proved from valid clusters, a caller-supplied `CanonicalPreprocessedInventory`, and
+  named preprocessing, memory-boundary, and public-limb transport contracts;
+- a hand-assembled one-instruction semantic trace record whose physical rows are circuit-generated,
+  carried through native AIR soundness to Sail for any supplied model satisfying
+  `UsesOrdinarySchedule`;
 - honest COMMIT-row versus wrapper-coverage separation; and
 - zero main-library proof deferrals or project axioms.
 
@@ -28,6 +36,11 @@ Not completed:
 - whole-machine witness-generation completeness.
 
 ## P0: close exact Core AIR soundness
+
+The final exact-v6.4.0 theorem in this phase is concrete at SP1's KoalaBear field. The native
+instruction/grounding library remains generic, but the extracted `Global`/`SyscallInstrs` and
+public-value curve-seed assertions contain KoalaBear-canonical literals; generalizing that exact
+system layer would require a separate literal-interpretation theorem.
 
 ### 1. Transport all instruction tables
 
@@ -45,15 +58,51 @@ creates an explicit coverage failure. Do not write 25 unrelated top-level dispat
 Deliverable: a theorem that projects the exact 25 instruction tables into the instruction part of a
 valid native witness, with assertion and bus-balance transport proved once at the registry layer.
 
+**Status (2026-08-22): the instruction-table transport and its access aggregation are delivered.**
+`SP1Clean/Faithful/Transport/` proves the transport once over an
+arbitrary codec/oracle/`ChipFaithful` triple — no chip is named, so the 25 instantiations cannot
+drift apart — and `extracted_instructionTables_constraints` runs it against the real extracted
+relation: a witness satisfying `CoreAIR.Current.Relation` yields 25 native Clean tables satisfying their whole
+circuits' constraint systems. `transported_map_component` shows those tables *are* `sp1Tables`, by
+`rfl`; `transportedInstructionActiveAccesses_perm` appends the 25 per-table interaction
+permutations into one ordered active ledger. `Transport/Balance.lean` carries the
+extracted ℕ-exact balance to a zero signed-ℤ sum per payload under an explicit `SmallMultiplicities`
+premise (`ZMod.val` and the centred `signedVal` diverge above `p / 2`; this is the multiplicity bound
+the interaction-argument extractor must supply anyway), and `ExactBalance.lean` proves the
+payload→native-key projection injective and closes the per-key integer balance step as a reusable
+transport theorem. Those lemmas are not yet composed across the provider/public redistribution to
+derive `CoreArtifact`'s global balance contract.
+
+The current instantiation remains 25 generated citations of the generic theorems rather than a fold
+over `supportedChipFaithfulness`; adding a Core table is still caught by the separately proved exact
+profile/coverage equalities, but not by the aggregate theorem's own type. The remaining balance work
+is no longer in the instruction segment: it is the provider/public-boundary redistribution described
+below.
+
 ### 2. Ground preprocessed and system tables
+
+> **Upstream drift, measured 2026-08-19 — read before sequencing this.** SP1's internal line has
+> replaced the global-accumulation memory architecture with a Merkle-tree one: relative to our
+> `v6.4.0` pin, `RiscvAir` drops `Global`, `MemoryGlobalInit`, `MemoryGlobalFinal`,
+> `PageProtGlobalInit`, `PageProtGlobalFinal` and all four `Syscall*` tables, and gains
+> `MerkleTreeTraversal`, `LeafHash`, `LeafHashControl`, `HintRead`, `HintReadControl`; six
+> `InteractionKind` variants go with them. **The 25 instruction chips and their four buses are
+> untouched**, so P0 §1 and everything under it is unaffected. But several bullets below —
+> `Global`'s boundary/cumulative facts, the syscall tables, and the page-prot boundary — are
+> grounding work aimed at tables that upstream is retiring. Sequence accordingly: prefer the
+> bullets that survive the redesign (Program/Byte/Range/MemoryLocal/MemoryBump/StateBump), and
+> treat the `Global`/syscall/page-prot grounding as pinned-to-v6.4.0 work that a future re-pin
+> will re-derive rather than reuse. Details and evidence:
+> `docs/agents/extraction.md` § "Upstream architecture drift".
 
 Prove the semantic facts currently supplied to `SupportedCoreNativeRelation` from the exact upstream
 tables:
 
-- Program: the decoded Program-provider messages. Note the exact upstream Program table carries
-  an *empty* assert list — its whole semantic content is the preprocessed commitment — so this
-  discharge routes through the C1 `PreprocessedBinding` (C1–C3 are the named cryptographic trust
-  boundaries of `docs/verification-report.md`) plus a (still unbuilt) correspondence
+- Program: the decoded Program-provider messages. Note that all three raw exact preprocessing
+  tables — Byte, Range, and Program — carry *empty* assertion lists. C1 `PreprocessedBinding`
+  (C1–C3 are the named cryptographic trust boundaries of `docs/verification-report.md`) only records
+  the matrix/PCS-opening premise to be discharged by ArkLib. Row-local meaning therefore
+  remains a separate caller premise, and the Program discharge additionally needs a (still unbuilt) correspondence
   between the committed decoded-operand encoding and the native `GuestProgram`/`ext_decode`
   decode, not through table constraints;
 - Byte and Range: lookup-provider coverage;
@@ -70,9 +119,48 @@ tables:
   or a per-address premise restatement; and
 - SyscallCore/SyscallInstrs: raw syscall transcript consistency.
 
-This work should target the existing `InitialBoundaryFacts`,
-`SupportedCoreMemoryTimestampRangeRelation`, and event structures. Extend those contracts only when the
-exact upstream AIR proves a materially stronger fact that is needed by correctness.
+This work should target the existing `InitialBoundaryFacts` and event structures. Extend those
+contracts only when the exact upstream AIR proves a materially stronger fact that is needed by
+correctness. The pulled-timestamp `< 2^24` range fact is **not** on this list any more: it is
+derived natively from the per-location Memory balance (`SP1Clean/Soundness/AIR.lean`), so the
+upstream discharge inherits it rather than having to reprove it.
+
+**Status (2026-08-22): local provider/system transport and full native assembly under named
+transport contracts are delivered.**
+`PreprocessedProviders.lean`, `MemoryBoundary.lean`, `SystemTables.lean`, and
+`ProviderSegment.lean` constructs all 28 native provider tables from valid exact-cluster witnesses,
+a caller-supplied `CanonicalPreprocessedInventory`, and named per-row preprocessing and
+memory-boundary contracts, and proves their local constraints.
+`CoreEnsemble.lean` appends them to the 25 transported instruction tables; its separate public-limb
+contract projects the exact public boundary and justifies the native verifier row, yielding complete local
+`EnsembleWitness.Constraints`. `CoreArtifact.lean` is the stable consumer-facing endpoint: the
+caller-supplied recount contract derives Byte (including Range) and Program integer balance;
+`ExactNativeGlobalContract` retains all-channel interaction-count bounds, State/Memory integer
+balance, and `SemanticBoundaryBinding`. From the two, the library derives
+`SupportedCoreNativeRelation` and an official-Sail local execution for any supplied model satisfying
+`UsesOrdinarySchedule`. The
+provider family is six Byte-op tables, all 17 Range widths `0..16`, Program, MemoryInit,
+MemoryFinalize, MemoryBump, and StateBump. The complete Range family closes honest shift-row balance;
+the former four-width subset omitted live shift lookup keys.
+
+Byte/Range/Program multiplicities are now recounted from the actual Clean interaction ledger of the
+verifier, 25 transported instruction tables, MemoryInit/MemoryFinalize, and both bumps instead of
+copied from the full 34-table exact cluster, which includes system/public consumers absent here.
+The raw exact Byte/Range/Program assertion lists are empty. `CoreAIR.PreprocessedBinding` only
+records the named matrix/PCS-opening premise, to be discharged by ArkLib; it proves neither
+row-local meaning nor provider selection. `PreprocessedProviderContract` is the explicit caller
+premise for row-local semantics. Source main multiplicities are not reused and
+raw projected keys are not assumed unique. The caller-supplied
+`CanonicalPreprocessedInventory` selects matching-block source-backed carriers and explicitly carries
+projected-key `Nodup`; it may omit raw keys with zero native demand. The recount contract separately
+keeps nonzero Byte/Program-key coverage, skeleton nonpositivity, and `2 * count ≤ p` explicit.
+`freshRowsByKey` is declarative/regression-only, not the inventory construction path. PCS/program
+identity, State and Memory balance, and `SemanticBoundaryBinding` also remain explicit. The
+exact-access permutation and
+`ExactBalance` lemmas remain available; there is no joint inhabitance anchor for that contract and
+valid exact clusters. The open proof must also cross the deliberately named
+Range13-quotient→Range16 and raw `Global`→typed-Memory transformations; neither is a literal
+interaction permutation.
 
 The main correctness risks to audit are:
 
@@ -160,24 +248,66 @@ Pin the Core verifier target and prove:
 - LogUp/GKR knowledge soundness;
 - zero-check and PCS knowledge soundness;
 - commitment and preprocessed-trace binding;
-- extraction of exact natural interaction multiplicities with bounds; and
+- extraction of exact natural interaction multiplicities with bounds;
+- construction/authentication of a matching-block source-backed `CanonicalPreprocessedInventory`,
+  including projected-key `Nodup`, plus native-skeleton coverage/nonpositivity and canonical capacity
+  for the Byte/Range/Program recount — without identifying full-cluster counts with the smaller
+  native consumer universe; and
 - a composed probabilistic `sp1_verifier_sound` with an explicit failure probability.
 
 Compressed, Plonk, and Groth16 are separate targets. Do not broaden the Core theorem implicitly.
 
 ## P3: extractable witness generation and completeness
 
-Use Clean's witness-generation IR to replace sampled conformance with proved construction:
+All 25 instruction chips generate their witnesses through Clean's exportable witness IR, and the
+connection to SP1's Rust `generate_trace` exists today at **conformance strength**: the exported
+wire-format programs + symbolic row maps (`export/witgen/`), the committed SP1 trace dumps
+(`export/sp1dump/`), the fail-closed generation-time gate (`scripts/witgenExport.lean --testdata` —
+every event row of every chip recomputed and matched cell-for-cell against SP1's real prover
+output), and the independent Rust reference-interpreter differential (`rust/witgen-interp`, which
+also reconstructs the full Rust rows and checks all extracted constraints on them).
+
+The remaining P3 target is upgrading that sampled conformance to **proved construction**:
 
 - generate every native instruction and provider row from supported execution events;
 - prove row constraints and all channel balances;
-- reconfigure the native trace to the exact upstream trace;
-- connect the construction to SP1's Rust `generate_trace`; and
+- reconfigure the native trace to the exact upstream trace; and
 - prove proof-system completeness separately.
 
 The source relation must express supported, trace-generatable executions and concrete syscall handler
-behavior. Existing `SP1CleanTest` batteries remain regression tests during this work but are not a
-substitute for the theorem.
+behavior. The conformance pipeline remains the empirical regression layer during this work but is not
+a substitute for the theorem.
+
+**Status (2026-08-22): native assembly is proved conditionally, and one active path is witnessed.**
+W4 built `ToClean/Air/TableBuild.lean` and local completeness tables for all 25 chips plus the 28
+providers and verifier row. W5's `supported_core_native_complete`
+(`SP1Clean/Soundness/AIRCompleteness.lean`) turns a supplied trace into an `EnsembleWitness`
+satisfying `SupportedCoreNativeRelation` when it has `WellFormed`, `ProviderMultiplicitiesFit`
+(`2 * m ≤ p` for each
+aggregate Byte/Range/Program count), exact centered-integer per-key `BalancedOn` plus the separate
+interaction-count bound `< p`, public-value equality, and `SemanticBoundaryBinding`. It targets
+`SupportedCoreNativeRelation` itself with nothing weakened on the AIR side.
+`SP1CleanTest/Audit/ActiveTraceNonVacuity.lean` hand-assembles one semantic trace record for
+`JAL x0, 0`; its event count and decoded physical instruction-row count are both one, and its
+matching native provider occurrences close all four channel ledgers. Completeness then generates
+the physical AIR rows through the circuits, and soundness sends the resulting witness to the
+official-Sail local-execution relation for any supplied model satisfying `UsesOrdinarySchedule`.
+This is a real-row non-vacuity anchor, not a verified or full
+trace generator. Bitwise/Lt/Addw/ShiftLeft/ShiftRight immediate rows and UType/JAL x0 rows are now
+included by their
+generator-relative completeness theorems.
+
+What that does **not** yet say, and what P3 still means:
+
+- **The generator is not verified.** Nothing proves every supported Sail execution yields a
+  trace meeting the routing, provider-capacity, exact integer-balance, public-equality, and boundary
+  contracts above; the theorem is completeness *relative to* a correct generator.
+- **Bump inputs are assumed, not derived.** The trace record carries StateBump/MemoryBump input rows
+  satisfying the chips' `Spec`; `Table.build` constructs the physical rows, but no generator derives
+  those inputs at window crossings — the very rows that
+  make shards above ~2²¹ rows witnessable on the soundness side.
+- The third and fourth bullets above (reconfiguration to the exact upstream trace, proof-system
+  completeness) are untouched.
 
 ## Maintenance gates
 
@@ -195,7 +325,7 @@ On an SP1 pin change:
 - compare the unmodified Rust machine source first;
 - regenerate the runtime table/width/public-value manifest;
 - re-audit first/last/transition selector use;
-- regenerate every list anchor and conformance vector;
+- regenerate every list anchor, the SP1 trace dumps, and the gated fixtures;
 - update both semantic and extractor provenance;
 - prove the 25-table coverage permutation again; and
 - treat a cluster, width, interaction-kind, or schedule change as an architecture change, not a
@@ -203,8 +333,9 @@ On an SP1 pin change:
 
 On a Sail model re-pin: never hand-edit generated Lean. Update the pins in
 `scripts/sail-config/generate_lean_rv64d.sh`, run `--stock` until byte-identical against the new
-opencompl base, then `--sp1` and audit that the base diff is still exactly the six config-value
-sites; publish + tag + pin, and refresh the pin rows in `release-audit.md`. Full procedure:
+opencompl base, then `--sp1` and audit that the base diff is still exactly the four
+platform-value sites the two-key config sets (PMP-off is a Lean-side hypothesis, not a
+generated-model edit); publish + tag + pin, and refresh the pin rows in `release-audit.md`. Full procedure:
 `docs/agents/sail-model-provenance.md` (expect `Model/SailMemory.lean` + `Proofs/Sail/` proof
 churn from the base move itself).
 
@@ -214,15 +345,6 @@ Deferred quality/perf TODOs — none gate the VM theorem; pick up opportunistica
 *how-to-golf-safely* rules live in `docs/agents/cleanup-profile.md` (the binding house rules for
 `/cleanup` and `/cleanup-all`) and `docs/agents/proof-patterns.md` § "Golf & cleanup discipline"
 + § "Compile-time / performance landmines".
-
-- **One-instruction end-to-end instance** (2026-08 audit recommendation): a hand-built
-  single-Add-instruction witness — real ROM byte in `mem`, one instruction row, a whole
-  38-table `EnsembleWitness` with proved `Constraints ∧ BalancedChannels`, and a constructed
-  `InitialBoundaryFacts` exhibiting all 11 fields simultaneously. This is the cheapest strong
-  evidence for *joint* satisfiability of the capstone premise bundle (in particular
-  `memoryProvider` content vs `romLoaded`/`codeMemoryCompatible` at overlapping addresses —
-  a cross-field tension no current anchor exercises; today only `isInitialState_nonvacuous`
-  witnesses the empty program) and would validate the §2 closure story empirically.
 
 - **`linter.style.longLine`** — the one remaining syntactic linter not yet enabled (the last
   candidate noted in AGENTS.md § Linters). Current fallout, lines over 100 **codepoints** in

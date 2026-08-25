@@ -41,7 +41,8 @@ private theorem controlExpressions_subset_shallowConstraints
   rcases he with rfl | rfl | rfl | rfl | rfl | rfl | rfl
   all_goals
     simp only [MulChip.main, Circuit.operations, Circuit.bind_def, Circuit.pure_def,
-      witnessVectorNative, subcircuitWithAssertion, assertion, assertZero,
+      witnessVectorIR, Witnessable.witness, witnessIR,
+      subcircuitWithAssertion, assertion, assertZero,
       Operations.localLength, Operations.shallowConstraints, List.mem_cons, List.not_mem_nil,
       or_false, circuit_norm]
 

@@ -155,8 +155,39 @@ theorem completeness :
     rw [ProvableType.getElem_eval_fields, hpc]
   simp only [circuit_norm] at h_env_a h_env_cb h_env_v h_env_s h_env_lo h_env_hi h_env_lr
   simp only [circuit_norm] at h_env_msb h_env_fl
-  simp only [vec4_eval, hbpv_map, ec0] at h_env_a h_env_cb h_env_v h_env_s h_env_lo h_env_hi
-  simp only [vec4_eval, hbpv_map, ec0] at h_env_lr h_env_msb
+  -- The witness stream is the exportable IR; the family eval lemmas rewrite each pinned
+  -- obligation to the value-level witness functions (the operands folded through `heb`/`ec0`).
+  have hAIRa := populateAIR_eval env input_var_adapter_op_b_memory_prev_value
+    input_var_adapter_op_c_memory_prev_value[0] input_adapter_op_b_memory_prev_value
+    input_adapter_op_c_memory_prev_value[0] heb ec0 hbU (hcU 0)
+  have hIRcb := cBitsIR_eval env input_var_adapter_op_c_memory_prev_value[0]
+    input_adapter_op_c_memory_prev_value[0] ec0 (hcU 0)
+  have hIRv := vPowersIR_eval env input_var_adapter_op_c_memory_prev_value[0]
+    input_adapter_op_c_memory_prev_value[0] ec0 (hcU 0)
+  have hIRs := shiftU16IR_eval env input_var_adapter_op_c_memory_prev_value[0]
+    input_adapter_op_c_memory_prev_value[0] ec0 (hcU 0)
+  have hIRlo := lowerLimbIR_eval env input_var_adapter_op_b_memory_prev_value
+    input_var_adapter_op_c_memory_prev_value[0] input_adapter_op_b_memory_prev_value
+    input_adapter_op_c_memory_prev_value[0] heb ec0 hbU (hcU 0)
+  have hIRhi := higherLimbIR_eval env input_var_adapter_op_b_memory_prev_value
+    input_var_adapter_op_c_memory_prev_value[0] input_adapter_op_b_memory_prev_value
+    input_adapter_op_c_memory_prev_value[0] heb ec0 hbU (hcU 0)
+  have hIRlr := limbResultIR_eval env input_var_adapter_op_b_memory_prev_value
+    input_var_adapter_op_c_memory_prev_value[0] input_adapter_op_b_memory_prev_value
+    input_adapter_op_c_memory_prev_value[0] heb ec0 hbU (hcU 0)
+  have hIRmsb := sllwMsbIR_eval env input_var_adapter_op_b_memory_prev_value
+    input_var_adapter_op_c_memory_prev_value[0] input_adapter_op_b_memory_prev_value
+    input_adapter_op_c_memory_prev_value[0] heb ec0 hbU (hcU 0)
+  have hIRfl := flagsIR_eval env input_var_adapter_imm_c
+  simp only [hAIRa] at h_env_a
+  simp only [hIRcb] at h_env_cb
+  simp only [hIRv] at h_env_v
+  simp only [hIRs] at h_env_s
+  simp only [hIRlo] at h_env_lo
+  simp only [hIRhi] at h_env_hi
+  simp only [hIRlr] at h_env_lr
+  simp only [hIRmsb] at h_env_msb
+  simp only [hIRfl, himm_eval] at h_env_fl
   set B := input_adapter_op_b_memory_prev_value with hB
   set c0 := input_adapter_op_c_memory_prev_value[0] with hc0
   set F := hintFlags env.hint with hF
@@ -189,7 +220,8 @@ theorem completeness :
   have hlr1 : env.get (i₀ + 4 + 6 + 3 + 4 + 4 + 4 + 1) = (limbResult B c0)[1] := by simpa using h_env_lr 1
   have hlr2 : env.get (i₀ + 4 + 6 + 3 + 4 + 4 + 4 + 2) = (limbResult B c0)[2] := by simpa using h_env_lr 2
   have hlr3 : env.get (i₀ + 4 + 6 + 3 + 4 + 4 + 4 + 3) = (limbResult B c0)[3] := by simpa using h_env_lr 3
-  have hmsbc : env.get (i₀ + 4 + 6 + 3 + 4 + 4 + 4 + 4) = sllwMsb B c0 F := h_env_msb
+  have hmsbc : env.get (i₀ + 4 + 6 + 3 + 4 + 4 + 4 + 4) = sllwMsb B c0 F := by
+    simpa using h_env_msb 0
   have hfl0 : env.get (i₀ + 4 + 6 + 3 + 4 + 4 + 4 + 4 + 1) = F[0] := by simpa using h_env_fl 0
   have hfl1 : env.get (i₀ + 4 + 6 + 3 + 4 + 4 + 4 + 4 + 1 + 1) = F[1] := by simpa using h_env_fl 1
   have hfl2 : env.get (i₀ + 4 + 6 + 3 + 4 + 4 + 4 + 4 + 1 + 2)
@@ -360,7 +392,8 @@ def circuit : GeneralFormalCircuit (ZMod p) Inputs Columns :=
     soundness := soundness, completeness := completeness,
     -- `byteChannel` dropped from `channelsWithRequirements` (W11): the nine `gate`-gated byte pulls'
     -- off-gate `Requirements` are discharged locally via the shallow `(is_sll + is_sllw)` boolean gate
-    -- (`off_gate_vacuous`), so `byteChannel` can later be *finished* in a Clean `SoundEnsemble`.
+    -- (`off_gate_vacuous`), so this circuit needs no Byte-channel requirement; the assembled
+    -- provider ledger handles the active multiplicities globally.
     channelsWithRequirements := [memoryChannel.toRaw],
     requirementsChannelsLawful := fun input_var i₀ =>
       requirementsChannelsLawful_main input_var i₀,

@@ -1,5 +1,7 @@
 import SP1Clean.FormalModel.Contracts.Chips
 import SP1Clean.Native.Operations.BitwiseU16Operation
+import SP1Clean.Native.Witgen.HintFlags
+import ToClean.Circuit.WitnessCombinator
 import SP1Clean.Native.Readers.CPUState
 import SP1Clean.Native.Readers.ALUTypeReader
 import SP1Clean.Native.Readers.RegisterWrite
@@ -83,6 +85,20 @@ def InteractSpec (_cols : Columns (ZMod p)) : Prop := True
 def hintFlags (h : ProverHint (ZMod p)) : Vector (ZMod p) 3 :=
   ((h "bitwise_flags" 3)[0]?).getD #v[0, 0, 0]
 
+omit [Fact (2 ^ 17 < p)] in
+/-- The accessor is literally the `hintFlagsIR` evaluation: `hintGet`'s zero default IS the
+`.getD #v[0, 0, 0]` fallback. Stated in the `Witgen.eval` normal form the completeness seam's
+witness obligations arrive in. -/
+lemma hintFlags_eval_ir (env : ProverEnvironment (ZMod p)) :
+    Witgen.eval (M := fields 3) { env := env } (hintFlagsIR (ZMod p) "bitwise_flags" 3)
+      = hintFlags env.hint := by
+  have hdefault : (default : Vector (ZMod p) 3) = #v[0, 0, 0] := rfl
+  rw [hintFlags, ← hdefault]
+  apply Vector.ext
+  intro i hi
+  rw [Witgen.eval_fields', Vector.getElem_map]
+  interval_cases i <;> simp only [hintFlagsIR, Vector.getElem_ofFn, circuit_norm]
+
 /-- Compose `Readers.CPUState.circuit` (forms `next_pc = [pc[0]+4, …]`, `clk_inc = 8`), **witness** the
 three variant flags `is_xor`/`is_or`/`is_and` (from the `"bitwise_flags"` `ProverHint`), compose the
 witnessed `BitwiseU16Operation` gadget (`subcircuit`, fed the SP1
@@ -95,17 +111,15 @@ copies; these struct fields are not read by the `Spec`). -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p)) := do
   let _ ← Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
-  let flags ← witnessVectorNative 3 (fun env => hintFlags env.hint)
+  let flags ← witnessVectorIR 3 (.ofFExprs (hintFlagsIR (ZMod p) "bitwise_flags" 3))
   let is_xor := flags[0]; let is_or := flags[1]; let is_and := flags[2]
   let byteOpcode : Expression (ZMod p) := is_xor * 2 + is_or * 1 + is_and * 0
   -- The chip witnesses the `BitwiseU16Operation` column struct (the two `U16toU8` low-byte blocks +
-  -- the eight result bytes) via `populate`, then composes `BitwiseU16Operation.circuit` as a Clean
-  -- `assertion` (it is a `FormalAssertion`, witnessing nothing of its own).
-  let bw_cols ← witnessNative (var := Var BitwiseU16Operation.Columns) (fun env =>
-    BitwiseU16Operation.populate
-      #v[env input.op_b_val[0], env input.op_b_val[1], env input.op_b_val[2], env input.op_b_val[3]]
-      #v[env input.op_c_val[0], env input.op_c_val[1], env input.op_c_val[2], env input.op_c_val[3]]
-      (env byteOpcode))
+  -- the eight result bytes) via the witness-IR twin `populateFE` (`populateFE_eval` ties it to
+  -- `populate`), then composes `BitwiseU16Operation.circuit` as a Clean `assertion` (it is a
+  -- `FormalAssertion`, witnessing nothing of its own).
+  let bw_cols ← witness (var := Var BitwiseU16Operation.Columns)
+    (BitwiseU16Operation.populateFE input.op_b_val input.op_c_val byteOpcode)
   assertion BitwiseU16Operation.circuit
     ⟨input.op_b_val, input.op_c_val, bw_cols, byteOpcode, input.is_real⟩
   let r := bw_cols.bitwise_operation.result
@@ -189,5 +203,26 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main where
     (Eval.eval env input).is_real = Expression.eval env input.is_real := by
   simpa only [CircuitType.eval_expr] using
     congrArg (fun value : Inputs F => value.is_real) (eval_inputs env input)
+
+/-! ### Operand words, in `circuit_norm`'s own orientation (the `AddChip/Defs.lean` pattern) —
+the `ComputableWitnesses` proof projects the struct-level input agreement onto these. -/
+
+@[circuit_norm] theorem eval_opBVal {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    (ProvableStruct.eval env input).op_b_val
+      = Vector.map (Expression.eval env) input.op_b_val := by
+  rw [← ProvableStruct.eval_eq_eval]
+  simp only [Inputs.op_b_val, eval_inputs, Readers.ALUTypeReader.eval_cols,
+    Readers.ALUTypeReader.eval_accessCols]
+  exact ProvableType.eval_fields env _
+
+@[circuit_norm] theorem eval_opCVal {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    (ProvableStruct.eval env input).op_c_val
+      = Vector.map (Expression.eval env) input.op_c_val := by
+  rw [← ProvableStruct.eval_eq_eval]
+  simp only [Inputs.op_c_val, eval_inputs, Readers.ALUTypeReader.eval_cols,
+    Readers.ALUTypeReader.eval_accessCols]
+  exact ProvableType.eval_fields env _
 
 end SP1Clean.BitwiseChip

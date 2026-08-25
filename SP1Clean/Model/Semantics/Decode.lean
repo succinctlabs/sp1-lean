@@ -11,8 +11,8 @@ DOWN to `Model/Semantics/` (from `Soundness/Decode.lean`) so the Program-bus exe
 `ProgTruth` (`Model/Semantics/Truth.lean` — a grounding conclusion, not a channel guarantee) can
 reference `decodedInROM`. Built on the
 official `ext_decode`/`encdec_backwards` decoder so fetch-decode coherence with `try_step` holds by
-construction. The `RowView`/`TargetObligations`-coupled theorems (`DecodeOperandsBound`,
-`decode_bound`, …) stay in `Soundness/Decode.lean`, which imports this core. Namespace
+construction. The hoist/evidence layer (`decodedInROMg`, the per-family hoists, the concrete
+program shapes) stays in `Soundness/Decode.lean`, which imports this core. Namespace
 `SP1Clean.Soundness.Target` is unchanged (decoupled from path), so every
 `instrToProgramRow`/`decodedInROM` reference resolves as before. -/
 

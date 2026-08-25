@@ -86,8 +86,8 @@ def rowView (inp : Inputs (ZMod p)) (cols : Columns (ZMod p)) : Trace.RowView (Z
   ⟨cols.state, #v[cols.state.pc[0] + 4, cols.state.pc[1], cols.state.pc[2]],
     cols.adapter.toAdapterView, inp.is_real, cols.add_operation.value, 0, .regWrite⟩
 
-/-- **`AddChip.advance`** — the per-Add-row `try_step` lift (SC Phase 4), closing `TargetObligations.lift`
-for Add rows: from a state `s` refining the row `rowView inp cols` (`SailConfigured` + `RomLoaded` + the
+/-- **`AddChip.advance`** — the per-Add-row `try_step` lift (SC Phase 4), the Sail step-lift the
+grounding engine fires at Add rows: from a state `s` refining the row `rowView inp cols` (`SailConfigured` + `RomLoaded` + the
 committed pc), the Memory-bus value bound (`ValueOperandsBound`), the Program-bus fetch truth
 (`decodedInROM`), the chip `Spec`, a real-row selector, and the `advanceReady` bundle (the reader-passthrough
 `inp.adapter = cols.adapter` + the routing fact `op_a ≠ 0`, both discharged by the trace dispatcher), one

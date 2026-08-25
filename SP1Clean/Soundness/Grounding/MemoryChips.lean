@@ -1349,42 +1349,6 @@ theorem rowWiring_storeRam_of_shape {chip : SupportedChip p}
   · rw [DecodedInstructionRow.ordinaryRowFacts_memPushes,
       producedMemoryMessages_eq_of_immutableRamShape shape decoded data hchip real]
 
-/-- The explicit witness-level high-timestamp premise specializes to the RAM prior message selected
-by an authenticated normal-load shape. -/
-theorem ramPrevHigh_lt_of_loadShape {chip : SupportedChip p}
-    (shape : LoadMemoryInteractionShape chip)
-    (decoded : DecodedInstructionRow p) (data : ProverData (ZMod p))
-    (hchip : decoded.chip = chip)
-    (real : (decoded.toChipRow data).view.is_real = 1)
-    (high : MemoryPullTimestampHighBound (decoded.ordinaryRowFacts data)) :
-    (shape.access decoded data).prevHigh.val < 2 ^ 24 := by
-  have member : (ramPriorMessage (shape.access decoded data),
-      StateMsg.timeNat (decoded.ordinaryRowFacts data).statePull) ∈
-      (decoded.ordinaryRowFacts data).memPulls := by
-    rw [DecodedInstructionRow.ordinaryRowFacts_memPulls,
-      consumedMemoryMessages_eq_of_loadShape shape decoded data hchip real]
-    rw [DecodedInstructionRow.ordinaryRowFacts_statePull]
-    exact List.mem_cons_self
-  simpa only [ramPriorMessage] using high _ member
-
-/-- Immutable RAM/I-type rows use the same first RAM pull and therefore the same specialization of
-the explicit high-timestamp premise. -/
-theorem ramPrevHigh_lt_of_immutableRamShape {chip : SupportedChip p}
-    (shape : ImmutableRamMemoryInteractionShape chip)
-    (decoded : DecodedInstructionRow p) (data : ProverData (ZMod p))
-    (hchip : decoded.chip = chip)
-    (real : (decoded.toChipRow data).view.is_real = 1)
-    (high : MemoryPullTimestampHighBound (decoded.ordinaryRowFacts data)) :
-    (shape.access decoded data).prevHigh.val < 2 ^ 24 := by
-  have member : (ramPriorMessage (shape.access decoded data),
-      StateMsg.timeNat (decoded.ordinaryRowFacts data).statePull) ∈
-      (decoded.ordinaryRowFacts data).memPulls := by
-    rw [DecodedInstructionRow.ordinaryRowFacts_memPulls,
-      consumedMemoryMessages_eq_of_immutableRamShape shape decoded data hchip real]
-    rw [DecodedInstructionRow.ordinaryRowFacts_statePull]
-    exact List.mem_cons_self
-  simpa only [ramPriorMessage] using high _ member
-
 /-- The three touches of a memory instruction in increasing effect-slot order: RAM at `+1`,
 source B at `+3`, and the destination/source-A slot at `+4`. -/
 def ramItypeTouches (view : Trace.RowView (ZMod p))
@@ -1428,7 +1392,8 @@ theorem rowAligned_ramItype {view : Trace.RowView (ZMod p)}
     (aPushClk : Channels.MemoryMsg.ClkBound aPush)
     (hslots : ∀ tc ∈ ramItypeTouches view access rf aPush,
       Channels.MemoryMsg.ClkBound (tc : Touch p).1.1 →
-        MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2) :
+        (tc : Touch p).1.1.clk_high.val < 2 ^ 24 →
+          MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2) :
     AlignsWith (alignedOf rf (ramItypeTouches view access rf aPush)) rf ∧
       (∀ tc ∈ ramItypeTouches view access rf aPush,
         TouchOK (StateMsg.timeNat rf.statePull) tc.1 tc.2) ∧
@@ -1440,7 +1405,8 @@ theorem rowAligned_ramItype {view : Trace.RowView (ZMod p)}
         Channels.MemoryMsg.ClkBound tc.2) ∧
       (∀ tc ∈ ramItypeTouches view access rf aPush,
         Channels.MemoryMsg.ClkBound (tc : Touch p).1.1 →
-          MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2) := by
+          (tc : Touch p).1.1.clk_high.val < 2 ^ 24 →
+            MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2) := by
   have hidxA : ((BitVec.ofNat 5 view.adapter.op_a.val).toNat : ZMod p) =
       view.adapter.op_a := by
     rw [BitVec.toNat_ofNat, Nat.mod_eq_of_lt (show view.adapter.op_a.val < 2 ^ 5 by omega)]
@@ -1659,7 +1625,6 @@ theorem rowAligned_loadRam_of_shape {chip : SupportedChip p}
     (timestamps : LoadMemoryTimestampBounds (decoded.toChipRow data).view
       (shape.access decoded data))
     (isRam : RamAccessIsRam (shape.access decoded data))
-    (ramHighBound : (shape.access decoded data).prevHigh.val < 2 ^ 24)
     (opa_lt : (decoded.toChipRow data).view.adapter.op_a.val < 32)
     (opb_lt : (decoded.toChipRow data).view.adapter.op_b[0].val < 32) :
     AlignsWith
@@ -1686,7 +1651,8 @@ theorem rowAligned_loadRam_of_shape {chip : SupportedChip p}
           (decoded.ordinaryRowFacts data)
           (rtypeWriteMessage (decoded.toChipRow data).view),
         Channels.MemoryMsg.ClkBound (tc : Touch p).1.1 →
-          MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2) := by
+          (tc : Touch p).1.1.clk_high.val < 2 ^ 24 →
+            MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2) := by
   let view := (decoded.toChipRow data).view
   let access := shape.access decoded data
   let rf := decoded.ordinaryRowFacts data
@@ -1695,8 +1661,9 @@ theorem rowAligned_loadRam_of_shape {chip : SupportedChip p}
   obtain ⟨ramTimestamp, timestampA, timestampB⟩ := timestamps
   have hslots : ∀ tc ∈ ramItypeTouches view access rf (rtypeWriteMessage view),
       Channels.MemoryMsg.ClkBound (tc : Touch p).1.1 →
-        MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2 := by
-    intro tc htc hclk
+        (tc : Touch p).1.1.clk_high.val < 2 ^ 24 →
+          MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2 := by
+    intro tc htc hclk hhigh
     simp only [ramItypeTouches, List.mem_cons, List.not_mem_nil, or_false] at htc
     rcases htc with rfl | rfl | rfl
     · exact memoryTimeNat_lt_of_memoryAccessFacts
@@ -1704,7 +1671,7 @@ theorem rowAligned_loadRam_of_shape {chip : SupportedChip p}
         access.compareLow access.prevHigh access.prevLow access.diffLow access.diffHigh
         view.state.clk_high
         (view.state.clk_0_16 + view.state.clk_16_24 * 65536)
-        hclk ramHighBound ramTimestamp rfl rfl rfl rfl
+        hclk (by simpa only [ramPriorMessage] using hhigh) ramTimestamp rfl rfl rfl rfl
     · exact TimeExtraction.memoryTimeNat_lt_of_activeTimestampBounds
         _ _ _ _ _ hclk timestampB rfl rfl rfl
     · exact TimeExtraction.memoryTimeNat_lt_of_activeTimestampBounds
@@ -1732,7 +1699,6 @@ theorem rowAligned_immutableRam_of_shape {chip : SupportedChip p}
     (timestamps : ImmutableRamTimestampBounds (decoded.toChipRow data).view
       (shape.access decoded data))
     (isRam : RamAccessIsRam (shape.access decoded data))
-    (ramHighBound : (shape.access decoded data).prevHigh.val < 2 ^ 24)
     (opa_lt : (decoded.toChipRow data).view.adapter.op_a.val < 32)
     (opb_lt : (decoded.toChipRow data).view.adapter.op_b[0].val < 32) :
     AlignsWith
@@ -1769,7 +1735,8 @@ theorem rowAligned_immutableRam_of_shape {chip : SupportedChip p}
             (decoded.toChipRow data).view.adapter.op_a
             (decoded.toChipRow data).view.adapter.op_a_memory 4),
         Channels.MemoryMsg.ClkBound (tc : Touch p).1.1 →
-          MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2) := by
+          (tc : Touch p).1.1.clk_high.val < 2 ^ 24 →
+            MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2) := by
   let view := (decoded.toChipRow data).view
   let access := shape.access decoded data
   let rf := decoded.ordinaryRowFacts data
@@ -1779,8 +1746,9 @@ theorem rowAligned_immutableRam_of_shape {chip : SupportedChip p}
   obtain ⟨ramTimestamp, timestampA, timestampB⟩ := timestamps
   have hslots : ∀ tc ∈ ramItypeTouches view access rf aPush,
       Channels.MemoryMsg.ClkBound (tc : Touch p).1.1 →
-        MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2 := by
-    intro tc htc hclk
+        (tc : Touch p).1.1.clk_high.val < 2 ^ 24 →
+          MemoryMsg.timeNat (tc : Touch p).1.1 < MemoryMsg.timeNat tc.2 := by
+    intro tc htc hclk hhigh
     simp only [ramItypeTouches, List.mem_cons, List.not_mem_nil, or_false] at htc
     rcases htc with rfl | rfl | rfl
     · exact memoryTimeNat_lt_of_memoryAccessFacts
@@ -1788,7 +1756,7 @@ theorem rowAligned_immutableRam_of_shape {chip : SupportedChip p}
         access.compareLow access.prevHigh access.prevLow access.diffLow access.diffHigh
         view.state.clk_high
         (view.state.clk_0_16 + view.state.clk_16_24 * 65536)
-        hclk ramHighBound ramTimestamp rfl rfl rfl rfl
+        hclk (by simpa only [ramPriorMessage] using hhigh) ramTimestamp rfl rfl rfl rfl
     · exact TimeExtraction.memoryTimeNat_lt_of_activeTimestampBounds
         _ _ _ _ _ hclk timestampB rfl rfl rfl
     · exact TimeExtraction.memoryTimeNat_lt_of_activeTimestampBounds
@@ -4744,7 +4712,7 @@ theorem storeByteAdvanceReady_of_decoded
   exact h
 
 omit [Fact (2 ^ 17 < p)] [Fact (2 ^ 25 < p)] in
-/-- The two high v6.3.1 SB offset bits select one prior 16-bit cell limb. The four
+/-- The two high v6.4.0 SB offset bits select one prior 16-bit cell limb. The four
 read-modify-write equations add the byte-sized increment to exactly that limb. -/
 theorem StoreByteChip.limbFacts
     (input : StoreByteChip.Inputs (ZMod p))
@@ -4837,7 +4805,7 @@ theorem StoreByteChip.limbFacts
       all_goals exact rmw3.trans (add_comm _ _)
 
 omit [Fact (2 ^ 25 < p)] in
-/-- The v6.3.1 SB byte selectors and read-modify-write equations describe exactly one
+/-- The v6.4.0 SB byte selectors and read-modify-write equations describe exactly one
 byte replacement in the authenticated aligned cell. -/
 theorem StoreByteChip.mergeFacts
     (input : StoreByteChip.Inputs (ZMod p))
@@ -5930,7 +5898,7 @@ theorem storeHalfAdvanceReady_of_decoded
   exact h
 
 omit [Fact (2 ^ 17 < p)] [Fact (2 ^ 25 < p)] in
-/-- The two v6.3.1 SH selector bits identify one 16-bit cell limb, and the four read-modify-write
+/-- The two v6.4.0 SH selector bits identify one 16-bit cell limb, and the four read-modify-write
 equations replace exactly that limb with rs2's low limb. -/
 theorem StoreHalfChip.mergeFacts
     (input : StoreHalfChip.Inputs (ZMod p))
@@ -6910,7 +6878,7 @@ theorem StoreWordChip.storeValue_isU64_of_constraints
 
 omit [Fact (2 ^ 25 < p)] in
 /-- StoreWord's semantic row writes the low four source bytes into the selected half of the
-authenticated RAM cell. The two cases are exactly the v6.3.1 AIR's `offset_bit`-selected
+authenticated RAM cell. The two cases are exactly the v6.4.0 AIR's `offset_bit`-selected
 read-modify-write equations. -/
 theorem storeWordChip_storeFacts
     (input : StoreWordChip.Inputs (ZMod p))

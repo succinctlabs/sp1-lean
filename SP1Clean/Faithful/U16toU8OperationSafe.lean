@@ -3,7 +3,7 @@ import Mathlib.Data.ZMod.Basic
 import SP1Clean.Native.Operations.U16toU8OperationSafe
 import SP1Clean.Model.SP1Constraint
 import SP1Clean.Model.InteractionProjection
-import SP1Clean.Model.InteractionRecovery
+import ToClean.Circuit.InteractionRecovery
 import SP1Clean.Faithful.ExtractedInteractionModel
 import SP1Clean.Extracted.U16toU8OperationSafe
 
@@ -40,7 +40,7 @@ theorem u16tou8safe_constraints_faithful (u16_values : Vector (ZMod p) 4)
     show (0 : ℕ) < 256 by norm_num]
 
 open SP1Clean.Channels (byteChannel)
-open SP1Clean.InteractionRecovery
+open InteractionRecovery
 
 /-- **Faithfulness anchor — interaction half, SYNTACTIC (WITNESSED case).** SP1's extracted
 `U16toU8OperationSafe.interactions` (at `is_real = 1`) and the Clean circuit's emitted byte interactions

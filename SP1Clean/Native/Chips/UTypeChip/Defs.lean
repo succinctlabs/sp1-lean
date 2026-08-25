@@ -4,6 +4,7 @@ import SP1Clean.Native.Readers.CPUState
 import SP1Clean.Native.Readers.JTypeReader
 import SP1Clean.Native.Readers.RegisterWrite
 import SP1Clean.Model.Channels
+import ToClean.Circuit.WitnessCombinator
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit
 import Clean.Circuit.Channel
@@ -27,17 +28,20 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 `AddOperation` (gate `is_real - op_a_0`), and `JTypeReader`. Pin the addend per-limb with
 `addend[i] = is_auipc * pc[i]` gates. -/
 def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p)) := do
-  let addend ← witnessVectorNative 3 (fun env =>
-    #v[env input.is_auipc * env input.state.pc[0],
-       env input.is_auipc * env input.state.pc[1],
-       env input.is_auipc * env input.state.pc[2]])
-  let add_value ← witnessVectorNative 4 (fun env =>
-    AddOperation.populate
-      #v[env input.is_auipc * env input.state.pc[0],
-         env input.is_auipc * env input.state.pc[1],
-         env input.is_auipc * env input.state.pc[2], 0]
-      #v[env input.adapter.op_b_imm[0], env input.adapter.op_b_imm[1],
-         env input.adapter.op_b_imm[2], env input.adapter.op_b_imm[3]])
+  -- The addend is pure field arithmetic over the input row, so it needs no `populate` companion:
+  -- the three products go straight into the witness IR as literal expressions.
+  let addend ← witnessVector 3 (.lit
+    #v[input.is_auipc * input.state.pc[0],
+       input.is_auipc * input.state.pc[1],
+       input.is_auipc * input.state.pc[2]])
+  -- SP1 populates the result word only when `rd ≠ x0` (`utype/mod.rs`:
+  -- `if record.op_a != 0 { add_operation.populate(..) }`); the gated IR zeroes these
+  -- cells on `op_a_0` rows so the derived trace matches byte-for-byte.
+  let add_value ← witnessVectorIR 4 (AddOperation.populateIRGated input.adapter.op_a_0
+    #v[input.is_auipc * input.state.pc[0],
+       input.is_auipc * input.state.pc[1],
+       input.is_auipc * input.state.pc[2], 0]
+    input.adapter.op_b_imm)
   let addendV : Word (Expression (ZMod p)) := #v[addend[0], addend[1], addend[2], 0]
   let _ ← Readers.CPUState.circuit
     ⟨input.state, #v[input.state.pc[0] + 4, input.state.pc[1], input.state.pc[2]], 8, input.is_real⟩
@@ -103,5 +107,36 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main := by
          add_operation := Eval.eval env cols.add_operation,
          is_auipc := Eval.eval env cols.is_auipc } : Columns F) := by
   rw [ProvableStruct.eval_eq_eval]; rfl
+
+/-! ### Operand words, in `circuit_norm`'s own orientation
+
+Projection outside `eval`, inert right-hand side — the form `ComputableWitnesses` hands over; see
+`AddChip/Defs.lean` for the rationale. U-type's addend is `is_auipc · pc` (zero for LUI, the program
+counter for AUIPC), so the pieces to project are the program counter and the J-type immediate; the
+`is_auipc` selector is a scalar and so is already in normal form. -/
+
+@[circuit_norm] theorem eval_statePc {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    (ProvableStruct.eval env input).state.pc
+      = Vector.map (Expression.eval env) input.state.pc := by
+  rw [← ProvableStruct.eval_eq_eval]
+  simp only [eval_inputs, Readers.CPUState.eval_cols]
+  exact ProvableType.eval_fields env _
+
+@[circuit_norm] theorem eval_opBImm {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    (ProvableStruct.eval env input).adapter.op_b_imm
+      = Vector.map (Expression.eval env) input.adapter.op_b_imm := by
+  rw [← ProvableStruct.eval_eq_eval]
+  simp only [eval_inputs, Readers.JTypeReader.eval_cols]
+  exact ProvableType.eval_fields env _
+
+@[circuit_norm] theorem eval_opA0 {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    (ProvableStruct.eval env input).adapter.op_a_0
+      = Expression.eval env input.adapter.op_a_0 := by
+  rw [← ProvableStruct.eval_eq_eval]
+  simp only [eval_inputs, Readers.JTypeReader.eval_cols]
+  exact ProvableType.eval_field env _
 
 end SP1Clean.UTypeChip

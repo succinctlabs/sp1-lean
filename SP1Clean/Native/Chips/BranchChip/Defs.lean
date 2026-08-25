@@ -2,6 +2,10 @@ import SP1Clean.FormalModel.Contracts.Chips
 import SP1Clean.Native.Operations.AddOperation.Populate
 import SP1Clean.Proofs.Operations.LtOperationSigned.Formal
 import SP1Clean.Native.Operations.LtOperationSigned.Populate
+import SP1Clean.Native.Witgen.HintFlags
+import ToClean.Circuit.WitnessCombinator
+import SP1Clean.Native.Readers.RTypeReader
+import SP1Clean.Native.Readers.ITypeReader
 import SP1Clean.Native.Readers.CPUState
 import SP1Clean.Native.Readers.ITypeReaderImmutable
 import SP1Clean.Model.Channels
@@ -19,7 +23,7 @@ Conditional control flow (opcodes 40–45: BEQ/BNE/BLT/BGE/BLTU/BGEU): `next_pc`
 SP1's eight inline gated carry equations for the two possible PC additions exactly. `AddOperation`
 is used only as proof-oriented witness-generation mathematics; it is not a Branch AIR subcircuit and
 does not contribute interactions. The six opcode flags sum to `is_real` (one-hot); the branch opcode
-is threaded via `ProverHint`. Implements pinned SP1 v6.3.1's `Branch` `air.rs::eval`. -/
+is threaded via `ProverHint`. Implements pinned SP1 v6.4.0's `Branch` `air.rs::eval`. -/
 
 namespace SP1Clean.BranchChip
 
@@ -40,6 +44,109 @@ def hintFlags (h : ProverHint (ZMod p)) : Vector (ZMod p) 6 :=
 /-- The honest `is_branching` decision the prover supplies via the `"branch_branching"` hint key. -/
 def hintBranching (h : ProverHint (ZMod p)) : ZMod p :=
   (((h "branch_branching" 1)[0]?).getD #v[0])[0]
+
+omit [Fact (2 ^ 17 < p)] in
+/-- The flag accessor is literally the `hintFlagsIR` evaluation (`hintGet`'s zero default IS the
+`.getD` fallback), in the `Witgen.eval` normal form the completeness seam arrives in. -/
+lemma hintFlags_eval_ir (env : ProverEnvironment (ZMod p)) :
+    (Witgen.WitgenIR.ofFExprs (hintFlagsIR (ZMod p) "branch_flags" 6)).eval env
+      = hintFlags env.hint := by
+  have hdefault : (default : Vector (ZMod p) 6) = #v[0, 0, 0, 0, 0, 0] := rfl
+  rw [hintFlagsIR_eval, hintFlags, ← hdefault]
+
+omit [Fact (2 ^ 17 < p)] in
+/-- The branching-decision accessor is literally the single-cell `hintGet` evaluation. -/
+lemma hintBranching_eval_ir (env : ProverEnvironment (ZMod p)) :
+    Witgen.FExpr.eval { env := env }
+        (.hintGet "branch_branching" 1 0 (0 : Fin 1) : Witgen.FExpr (ZMod p))
+      = hintBranching env.hint := by
+  have hdefault : (default : Vector (ZMod p) 1) = #v[0] := rfl
+  rw [hintBranching, ← hdefault]
+  simp only [circuit_norm]
+
+/-- The `next_pc` witness as exportable IR: the `is_branching`-selected blend of the two
+`AddOperation`-style carry chains (branch target `pc + imm`, fall-through `pc + 4`), limbs 0–2.
+Deliberately **not** `@[circuit_norm]`; `nextPcIR_eval` is the boundary. -/
+def nextPcIR (pc : Vector (Expression (ZMod p)) 3) (imm : Word (Expression (ZMod p)))
+    (is_branching is_real : Expression (ZMod p)) : Witgen.WitgenIR (ZMod p) 3 :=
+  let bs0 : Witgen.U64Expr (ZMod p) := pc[0].val + imm[0].val
+  let bs1 : Witgen.U64Expr (ZMod p) := pc[1].val + imm[1].val + bs0 / 65536
+  let bs2 : Witgen.U64Expr (ZMod p) := pc[2].val + imm[2].val + bs1 / 65536
+  let fs0 : Witgen.U64Expr (ZMod p) := pc[0].val + (4 : Witgen.U64Expr (ZMod p))
+  let fs1 : Witgen.U64Expr (ZMod p) := pc[1].val + fs0 / 65536
+  let fs2 : Witgen.U64Expr (ZMod p) := pc[2].val + fs1 / 65536
+  let br : Witgen.FExpr (ZMod p) := .expr is_branching
+  let rl : Witgen.FExpr (ZMod p) := .expr is_real
+  .ofFExprs #v[br * (bs0 % 65536).toField + (rl - br) * (fs0 % 65536).toField,
+               br * (bs1 % 65536).toField + (rl - br) * (fs1 % 65536).toField,
+               br * (bs2 % 65536).toField + (rl - br) * (fs2 % 65536).toField]
+
+omit [Fact (2 ^ 17 < p)] in
+private lemma word4_isU64 {v : Word (ZMod p)} (h : Word.isU64 v) :
+    v[0].val < 2 ^ 16 ∧ v[1].val < 2 ^ 16 ∧ v[2].val < 2 ^ 16 ∧ v[3].val < 2 ^ 16 :=
+  Word.lt_cases_of_isU64 h
+
+/-- Evaluating the `next_pc` IR is exactly the value-level blend of the two `AddOperation.populate`
+words, elementwise — the per-cell shape the completeness seam's witness obligations arrive in. The
+`isU64` bounds keep the u64-sorted carry chains from wrapping. -/
+theorem nextPcIR_eval (env : ProverEnvironment (ZMod p))
+    (pc : Vector (Expression (ZMod p)) 3) (imm : Word (Expression (ZMod p)))
+    (is_branching is_real : Expression (ZMod p))
+    (vpc : Vector (ZMod p) 3) (vimm : Word (ZMod p))
+    (hpc : #v[Expression.eval env.toEnvironment pc[0], Expression.eval env.toEnvironment pc[1],
+              Expression.eval env.toEnvironment pc[2]] = vpc)
+    (himm : #v[Expression.eval env.toEnvironment imm[0], Expression.eval env.toEnvironment imm[1],
+               Expression.eval env.toEnvironment imm[2],
+               Expression.eval env.toEnvironment imm[3]] = vimm)
+    (hpcU : Word.isU64 (#v[vpc[0], vpc[1], vpc[2], 0] : Word (ZMod p)))
+    (himmU : vimm.isU64) (k : ℕ) (hk : k < 3) :
+    ((nextPcIR pc imm is_branching is_real).eval env)[k]
+      = Expression.eval env.toEnvironment is_branching
+          * (AddOperation.populate #v[vpc[0], vpc[1], vpc[2], 0] vimm)[k]
+        + (Expression.eval env.toEnvironment is_real
+            - Expression.eval env.toEnvironment is_branching)
+          * (AddOperation.populate #v[vpc[0], vpc[1], vpc[2], 0]
+              (#v[4, 0, 0, 0] : Word (ZMod p)))[k] := by
+  have hp : 2 ^ 17 < p := Fact.out
+  obtain ⟨hu0, hu1, hu2, -⟩ := word4_isU64 hpcU
+  obtain ⟨hi0, hi1, hi2, hi3⟩ := word4_isU64 himmU
+  simp only [Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+    List.getElem_cons_succ] at hu0 hu1 hu2
+  have hP0 : Expression.eval env.toEnvironment pc[0] = vpc[0] := by rw [← hpc]; simp
+  have hP1 : Expression.eval env.toEnvironment pc[1] = vpc[1] := by rw [← hpc]; simp
+  have hP2 : Expression.eval env.toEnvironment pc[2] = vpc[2] := by rw [← hpc]; simp
+  have hI0 : Expression.eval env.toEnvironment imm[0] = vimm[0] := by rw [← himm]; simp
+  have hI1 : Expression.eval env.toEnvironment imm[1] = vimm[1] := by rw [← himm]; simp
+  have hI2 : Expression.eval env.toEnvironment imm[2] = vimm[2] := by rw [← himm]; simp
+  have h4 : ((4 : ZMod p)).val = 4 := by
+    rw [show (4 : ZMod p) = ((4 : ℕ) : ZMod p) by push_cast; ring,
+      ZMod.val_natCast_of_lt (by omega)]
+  interval_cases k <;>
+    simp only [nextPcIR, AddOperation.populate, Vector.getElem_mk, List.getElem_toArray,
+      List.getElem_cons_zero, List.getElem_cons_succ, circuit_norm,
+      hP0, hP1, hP2, hI0, hI1, hI2, h4, ZMod.val_zero]
+
+omit [Fact (2 ^ 17 < p)] in
+/-- Environment-locality of the `next_pc` IR (no bounds — a congruence). -/
+theorem nextPcIR_congr (env env' : ProverEnvironment (ZMod p))
+    (pc : Vector (Expression (ZMod p)) 3) (imm : Word (Expression (ZMod p)))
+    (is_branching is_real : Expression (ZMod p))
+    (hP : ∀ (i : ℕ) (_ : i < 3),
+      Expression.eval env.toEnvironment pc[i] = Expression.eval env'.toEnvironment pc[i])
+    (hI : ∀ (i : ℕ) (_ : i < 4),
+      Expression.eval env.toEnvironment imm[i] = Expression.eval env'.toEnvironment imm[i])
+    (hBr : Expression.eval env.toEnvironment is_branching
+      = Expression.eval env'.toEnvironment is_branching)
+    (hRl : Expression.eval env.toEnvironment is_real
+      = Expression.eval env'.toEnvironment is_real) :
+    (nextPcIR pc imm is_branching is_real).eval env
+      = (nextPcIR pc imm is_branching is_real).eval env' := by
+  apply Vector.ext
+  intro i hi
+  interval_cases i <;>
+    simp only [nextPcIR, circuit_norm, -Witgen.u64Wrap,
+      hP 0 (by omega), hP 1 (by omega), hP 2 (by omega),
+      hI 0 (by omega), hI 1 (by omega), hI 2 (by omega), hBr, hRl]
 
 /-- The rs1 register value (the `op_a` source read's prior value) as a 4-limb word, from the inputs. -/
 def rs1WordInput (input : Inputs (ZMod p)) : Word (ZMod p) :=
@@ -63,31 +170,15 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p))
     #v[input.adapter.op_b_memory.prev_value[0], input.adapter.op_b_memory.prev_value[1],
        input.adapter.op_b_memory.prev_value[2], input.adapter.op_b_memory.prev_value[3]]
   -- six opcode flags + is_branching: threaded via ProverHint (not an Inputs field).
-  let flags ← witnessVectorNative 6 (fun env => hintFlags env.hint)
+  let flags ← witnessVectorIR 6 (.ofFExprs (hintFlagsIR (ZMod p) "branch_flags" 6))
   let is_beq := flags[0]; let is_bne := flags[1]; let is_blt := flags[2]
   let is_bge := flags[3]; let is_bltu := flags[4]; let is_bgeu := flags[5]
-  let is_branching ← witnessNative (var := Expression) (fun env => hintBranching env.hint)
-  let next_pc ← witnessVectorNative 3 (fun env =>
-    let pc : Word (ZMod p) :=
-      #v[env input.state.pc[0], env input.state.pc[1],
-        env input.state.pc[2], 0]
-    let imm : Word (ZMod p) :=
-      #v[env input.adapter.op_c_imm[0], env input.adapter.op_c_imm[1],
-        env input.adapter.op_c_imm[2], env input.adapter.op_c_imm[3]]
-    let branchValue := AddOperation.populate pc imm
-    let fallValue := AddOperation.populate pc #v[4, 0, 0, 0]
-    let branch := env is_branching
-    let real := env input.is_real
-    #v[branch * branchValue[0] + (real - branch) * fallValue[0],
-      branch * branchValue[1] + (real - branch) * fallValue[1],
-      branch * branchValue[2] + (real - branch) * fallValue[2]])
-  let lt_cols ← witnessNative (var := Var Extracted.LtOperationSigned) (fun env =>
-    LtOperationSigned.populate
-      #v[env input.adapter.op_a_memory.prev_value[0], env input.adapter.op_a_memory.prev_value[1],
-         env input.adapter.op_a_memory.prev_value[2], env input.adapter.op_a_memory.prev_value[3]]
-      #v[env input.adapter.op_b_memory.prev_value[0], env input.adapter.op_b_memory.prev_value[1],
-         env input.adapter.op_b_memory.prev_value[2], env input.adapter.op_b_memory.prev_value[3]]
-      (env (is_blt + is_bge)) (env input.is_real))
+  let is_branching ← witnessField (.hintGet "branch_branching" 1 0 0)
+  let next_pc ← witnessVectorIR 3
+    (nextPcIR #v[input.state.pc[0], input.state.pc[1], input.state.pc[2]]
+      input.adapter.op_c_imm is_branching input.is_real)
+  let lt_cols ← witness (var := Var Extracted.LtOperationSigned)
+    (LtOperationSigned.populateFE rs1WordV rs2WordV (is_blt + is_bge) input.is_real)
   let cmp := lt_cols
   assertion LtOperationSigned.circuit ⟨rs1WordV, rs2WordV, lt_cols, is_blt + is_bge, input.is_real⟩
   is_beq * (is_beq - 1) === 0
@@ -196,7 +287,6 @@ reducibility to unfold the completed circuit while recovering the first input ce
   simpa only [CircuitType.eval_expr] using
     congrArg (fun value : Inputs F => value.is_real) (eval_inputs env input)
 
-/-- Component-wise evaluation of the completed Branch row. -/
 @[circuit_norm] theorem eval_columns {F : Type} [FiniteField F]
     (env : Environment F) (cols : Columns (Expression F)) :
     Eval.eval env cols =
@@ -215,8 +305,72 @@ reducibility to unfold the completed circuit while recovering the first input ce
   rw [ProvableStruct.eval_eq_eval]; rfl
 
 set_option linter.unusedSectionVars false in
+
 @[circuit_norm] lemma localLength_eq (input : Var Inputs (ZMod p)) :
     (elaborated (p := p)).localLength input = 20 := rfl
+
+/-! ### Operand projections, in `circuit_norm`'s own orientation — stated at the **component**
+level (the lift simprocs move projections inside `eval` before an input-level lemma could match;
+the `ComputableWitnesses` proof projects the struct-level agreement onto these). -/
+
+@[circuit_norm] theorem eval_statePc {F : Type} [FiniteField F]
+    (env : Environment F) (cols : Extracted.CPUState (Expression F)) :
+    (ProvableStruct.eval env cols).pc = Vector.map (Expression.eval env) cols.pc := by
+  rw [← ProvableStruct.eval_eq_eval]
+  simp only [Readers.CPUState.eval_cols]
+  exact ProvableType.eval_fields env _
+
+@[circuit_norm] theorem eval_opCImm {F : Type} [FiniteField F]
+    (env : Environment F) (cols : Extracted.ITypeReader (Expression F)) :
+    (ProvableStruct.eval env cols).op_c_imm = Vector.map (Expression.eval env) cols.op_c_imm := by
+  rw [← ProvableStruct.eval_eq_eval]
+  simp only [Readers.ITypeReader.eval_cols]
+  exact ProvableType.eval_fields env _
+
+@[circuit_norm] theorem eval_prevValue {F : Type} [FiniteField F]
+    (env : Environment F) (cols : Extracted.RegisterAccessCols (Expression F)) :
+    (ProvableStruct.eval env cols).prev_value
+      = Vector.map (Expression.eval env) cols.prev_value := by
+  rw [← ProvableStruct.eval_eq_eval]
+  simp only [Readers.RTypeReader.eval_registerAccessCols]
+  exact ProvableType.eval_fields env _
+
+/-! Input-level operand projections (plain lemmas, applied by `rw` in the `ComputableWitnesses`
+proof — deliberately NOT `@[circuit_norm]`, so no simp set ever renormalizes the struct evals). -/
+
+theorem eval_statePcIn {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    (ProvableStruct.eval env input).state.pc
+      = Vector.map (Expression.eval env) input.state.pc := by
+  rw [← ProvableStruct.eval_eq_eval]
+  simp only [eval_inputs, Readers.CPUState.eval_cols]
+  exact ProvableType.eval_fields env _
+
+theorem eval_opCImmIn {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    (ProvableStruct.eval env input).adapter.op_c_imm
+      = Vector.map (Expression.eval env) input.adapter.op_c_imm := by
+  rw [← ProvableStruct.eval_eq_eval]
+  simp only [eval_inputs, Readers.ITypeReader.eval_cols]
+  exact ProvableType.eval_fields env _
+
+theorem eval_rs1In {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    (ProvableStruct.eval env input).adapter.op_a_memory.prev_value
+      = Vector.map (Expression.eval env) input.adapter.op_a_memory.prev_value := by
+  rw [← ProvableStruct.eval_eq_eval]
+  simp only [eval_inputs, Readers.ITypeReader.eval_cols,
+    Readers.RTypeReader.eval_registerAccessCols]
+  exact ProvableType.eval_fields env _
+
+theorem eval_rs2In {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    (ProvableStruct.eval env input).adapter.op_b_memory.prev_value
+      = Vector.map (Expression.eval env) input.adapter.op_b_memory.prev_value := by
+  rw [← ProvableStruct.eval_eq_eval]
+  simp only [eval_inputs, Readers.ITypeReader.eval_cols,
+    Readers.RTypeReader.eval_registerAccessCols]
+  exact ProvableType.eval_fields env _
 
 /-- The taken target word the chip witnesses for `branch_value` (`pc + op_c_imm`, base-2^16). -/
 def branchTargetWord (input : Inputs (ZMod p)) : Word (ZMod p) :=
