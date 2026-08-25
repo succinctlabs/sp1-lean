@@ -80,7 +80,8 @@ private lemma providers_channels_eq :
 private lemma providers_assumptions :
     ∀ c ∈ sp1ProviderTables (p := p), ∀ env : Environment (ZMod p), c.Assumptions env := by
   intro c hc env
-  simp only [sp1ProviderTables, List.mem_append] at hc
+  rw [sp1ProviderTables_explicit] at hc
+  simp only [List.mem_append] at hc
   rcases hc with (hc | hc) | hc
   · fin_cases hc <;> trivial
   · obtain ⟨width, _, rfl⟩ := List.mem_map.mp hc

@@ -381,10 +381,10 @@ theorem memorySelectorConstraintShape_of_circuit (kind : ChipKind p)
       kind.provableInputs kind.provableCols)
     (specEq : @GeneralFormalCircuit.Spec (ZMod p) kind.Inputs kind.Cols inferInstance
       kind.provableInputs kind.provableCols circuit = kind.chipSpec)
-    (opcodes : List Opcode) (rdGuard : RdGuard)
+    (id : InstructionChipId)
     (shape : @CircuitMemorySelectorGated p _ kind.Inputs kind.Cols kind.provableInputs
       kind.provableCols circuit kind.view) :
-    MemorySelectorConstraintShape ⟨kind, circuit, specEq, opcodes, rdGuard⟩ :=
+    MemorySelectorConstraintShape ⟨id, kind, circuit, specEq⟩ :=
   shape
 
 /-- Lift a chip's `main`-local Memory gating theorem to its completed whole-chip circuit. -/

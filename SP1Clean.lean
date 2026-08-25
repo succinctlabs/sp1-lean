@@ -274,7 +274,6 @@ import SP1Clean.Composition.Table
 import SP1Clean.Composition.Chips
 import SP1Clean.Composition.Ensemble
 import SP1Clean.Composition.Balance
-import SP1Clean.Composition.ExactBalance
 import SP1Clean.Composition.Extracted
 import SP1Clean.Composition.PreprocessedProviders
 import SP1Clean.Composition.MemoryBoundary
@@ -323,11 +322,13 @@ import SP1Clean.Model.BalanceBridge
 import SP1Clean.Model.BusMessages
 import SP1Clean.Model.ByteTable
 import SP1Clean.Model.Channels
-import SP1Clean.Model.ChipAir
 import SP1Clean.Math.HWord
 import SP1Clean.Model.InteractionBus
 import SP1Clean.Model.InteractionProjection
 import SP1Clean.Model.CleanLedger
+import SP1Clean.Model.InstructionChipId
+import SP1Clean.Model.InstructionRouting
+import SP1Clean.Model.ProviderTableId
 import SP1Clean.Math.MulCarryChain
 import SP1Clean.Math.ShiftBounds
 import SP1Clean.Model.Register
@@ -345,6 +346,10 @@ import SP1Clean.Proofs.Sail.Advance
 import SP1Clean.Model.Semantics.GuestProgram
 import SP1Clean.Model.Semantics.ProgramCommitment
 import SP1Clean.Model.Semantics.MicroTime
+import SP1Clean.Model.Semantics.AccessPlan
+import SP1Clean.Model.Semantics.AccessSchedule
+import SP1Clean.Model.Semantics.InstructionPlan
+import SP1Clean.Model.Semantics.TransitionDecode
 import SP1Clean.Model.Semantics.Truth
 import SP1Clean.Model.Semantics.Decode
 import SP1Clean.Math.Word
@@ -423,7 +428,6 @@ import SP1Clean.Native.Readers.RegisterAccessCols
 import SP1Clean.Native.Readers.RegisterAccessTimestamp
 import SP1Clean.Native.Readers.RegisterWrite
 import SP1Clean.Native.Witgen.HintFlags
-import SP1Clean.Soundness.ByteConsistency
 import SP1Clean.Soundness.ChipRegistry
 import SP1Clean.Soundness.ChipRow
 import SP1Clean.Soundness.SupportedMachine
@@ -431,12 +435,7 @@ import SP1Clean.Soundness.Coverage
 import SP1Clean.Soundness.Decode
 
 import SP1Clean.Soundness.Walk
-import SP1Clean.Soundness.MemoryConsistency
-import SP1Clean.Soundness.MemoryGlobal
-import SP1Clean.Soundness.MemoryIsU64
 import SP1Clean.Model.Opcode
-import SP1Clean.Soundness.ProgramConsistency
-import SP1Clean.Soundness.ProgramProviderSpike
 import SP1Clean.Soundness.EnsembleChannels
 import SP1Clean.Soundness.SP1Ensemble
 import SP1Clean.Soundness.WitnessDecode
@@ -471,7 +470,6 @@ import SP1Clean.Soundness.AIRCompleteness
 import SP1Clean.Soundness.CoreAIR
 import SP1Clean.Soundness.CoreAIRSyscallFree
 import SP1Clean.Soundness.FinishedChannels
-import SP1Clean.Soundness.StateConsistency
 import SP1Clean.FormalModel.Contracts.Chips
 import SP1Clean.FormalModel.Contracts.ChipAssumptions
 import SP1Clean.FormalModel.Contracts.DivRem
@@ -483,6 +481,7 @@ import SP1Clean.FormalModel.OpcodeTable
 import SP1Clean.FormalModel.CoreAIRRelation
 import SP1Clean.FormalModel.Relations
 import SP1Clean.FormalModel.Execution
+import SP1Clean.FormalModel.SupportedShard
 import SP1Clean.FormalModel.Verifier
 import SP1Clean.FormalModel.Trace.Witness
 import SP1Clean.FormalModel.Contracts.Operations
@@ -523,9 +522,25 @@ import SP1Clean.Proofs.Completeness.ProviderWitgen
 import SP1Clean.Proofs.Completeness.Providers
 import SP1Clean.Proofs.Completeness.AluGeneration
 import SP1Clean.Proofs.Completeness.Assembly
+import SP1Clean.Proofs.Completeness.EventBuckets
+import SP1Clean.Proofs.Completeness.Footprint
+import SP1Clean.Proofs.Completeness.InstructionEvent
+import SP1Clean.Proofs.Completeness.ExecutionCompiler
+import SP1Clean.Proofs.Completeness.MemoryHistory
+import SP1Clean.Proofs.Completeness.StateHistory
 import SP1Clean.Proofs.Completeness.Ledger
 import SP1Clean.Proofs.Completeness.ProviderInteractions
 import SP1Clean.Proofs.Completeness.ProviderTables
 import SP1Clean.Proofs.Completeness.ChipLedger
 import SP1Clean.Proofs.Completeness.Closure
 import SP1Clean.Proofs.Completeness.ClosureRealization
+import SP1Clean.Proofs.Completeness.FieldClosure
+import SP1Clean.Proofs.Completeness.CanonicalClosure
+import SP1Clean.Proofs.Completeness.CanonicalClosureWellFormed
+import SP1Clean.Proofs.Completeness.ConsumerClosure
+import SP1Clean.Proofs.Completeness.NativeTraceCompiler
+import SP1Clean.Proofs.Completeness.NativeStateAgreement
+import SP1Clean.Proofs.Completeness.NativeMemoryAgreement
+import SP1Clean.Proofs.Completeness.NativeProgramAgreement
+import SP1Clean.Proofs.Completeness.NativeBoundaryAgreement
+import SP1Clean.Soundness.NativeCompleteness

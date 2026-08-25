@@ -113,10 +113,10 @@ theorem selectorConstraintShape_of_circuit (kind : ChipKind p)
       kind.provableInputs kind.provableCols)
     (spec_eq : @GeneralFormalCircuit.Spec (ZMod p) kind.Inputs kind.Cols inferInstance
       kind.provableInputs kind.provableCols circuit = kind.chipSpec)
-    (opcodes : List Opcode) (rdGuard : RdGuard)
+    (id : InstructionChipId)
     (shape : @CircuitSelectorBinary p _ kind.Inputs kind.Cols kind.provableInputs
       kind.provableCols circuit kind.view) :
-    SelectorConstraintShape ⟨kind, circuit, spec_eq, opcodes, rdGuard⟩ := by
+    SelectorConstraintShape ⟨id, kind, circuit, spec_eq⟩ := by
   exact shape
 
 theorem AddChip.mainSelectorBinary : @MainSelectorBinary p _ AddChip.Inputs AddChip.Columns

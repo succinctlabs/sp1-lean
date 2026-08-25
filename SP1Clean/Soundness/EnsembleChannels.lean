@@ -452,7 +452,7 @@ private theorem verifier_channels_subset :
 theorem sp1ProviderTables_channels_subset : ∀ c ∈ sp1ProviderTables (p := p),
     c.circuit.channels ⊆ (sp1Ensemble (p := p)).channels := by
   intro c hc
-  rw [sp1ProviderTables, List.mem_append, List.mem_append] at hc
+  rw [sp1ProviderTables_explicit, List.mem_append, List.mem_append] at hc
   rcases hc with (hc | hc) | hc
   · simp only [List.mem_cons, List.not_mem_nil, or_false] at hc
     rcases hc with rfl | rfl | rfl | rfl | rfl | rfl

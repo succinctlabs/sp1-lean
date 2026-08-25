@@ -31,8 +31,7 @@ drives the sign extension. Two selectors `is_lw` / `is_lwu` replace the single `
 
 The chip `Spec` composes the sub-circuits' `Spec`s + the selection equations + the `op_a != x0` gate +
 the selector binaries; the load meaning (`rd =` extended `selected_word`) is carried by `ITypeReader`'s
-write value. The cross-row offline-memory meaning lives at the trace level
-(`Soundness/MemoryConsistency.lean`). -/
+write value. The cross-row offline-memory meaning is derived by `Soundness/TypedMemory.lean`. -/
 
 namespace SP1Clean.LoadWordChip
 

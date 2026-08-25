@@ -34,8 +34,8 @@ what defeated a single inline witness, so we mirror the nesting with **two compo
 `clk_target` is the operand's access clock (`clk_low + 4/3/2` for op_a/op_b/op_c) — a cross-block
 input, like `RTypeReader`'s `clk_low`. The composing chip's witness closure computes the timestamp
 columns from it (`prev_low := clk_target - 1`, `diff := 0`, so the scaled numerator is `0`), which
-is what makes completeness hold for every `clk_target`. The `.memory` interactions themselves are off-chip
-membership (their meaning is the trace-level memory bus, `Soundness/MemoryConsistency.lean`), so these
+is what makes completeness hold for every `clk_target`. The `.memory` interactions themselves receive
+their cross-row meaning from timed typed-memory grounding, so these
 sub-circuits emit no lookup for them. -/
 
 namespace SP1Clean.Readers

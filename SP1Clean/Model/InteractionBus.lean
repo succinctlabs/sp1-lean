@@ -17,9 +17,8 @@ mirrors SP1's Rust `AirInteraction<E> { values, multiplicity, kind }`
 
 Because the per-key sum is a `List.filter`+`List.map`+`List.sum`, every property below is
 permutation-invariant by construction — there is no order dependence (unlike the memory bus's
-"last write wins"). That is what makes this core directly provable. The *connection* of a balanced
-bus to a per-operation semantic property (e.g. the State bus's PC chain) is the genuinely hard step
-and lives, per-bus, in the trace-consistency modules (`Soundness/StateConsistency.lean`). -/
+"last write wins"). That is what makes this core directly provable. The connection from balance and
+ordered handoffs to execution semantics lives in the typed ranked-grounding layer. -/
 
 namespace SP1Clean
 
@@ -243,11 +242,6 @@ theorem isConsistentOnline_iff_isConsistentBalanced (accesses : LookupAccessList
 def aggregateChipRows {α : Type} (rows : List α) (perRow : α → LookupAccessList) :
     LookupAccessList :=
   rows.flatMap perRow
-
-/-- The trace-level claim a per-bus consistency module discharges: the aggregated per-row
-contributions form a balanced bus. -/
-def TraceLookupConsistent {α : Type} (rows : List α) (perRow : α → LookupAccessList) : Prop :=
-  (aggregateChipRows rows perRow).isConsistentOnline
 
 /-! ## The provider-cancels-sends lemma (the kernel of "balance ⟹ membership")
 
@@ -570,8 +564,7 @@ theorem active_flatMap_gatedPair {α : Type*} (items : List α) (gate : α → �
 /-- **The chain condition**: each link consumes what its predecessor produced, starting from the
 token the boundary pushed and ending with the one the boundary pulls.
 
-For the State bus this is the PC chain (`Soundness/StateConsistency.lean`'s `pcChainProp`) — each
-row's `next_pc` is the next row's `pc`, and the clock advances by the row's own increment. For the
+For the State bus each row's successor token is the next row's current `(clock, pc)` token. For the
 Memory bus it is the per-location record chain. -/
 def IsHandoffChain : LookupKey → List (LookupKey × LookupKey) → LookupKey → Prop
   | held, [], last => held = last

@@ -229,11 +229,10 @@ chip, in force for any future site of comparable depth:
 
 - Register/memory reads and the PC next-state are **native readers** now: the chip composes
   `Readers.CPUState.circuit` + the register adapter reader (`RTypeReader`/`ALUTypeReader`) as subcircuits
-  (§2). The trace-level bus projections (`Soundness/{State,Program,Memory}Consistency.lean`) read a
-  **reader-agnostic `Trace.AdapterView`** that every reader projects into via `<Reader>.toAdapterView`
-  (R-type ⇒ `op_c := #v[op_c,0,0,0]`, `imm_c := 0`; the op_c memory pair and Program tuple then degenerate
-  to the scalar shape). `ProgramChip.ProgramRow` carries `op_c : Word` + `imm_c` to match. The cross-row
-  links (PC chain, offline-memory) stay threaded honest assumptions (`TraceStateLink`/`TraceMemoryLink`).
+  (§2). `Soundness/RowView.lean` supplies the reader-agnostic `Trace.AdapterView` and normalized
+  State/Program access views; `TypedState`, `TypedProgram`, and `TypedMemory` consume the actual Clean
+  interactions directly. R-type projects `op_c := #v[op_c,0,0,0]`, `imm_c := 0`, while
+  `ProgramChip.ProgramRow` carries `op_c : Word` + `imm_c` to match the common shape.
 - **`x0`-destination / result-discarding chips (the `AluX0` variant).** SP1 routes any instruction writing
   `x0` to a dedicated chip (loads → `LoadX0`, ALU ops → `AluX0`); `Coverage.routeOf` keys on
   `(opcode, rd == x0)`. Such a chip has **no arithmetic gadget** (the result is discarded) — it composes only

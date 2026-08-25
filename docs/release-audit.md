@@ -108,13 +108,17 @@ bytes by the exact commit, but the gate does not label them semantically inert.
 | Exact Rust AIR-to-Sail | `sp1_air_sound_of_obligations` | conditional; bundle not instantiated |
 | Cross-shard execution | `SP1ExecutionRelation` | target relation specified; no soundness theorem yet |
 | Core verifier | `VerifierBoundary.PerfectExtraction` composition API | cryptographic proof not implemented here |
-| Native witness assembly | `supported_core_native_complete` | closed relative to a supplied well-formed, balanced trace |
-| Semantic whole-machine completeness | supported Sail execution → trace generation | open; no theorem declared |
+| Native ensemble completeness | `supported_core_native_functionalCompleteness` | closed for the deterministic all-25 compiler on its explicit admissible semantic image |
+| Broader semantic-language completeness | shared capacity-bounded semantic relation | open two-sided relation alignment plus residual semantic/footprint implications; no language equality claimed |
 
-`supported_core_native_complete` is generator-relative assembly completeness: it computes all native
-physical rows with the circuits' witness generators once the trace-level routing, provider capacity,
-integer balance, public equality, and boundary contracts are supplied. It does not prove that every
-supported Sail execution produces such a trace; that semantic Sail→trace generator remains open.
+`supported_core_native_complete` is the existential projection of a proof-independent functional
+compiler. It computes all native physical rows, refreshes, Memory boundaries, and canonical
+Byte/Range/Program providers from the supplied semantic execution; constraints and all four channel
+balances are proved. Its explicit admissible source still requires the named event-validity,
+provider-semantic, and actual-footprint facts. Proving those on an intended bounded source is not
+by itself enough to combine this theorem with exact soundness: the current soundness target is
+unbounded and does not record the Core row cap or physical capacity. Public-language equality first
+requires a shared capacity-bounded semantic relation (or equivalent two-sided refinement).
 
 ## Closed capstone statement
 

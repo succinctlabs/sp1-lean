@@ -4,7 +4,7 @@ import SP1Clean.Proofs.Completeness.ProviderTables
 
 /-! # The provider closure: recounting Byte/Range/Program demand from the consumers
 
-`SupportedCoreTraceWitness` takes its provider occurrence lists as raw input fields, and
+`SupportedCoreTraceWitness` takes its provider occurrence lists through the provider registry, and
 `Soundness/AIRCompleteness.lean`'s `Balanced` is a *hypothesis*: the assembled witness satisfies
 the ensemble's constraint system, but nothing derives that its channels cancel. Every use so far
 discharges balance by compiled evaluation on a fully concrete shard — which is only available in the
@@ -178,20 +178,27 @@ program table — one `rfl`, so it cannot drift from `tables` under a reordering
 theorem preprocessedProviderTables_eq :
     trace.preprocessedProviderTables =
       [Table.build ByteChip.U8Range.component
-          (ByteChip.U8Range.traceInputs trace.u8RangeEntries) trace.data trace.hint,
+          (ByteChip.U8Range.traceInputs (trace.providerOccurrences (.byte .u8Range)))
+            trace.data trace.hint,
         Table.build ByteChip.MSB.component
-          (ByteChip.MSB.traceInputs trace.msbEntries) trace.data trace.hint,
+          (ByteChip.MSB.traceInputs (trace.providerOccurrences (.byte .msb)))
+            trace.data trace.hint,
         Table.build ByteChip.AndByte.component
-          (ByteChip.AndByte.traceInputs trace.andByteEntries) trace.data trace.hint,
+          (ByteChip.AndByte.traceInputs (trace.providerOccurrences (.byte .andByte)))
+            trace.data trace.hint,
         Table.build ByteChip.OrByte.component
-          (ByteChip.OrByte.traceInputs trace.orByteEntries) trace.data trace.hint,
+          (ByteChip.OrByte.traceInputs (trace.providerOccurrences (.byte .orByte)))
+            trace.data trace.hint,
         Table.build ByteChip.XorByte.component
-          (ByteChip.XorByte.traceInputs trace.xorByteEntries) trace.data trace.hint,
+          (ByteChip.XorByte.traceInputs (trace.providerOccurrences (.byte .xorByte)))
+            trace.data trace.hint,
         Table.build ByteChip.Ltu.component
-          (ByteChip.Ltu.traceInputs trace.ltuEntries) trace.data trace.hint] ++
+          (ByteChip.Ltu.traceInputs (trace.providerOccurrences (.byte .ltu)))
+            trace.data trace.hint] ++
       trace.rangeTables ++
       [Table.build ProgramProviderChip.component
-        (ProgramProviderChip.traceInputs trace.romEntries) trace.data trace.hint] := rfl
+        (ProgramProviderChip.traceInputs (trace.providerOccurrences .program))
+          trace.data trace.hint] := rfl
 
 /--
 **The capacity contract a trace generator owes the ledger.**
@@ -204,28 +211,28 @@ occurrences' semantic content; this collects what the ledger needs of their magn
 five Program key cells the program circuit passes through unchecked.
 -/
 structure CountsFit : Prop where
-  u8Range : ∀ e ∈ trace.u8RangeEntries, e.MultiplicityFits p
-  msb : ∀ e ∈ trace.msbEntries, e.MultiplicityFits p
-  andByte : ∀ e ∈ trace.andByteEntries, e.MultiplicityFits p
-  orByte : ∀ e ∈ trace.orByteEntries, e.MultiplicityFits p
-  xorByte : ∀ e ∈ trace.xorByteEntries, e.MultiplicityFits p
-  ltu : ∀ e ∈ trace.ltuEntries, e.MultiplicityFits p
-  range : ∀ width e, e ∈ trace.rangeEntries width → e.MultiplicityFits p
-  rom : ∀ e ∈ trace.romEntries, e.MultiplicityFits p
-  romKeys : ∀ e ∈ trace.romEntries, RomKeyFits e
+  u8Range : ∀ e ∈ trace.providerOccurrences (.byte .u8Range), e.MultiplicityFits p
+  msb : ∀ e ∈ trace.providerOccurrences (.byte .msb), e.MultiplicityFits p
+  andByte : ∀ e ∈ trace.providerOccurrences (.byte .andByte), e.MultiplicityFits p
+  orByte : ∀ e ∈ trace.providerOccurrences (.byte .orByte), e.MultiplicityFits p
+  xorByte : ∀ e ∈ trace.providerOccurrences (.byte .xorByte), e.MultiplicityFits p
+  ltu : ∀ e ∈ trace.providerOccurrences (.byte .ltu), e.MultiplicityFits p
+  range : ∀ width e, e ∈ trace.providerOccurrences (.range width) → e.MultiplicityFits p
+  rom : ∀ e ∈ trace.providerOccurrences .program, e.MultiplicityFits p
+  romKeys : ∀ e ∈ trace.providerOccurrences .program, RomKeyFits e
 
 /-- The ledger the preprocessed providers supply, as an occurrence list rather than as a fold over
 built rows. -/
 def providerLedger : LookupAccessList :=
-  trace.u8RangeEntries.map u8RangeAccess ++
-    trace.msbEntries.map msbAccess ++
-    trace.andByteEntries.map andAccess ++
-    trace.orByteEntries.map orAccess ++
-    trace.xorByteEntries.map xorAccess ++
-    trace.ltuEntries.map ltuAccess ++
+  (trace.providerOccurrences (.byte .u8Range)).map u8RangeAccess ++
+    (trace.providerOccurrences (.byte .msb)).map msbAccess ++
+    (trace.providerOccurrences (.byte .andByte)).map andAccess ++
+    (trace.providerOccurrences (.byte .orByte)).map orAccess ++
+    (trace.providerOccurrences (.byte .xorByte)).map xorAccess ++
+    (trace.providerOccurrences (.byte .ltu)).map ltuAccess ++
     (RangeChip.allWidths.flatMap fun width =>
-      (trace.rangeEntries width).map (rangeAccess width)) ++
-    trace.romEntries.map programEntryAccess
+      (trace.providerOccurrences (.range width)).map (rangeAccess width)) ++
+    (trace.providerOccurrences .program).map programEntryAccess
 
 /-- **What the twenty-four provider tables emit is exactly their occurrence lists.**
 
@@ -235,15 +242,15 @@ theorem preprocessedProviderLedger_eq (hwf : trace.WellFormed) (hfit : trace.Cou
   rw [preprocessedProviderTables_eq]
   simp only [tablesCleanAccesses, List.flatMap_cons, List.flatMap_nil, List.flatMap_append,
     List.append_nil, rangeTables,
-    u8Range_traceTable_cleanAccesses _ _ _ hwf.u8Range hfit.u8Range,
-    msb_traceTable_cleanAccesses _ _ _ hwf.msb hfit.msb,
-    and_traceTable_cleanAccesses _ _ _ hwf.andByte hfit.andByte,
-    or_traceTable_cleanAccesses _ _ _ hwf.orByte hfit.orByte,
-    xor_traceTable_cleanAccesses _ _ _ hwf.xorByte hfit.xorByte,
-    ltu_traceTable_cleanAccesses _ _ _ hwf.ltu hfit.ltu,
+    u8Range_traceTable_cleanAccesses _ _ _ (hwf.provider (.byte .u8Range)) hfit.u8Range,
+    msb_traceTable_cleanAccesses _ _ _ (hwf.provider (.byte .msb)) hfit.msb,
+    and_traceTable_cleanAccesses _ _ _ (hwf.provider (.byte .andByte)) hfit.andByte,
+    or_traceTable_cleanAccesses _ _ _ (hwf.provider (.byte .orByte)) hfit.orByte,
+    xor_traceTable_cleanAccesses _ _ _ (hwf.provider (.byte .xorByte)) hfit.xorByte,
+    ltu_traceTable_cleanAccesses _ _ _ (hwf.provider (.byte .ltu)) hfit.ltu,
     program_traceTable_cleanAccesses _ _ _ hfit.romKeys hfit.rom]
   simp only [providerLedger, List.flatMap_def, List.map_map, Function.comp_def,
-    range_traceTable_cleanAccesses _ _ _ _ (fun e he => hwf.range _ e he)
+    range_traceTable_cleanAccesses _ _ _ _ (fun e he => hwf.provider (.range _) e he)
       (fun e he => hfit.range _ e he)]
   simp [List.append_assoc]
 

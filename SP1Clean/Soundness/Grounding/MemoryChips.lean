@@ -1982,8 +1982,9 @@ section LoadByte
 
 /-- The LoadByte descriptor in the supported Core registry. -/
 def loadByteChipDescriptor : SupportedChip p :=
-  ⟨LoadByteChip.kind, LoadByteChip.circuit, rfl, [.LB, .LBU], .nonX0⟩
+  ⟨.loadByte, LoadByteChip.kind, LoadByteChip.circuit, rfl⟩
 
+omit [Fact (2 ^ 25 < p)] in
 /-- Small descriptor projections kept symbolic so decoded-row proofs never normalize the full
 dependent component merely to identify its circuit, row view, or RAM access. -/
 theorem loadByteChipDescriptor_table :
@@ -2087,9 +2088,9 @@ theorem chipSpec_of_literalDescriptor
       kind.provableInputs kind.provableCols)
     (specEq : @GeneralFormalCircuit.Spec (ZMod p) kind.Inputs kind.Cols inferInstance
       kind.provableInputs kind.provableCols circuit = kind.chipSpec)
-    (opcodes : List Opcode) (rdGuard : RdGuard)
+    (id : InstructionChipId)
     (data : ProverData (ZMod p)) (physical : Array (ZMod p))
-    (h : ((⟨kind, circuit, specEq, opcodes, rdGuard⟩ : SupportedChip p).decodeRow
+    (h : ((⟨id, kind, circuit, specEq⟩ : SupportedChip p).decodeRow
       data physical).chipSpec data) :
     kind.chipSpec
       (@circuitRowInputOf p inferInstance kind.Inputs kind.Cols
@@ -2111,7 +2112,7 @@ theorem advanceReady_of_literalDescriptor
       kind.provableInputs kind.provableCols)
     (specEq : @GeneralFormalCircuit.Spec (ZMod p) kind.Inputs kind.Cols inferInstance
       kind.provableInputs kind.provableCols circuit = kind.chipSpec)
-    (opcodes : List Opcode) (rdGuard : RdGuard)
+    (id : InstructionChipId)
     (data : ProverData (ZMod p)) (physical : Array (ZMod p))
     (program : GuestProgram) (state : SailState)
     (h : kind.advanceReady
@@ -2122,11 +2123,11 @@ theorem advanceReady_of_literalDescriptor
         kind.provableInputs kind.provableCols circuit
         (Environment.fromArray physical data))
       program state) :
-    ((⟨kind, circuit, specEq, opcodes, rdGuard⟩ : SupportedChip p).decodeRow
+    ((⟨id, kind, circuit, specEq⟩ : SupportedChip p).decodeRow
       data physical).kind.advanceReady
-      ((⟨kind, circuit, specEq, opcodes, rdGuard⟩ : SupportedChip p).decodeRow
+      ((⟨id, kind, circuit, specEq⟩ : SupportedChip p).decodeRow
         data physical).inputs
-      ((⟨kind, circuit, specEq, opcodes, rdGuard⟩ : SupportedChip p).decodeRow
+      ((⟨id, kind, circuit, specEq⟩ : SupportedChip p).decodeRow
         data physical).cols
       program state := by
   letI : ProvableType kind.Inputs := kind.provableInputs
@@ -2134,6 +2135,7 @@ theorem advanceReady_of_literalDescriptor
   rw [circuitRowInputOf_eq_component, circuitRowOutputOf_eq_component] at h
   exact h
 
+omit [Fact (2 ^ 25 < p)] in
 theorem loadByteChipDescriptor_assumptions_iff
     (env : Environment (ZMod p)) :
     (loadByteChipDescriptor (p := p)).table.Assumptions env ↔
@@ -2485,7 +2487,7 @@ theorem loadByteSpec_of_decoded
       data := by
   unfold loadByteChipDescriptor at h
   exact chipSpec_of_literalDescriptor LoadByteChip.kind LoadByteChip.circuit
-    rfl [.LB, .LBU] .nonX0 data physical h
+    rfl .loadByte data physical h
 
 /-- Specialize the folded `advanceReady` transport to LoadByte. -/
 theorem loadByteAdvanceReady_of_decoded
@@ -2503,7 +2505,7 @@ theorem loadByteAdvanceReady_of_decoded
       program state := by
   unfold loadByteChipDescriptor
   apply advanceReady_of_literalDescriptor LoadByteChip.kind LoadByteChip.circuit
-    rfl [.LB, .LBU] .nonX0 data physical program state
+    rfl .loadByte data physical program state
   exact h
 
 omit [Fact (2 ^ 25 < p)] in
@@ -2729,8 +2731,9 @@ section LoadHalf
 
 /-- The LoadHalf descriptor in the supported Core registry. -/
 def loadHalfChipDescriptor : SupportedChip p :=
-  ⟨LoadHalfChip.kind, LoadHalfChip.circuit, rfl, [.LH, .LHU], .nonX0⟩
+  ⟨.loadHalf, LoadHalfChip.kind, LoadHalfChip.circuit, rfl⟩
 
+omit [Fact (2 ^ 25 < p)] in
 theorem loadHalfChipDescriptor_table :
     (loadHalfChipDescriptor (p := p)).table =
       (⟨LoadHalfChip.circuit (p := p)⟩ : Component (ZMod p)) := rfl
@@ -2751,6 +2754,7 @@ theorem loadHalfChipDescriptor_ramAccess (input : LoadHalfChip.Inputs (ZMod p))
     (loadHalfChipDescriptor (p := p)).kind.ramAccess input output =
       some (LoadHalfChip.ramAccessView input output) := rfl
 
+omit [Fact (2 ^ 25 < p)] in
 theorem loadHalfChipDescriptor_assumptions_iff
     (env : Environment (ZMod p)) :
     (loadHalfChipDescriptor (p := p)).table.Assumptions env ↔
@@ -2784,7 +2788,7 @@ theorem loadHalfSpec_of_decoded
       data := by
   unfold loadHalfChipDescriptor at h
   exact chipSpec_of_literalDescriptor LoadHalfChip.kind LoadHalfChip.circuit
-    rfl [.LH, .LHU] .nonX0 data physical h
+    rfl .loadHalf data physical h
 
 /-- Specialize the folded readiness transport to LoadHalf. -/
 theorem loadHalfAdvanceReady_of_decoded
@@ -2802,7 +2806,7 @@ theorem loadHalfAdvanceReady_of_decoded
       program state := by
   unfold loadHalfChipDescriptor
   apply advanceReady_of_literalDescriptor LoadHalfChip.kind LoadHalfChip.circuit
-    rfl [.LH, .LHU] .nonX0 data physical program state
+    rfl .loadHalf data physical program state
   exact h
 
 omit [Fact (2 ^ 25 < p)] in
@@ -3153,8 +3157,9 @@ section LoadWord
 
 /-- The LoadWord descriptor in the supported Core registry. -/
 def loadWordChipDescriptor : SupportedChip p :=
-  ⟨LoadWordChip.kind, LoadWordChip.circuit, rfl, [.LW, .LWU], .nonX0⟩
+  ⟨.loadWord, LoadWordChip.kind, LoadWordChip.circuit, rfl⟩
 
+omit [Fact (2 ^ 25 < p)] in
 theorem loadWordChipDescriptor_table :
     (loadWordChipDescriptor (p := p)).table =
       (⟨LoadWordChip.circuit (p := p)⟩ : Component (ZMod p)) := rfl
@@ -3175,6 +3180,7 @@ theorem loadWordChipDescriptor_ramAccess (input : LoadWordChip.Inputs (ZMod p))
     (loadWordChipDescriptor (p := p)).kind.ramAccess input output =
       some (LoadWordChip.ramAccessView input output) := rfl
 
+omit [Fact (2 ^ 25 < p)] in
 theorem loadWordChipDescriptor_assumptions_iff
     (env : Environment (ZMod p)) :
     (loadWordChipDescriptor (p := p)).table.Assumptions env ↔
@@ -3208,7 +3214,7 @@ theorem loadWordSpec_of_decoded
       data := by
   unfold loadWordChipDescriptor at h
   exact chipSpec_of_literalDescriptor LoadWordChip.kind LoadWordChip.circuit
-    rfl [.LW, .LWU] .nonX0 data physical h
+    rfl .loadWord data physical h
 
 /-- Specialize the folded readiness transport to LoadWord. -/
 theorem loadWordAdvanceReady_of_decoded
@@ -3226,7 +3232,7 @@ theorem loadWordAdvanceReady_of_decoded
       program state := by
   unfold loadWordChipDescriptor
   apply advanceReady_of_literalDescriptor LoadWordChip.kind LoadWordChip.circuit
-    rfl [.LW, .LWU] .nonX0 data physical program state
+    rfl .loadWord data physical program state
   exact h
 
 omit [Fact (2 ^ 25 < p)] in
@@ -3574,8 +3580,9 @@ section LoadDouble
 
 /-- The LoadDouble descriptor in the supported Core registry. -/
 def loadDoubleChipDescriptor : SupportedChip p :=
-  ⟨LoadDoubleChip.kind, LoadDoubleChip.circuit, rfl, [.LD], .nonX0⟩
+  ⟨.loadDouble, LoadDoubleChip.kind, LoadDoubleChip.circuit, rfl⟩
 
+omit [Fact (2 ^ 25 < p)] in
 theorem loadDoubleChipDescriptor_table :
     (loadDoubleChipDescriptor (p := p)).table =
       (⟨LoadDoubleChip.circuit (p := p)⟩ : Component (ZMod p)) := rfl
@@ -3596,6 +3603,7 @@ theorem loadDoubleChipDescriptor_ramAccess (input : LoadDoubleChip.Inputs (ZMod 
     (loadDoubleChipDescriptor (p := p)).kind.ramAccess input output =
       some (LoadDoubleChip.ramAccessView input output) := rfl
 
+omit [Fact (2 ^ 25 < p)] in
 theorem loadDoubleChipDescriptor_assumptions_iff
     (env : Environment (ZMod p)) :
     (loadDoubleChipDescriptor (p := p)).table.Assumptions env ↔
@@ -3629,7 +3637,7 @@ theorem loadDoubleSpec_of_decoded
       data := by
   unfold loadDoubleChipDescriptor at h
   exact chipSpec_of_literalDescriptor LoadDoubleChip.kind LoadDoubleChip.circuit
-    rfl [.LD] .nonX0 data physical h
+    rfl .loadDouble data physical h
 
 /-- Specialize the folded readiness transport to LoadDouble. -/
 theorem loadDoubleAdvanceReady_of_decoded
@@ -3647,7 +3655,7 @@ theorem loadDoubleAdvanceReady_of_decoded
       program state := by
   unfold loadDoubleChipDescriptor
   apply advanceReady_of_literalDescriptor LoadDoubleChip.kind LoadDoubleChip.circuit
-    rfl [.LD] .nonX0 data physical program state
+    rfl .loadDouble data physical program state
   exact h
 
 omit [Fact (2 ^ 25 < p)] in
@@ -3867,9 +3875,9 @@ section LoadX0
 
 /-- The LoadX0 descriptor in the supported Core registry. -/
 def loadX0ChipDescriptor : SupportedChip p :=
-  ⟨LoadX0Chip.kind, LoadX0Chip.circuit, rfl,
-    [.LB, .LBU, .LH, .LHU, .LW, .LWU, .LD], .onlyX0⟩
+  ⟨.loadX0, LoadX0Chip.kind, LoadX0Chip.circuit, rfl⟩
 
+omit [Fact (2 ^ 25 < p)] in
 theorem loadX0ChipDescriptor_table :
     (loadX0ChipDescriptor (p := p)).table =
       (⟨LoadX0Chip.circuit (p := p)⟩ : Component (ZMod p)) := rfl
@@ -3890,6 +3898,7 @@ theorem loadX0ChipDescriptor_ramAccess (input : LoadX0Chip.Inputs (ZMod p))
     (loadX0ChipDescriptor (p := p)).kind.ramAccess input output =
       some (LoadX0Chip.ramAccessView input output) := rfl
 
+omit [Fact (2 ^ 25 < p)] in
 theorem loadX0ChipDescriptor_assumptions_iff
     (env : Environment (ZMod p)) :
     (loadX0ChipDescriptor (p := p)).table.Assumptions env ↔
@@ -3923,7 +3932,7 @@ theorem loadX0Spec_of_decoded
       data := by
   unfold loadX0ChipDescriptor at h
   exact chipSpec_of_literalDescriptor LoadX0Chip.kind LoadX0Chip.circuit
-    rfl [.LB, .LBU, .LH, .LHU, .LW, .LWU, .LD] .onlyX0 data physical h
+    rfl .loadX0 data physical h
 
 /-- Specialize the folded readiness transport to LoadX0. -/
 theorem loadX0AdvanceReady_of_decoded
@@ -3941,7 +3950,7 @@ theorem loadX0AdvanceReady_of_decoded
       program state := by
   unfold loadX0ChipDescriptor
   apply advanceReady_of_literalDescriptor LoadX0Chip.kind LoadX0Chip.circuit
-    rfl [.LB, .LBU, .LH, .LHU, .LW, .LWU, .LD] .onlyX0
+    rfl .loadX0
     data physical program state
   exact h
 
@@ -4631,8 +4640,9 @@ section StoreByte
 
 /-- The StoreByte descriptor in the supported Core registry. -/
 def storeByteChipDescriptor : SupportedChip p :=
-  ⟨StoreByteChip.kind, StoreByteChip.circuit, rfl, [.SB], .any⟩
+  ⟨.storeByte, StoreByteChip.kind, StoreByteChip.circuit, rfl⟩
 
+omit [Fact (2 ^ 25 < p)] in
 theorem storeByteChipDescriptor_table :
     (storeByteChipDescriptor (p := p)).table =
       (⟨StoreByteChip.circuit (p := p)⟩ : Component (ZMod p)) := rfl
@@ -4653,6 +4663,7 @@ omit [Fact (2 ^ 25 < p)] in
 theorem storeByteChipDescriptor_rdGuard :
     (storeByteChipDescriptor (p := p)).rdGuard = .any := rfl
 
+omit [Fact (2 ^ 25 < p)] in
 theorem storeByteChipDescriptor_assumptions_iff
     (env : Environment (ZMod p)) :
     (storeByteChipDescriptor (p := p)).table.Assumptions env ↔
@@ -4691,7 +4702,7 @@ theorem storeByteSpec_of_decoded
       data := by
   unfold storeByteChipDescriptor at h
   exact chipSpec_of_literalDescriptor StoreByteChip.kind StoreByteChip.circuit
-    rfl [.SB] .any data physical h
+    rfl .storeByte data physical h
 
 theorem storeByteAdvanceReady_of_decoded
     (data : ProverData (ZMod p)) (physical : Array (ZMod p))
@@ -4708,7 +4719,7 @@ theorem storeByteAdvanceReady_of_decoded
       program state := by
   unfold storeByteChipDescriptor
   apply advanceReady_of_literalDescriptor StoreByteChip.kind StoreByteChip.circuit
-    rfl [.SB] .any data physical program state
+    rfl .storeByte data physical program state
   exact h
 
 omit [Fact (2 ^ 17 < p)] [Fact (2 ^ 25 < p)] in
@@ -5817,8 +5828,9 @@ section StoreHalf
 
 /-- The StoreHalf descriptor in the supported Core registry. -/
 def storeHalfChipDescriptor : SupportedChip p :=
-  ⟨StoreHalfChip.kind, StoreHalfChip.circuit, rfl, [.SH], .any⟩
+  ⟨.storeHalf, StoreHalfChip.kind, StoreHalfChip.circuit, rfl⟩
 
+omit [Fact (2 ^ 25 < p)] in
 theorem storeHalfChipDescriptor_table :
     (storeHalfChipDescriptor (p := p)).table =
       (⟨StoreHalfChip.circuit (p := p)⟩ : Component (ZMod p)) := rfl
@@ -5839,6 +5851,7 @@ omit [Fact (2 ^ 25 < p)] in
 theorem storeHalfChipDescriptor_rdGuard :
     (storeHalfChipDescriptor (p := p)).rdGuard = .any := rfl
 
+omit [Fact (2 ^ 25 < p)] in
 theorem storeHalfChipDescriptor_assumptions_iff
     (env : Environment (ZMod p)) :
     (storeHalfChipDescriptor (p := p)).table.Assumptions env ↔
@@ -5877,7 +5890,7 @@ theorem storeHalfSpec_of_decoded
       data := by
   unfold storeHalfChipDescriptor at h
   exact chipSpec_of_literalDescriptor StoreHalfChip.kind StoreHalfChip.circuit
-    rfl [.SH] .any data physical h
+    rfl .storeHalf data physical h
 
 theorem storeHalfAdvanceReady_of_decoded
     (data : ProverData (ZMod p)) (physical : Array (ZMod p))
@@ -5894,7 +5907,7 @@ theorem storeHalfAdvanceReady_of_decoded
       program state := by
   unfold storeHalfChipDescriptor
   apply advanceReady_of_literalDescriptor StoreHalfChip.kind StoreHalfChip.circuit
-    rfl [.SH] .any data physical program state
+    rfl .storeHalf data physical program state
   exact h
 
 omit [Fact (2 ^ 17 < p)] [Fact (2 ^ 25 < p)] in
@@ -6513,8 +6526,9 @@ section StoreWord
 
 /-- The StoreWord descriptor in the supported Core registry. -/
 def storeWordChipDescriptor : SupportedChip p :=
-  ⟨StoreWordChip.kind, StoreWordChip.circuit, rfl, [.SW], .any⟩
+  ⟨.storeWord, StoreWordChip.kind, StoreWordChip.circuit, rfl⟩
 
+omit [Fact (2 ^ 25 < p)] in
 theorem storeWordChipDescriptor_table :
     (storeWordChipDescriptor (p := p)).table =
       (⟨StoreWordChip.circuit (p := p)⟩ : Component (ZMod p)) := rfl
@@ -6535,6 +6549,7 @@ omit [Fact (2 ^ 25 < p)] in
 theorem storeWordChipDescriptor_rdGuard :
     (storeWordChipDescriptor (p := p)).rdGuard = .any := rfl
 
+omit [Fact (2 ^ 25 < p)] in
 theorem storeWordChipDescriptor_assumptions_iff
     (env : Environment (ZMod p)) :
     (storeWordChipDescriptor (p := p)).table.Assumptions env ↔
@@ -6573,7 +6588,7 @@ theorem storeWordSpec_of_decoded
       data := by
   unfold storeWordChipDescriptor at h
   exact chipSpec_of_literalDescriptor StoreWordChip.kind StoreWordChip.circuit
-    rfl [.SW] .any data physical h
+    rfl .storeWord data physical h
 
 theorem storeWordAdvanceReady_of_decoded
     (data : ProverData (ZMod p)) (physical : Array (ZMod p))
@@ -6590,7 +6605,7 @@ theorem storeWordAdvanceReady_of_decoded
       program state := by
   unfold storeWordChipDescriptor
   apply advanceReady_of_literalDescriptor StoreWordChip.kind StoreWordChip.circuit
-    rfl [.SW] .any data physical program state
+    rfl .storeWord data physical program state
   exact h
 
 omit [Fact (2 ^ 25 < p)] in
@@ -7143,8 +7158,9 @@ section StoreDouble
 
 /-- The StoreDouble descriptor in the supported Core registry. -/
 def storeDoubleChipDescriptor : SupportedChip p :=
-  ⟨StoreDoubleChip.kind, StoreDoubleChip.circuit, rfl, [.SD], .any⟩
+  ⟨.storeDouble, StoreDoubleChip.kind, StoreDoubleChip.circuit, rfl⟩
 
+omit [Fact (2 ^ 25 < p)] in
 theorem storeDoubleChipDescriptor_table :
     (storeDoubleChipDescriptor (p := p)).table =
       (⟨StoreDoubleChip.circuit (p := p)⟩ : Component (ZMod p)) := rfl
@@ -7165,6 +7181,7 @@ omit [Fact (2 ^ 25 < p)] in
 theorem storeDoubleChipDescriptor_rdGuard :
     (storeDoubleChipDescriptor (p := p)).rdGuard = .any := rfl
 
+omit [Fact (2 ^ 25 < p)] in
 theorem storeDoubleChipDescriptor_assumptions_iff
     (env : Environment (ZMod p)) :
     (storeDoubleChipDescriptor (p := p)).table.Assumptions env ↔
@@ -7201,7 +7218,7 @@ theorem storeDoubleSpec_of_decoded
       data := by
   unfold storeDoubleChipDescriptor at h
   exact chipSpec_of_literalDescriptor StoreDoubleChip.kind StoreDoubleChip.circuit
-    rfl [.SD] .any data physical h
+    rfl .storeDouble data physical h
 
 theorem storeDoubleAdvanceReady_of_decoded
     (data : ProverData (ZMod p)) (physical : Array (ZMod p))
@@ -7218,7 +7235,7 @@ theorem storeDoubleAdvanceReady_of_decoded
       program state := by
   unfold storeDoubleChipDescriptor
   apply advanceReady_of_literalDescriptor StoreDoubleChip.kind StoreDoubleChip.circuit
-    rfl [.SD] .any data physical program state
+    rfl .storeDouble data physical program state
   exact h
 
 omit [Fact (2 ^ 25 < p)] in

@@ -21,8 +21,8 @@ three kinds of bus interaction per ALU row:
   new-state), gated by `is_real`; and
 - per operand, two **byte** timestamp checks, gated by `is_real`.
 
-The `.program`/`.memory` interactions are trivial- or off-chip-membership (their meaning is the
-trace-level multiset balance — `Soundness/ProgramConsistency.lean`, `Soundness/MemoryConsistency.lean`),
+The `.program`/`.memory` interactions are trivial- or off-chip-membership (their global meaning comes
+from program commitment grounding and `Soundness/TypedMemory.lean`),
 so this reader emits no Clean lookup for them. The genuine per-row constraints it imposes are:
 
 - per operand, the two timestamp byte checks — **factored into `Readers/RegisterAccessCols.lean`**
@@ -168,8 +168,8 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
   -- No local range checks on the register **indices** `op_a`/`op_b`/`op_c`: SP1's R-type adapter
   -- (`crates/core/machine/src/adapter/register/r_type.rs:100-126`) does not range-check them — the index
   -- bounds (`op_a < 32`, `op_b0`/`op_c0 < 2^16`) come from the instruction *decode* / Program ROM on the
-  -- receive side, not a local send. So they are *received* facts (threaded `TraceProgramLink` until the
-  -- decode/ProgramChip lands), not part of the send-proven `ProgramMsg.Spec`. The `op_a_0` binary gate stays
+  -- receive side, not a local send. They are derived by typed Program grounding, not part of the
+  -- send-proven `ProgramMsg.Spec`. The `op_a_0` binary gate stays
   -- — a genuine local `assertZero` (SP1's `op_a_0` flag), and is the one index-side fact the send can prove.
   cols.op_a_0 * (cols.op_a_0 - 1) === 0
   -- W11 polarity flip: the Program-bus instruction fetch is now a **`pullIf`** (the ROM provider pushes &

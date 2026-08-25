@@ -1,5 +1,4 @@
 import SP1Clean.Soundness.RowView
-import SP1Clean.Soundness.StateConsistency
 import SP1Clean.Model.Semantics.GuestProgram
 import SP1Clean.Model.Semantics.Decode
 
@@ -122,6 +121,8 @@ named `SailCodeMemoryCompatible` boundary contract supplies preservation only wh
 program is refined all the way to a multi-step unmodified-Sail chain. -/
 structure RowEffect (_prog : GuestProgram) (r : Trace.RowView (ZMod p))
     (s s' : SailState) : Prop where
+  /-- The official interpreter took its normal `Retire_Success` branch for this row. -/
+  normal : SailRetiresNormally s s'
   pc : s'.regs.get? Register.PC = some (sndPcOf (stateAccess r))
   regs : (if r.commit.writesReg then
             (∀ idx : BitVec 5, (idx.toNat : ZMod p) = r.adapter.op_a →

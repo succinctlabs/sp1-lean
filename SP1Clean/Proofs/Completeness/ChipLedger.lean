@@ -240,35 +240,7 @@ theorem active_stateLedger_eq (trace : SupportedCoreTraceWitness p)
     rcases hbump row hrow with h | h <;> rw [h]
     · exact Or.inl h0
     · exact Or.inr h1
-  have hneg : ∀ (x : ZMod p), (x = 0 ∨ x = 1) → signedVal (-x) = -signedVal x := by
-    intro x hx
-    rw [signedVal_neg_is_real hp hx, signedVal_is_real hp hx]
-  rw [show (decodedInstructionRows (p := p) trace.witness.tables).flatMap
-      (fun a => [accessAt (msgToken stateChannel (statePullMessage (a.toChipRow trace.witness.data)))
-          (signedVal (-(a.toChipRow trace.witness.data).is_real)),
-        accessAt (msgToken stateChannel (statePushMessage (a.toChipRow trace.witness.data)))
-          (signedVal (a.toChipRow trace.witness.data).is_real)])
-      = (decodedInstructionRows (p := p) trace.witness.tables).flatMap
-      (fun a => [accessAt (msgToken stateChannel (statePullMessage (a.toChipRow trace.witness.data)))
-          (-signedVal (a.toChipRow trace.witness.data).is_real),
-        accessAt (msgToken stateChannel (statePushMessage (a.toChipRow trace.witness.data)))
-          (signedVal (a.toChipRow trace.witness.data).is_real)]) from
-    List.flatMap_congr fun a ha => by rw [hneg _ (hbinary a ha)]]
-  rw [show ((stateBumpTable trace.witness).table).flatMap
-      (fun row => [accessAt (msgToken stateChannel
-            (StateBumpChip.pulledMessage (stateBumpRow (stateBumpTable trace.witness) row)))
-          (signedVal (-(stateBumpRow (stateBumpTable trace.witness) row).is_real)),
-        accessAt (msgToken stateChannel
-            (StateBumpChip.pushedMessage (stateBumpRow (stateBumpTable trace.witness) row)))
-          (signedVal (stateBumpRow (stateBumpTable trace.witness) row).is_real)])
-      = ((stateBumpTable trace.witness).table).flatMap
-      (fun row => [accessAt (msgToken stateChannel
-            (StateBumpChip.pulledMessage (stateBumpRow (stateBumpTable trace.witness) row)))
-          (-signedVal (stateBumpRow (stateBumpTable trace.witness) row).is_real),
-        accessAt (msgToken stateChannel
-            (StateBumpChip.pushedMessage (stateBumpRow (stateBumpTable trace.witness) row)))
-          (signedVal (stateBumpRow (stateBumpTable trace.witness) row).is_real)]) from
-    List.flatMap_congr fun row hrow => by rw [hneg _ (hbump row hrow)]]
+  simp only [signedVal_neg hp]
   rw [active_flatMap_gatedPair _ _ _ _ hgateInstr,
     active_flatMap_gatedPair _ _ _ _ hgateBump]
   simp only [stateInstrLinks, stateBumpLinks, stateInitToken, stateFinalToken,
@@ -306,9 +278,9 @@ theorem stateLedger_perm_handoff (trace : SupportedCoreTraceWitness p)
 Memory follows the same route as State up to one real difference, and it is structural rather than
 incidental.
 
-The State bus carries **one** token — the machine's `(clock, pc)` — so its ledger is one chain, and
-the chain condition is `pcChainProp`, a fact about adjacent rows that the trace layer already
-states. The Memory bus carries **one token per location**: a record is pushed by whoever wrote it
+The State bus carries **one** token — the machine's `(clock, pc)` — so its ledger is one chain whose
+links are supplied by the ordered trace construction. The Memory bus carries **one token per
+location**: a record is pushed by whoever wrote it
 and pulled by the next access to that same address. So its ledger is a *family* of chains, one per
 touched location, each opened by memory-init and closed by memory-finalize
 (`multiChainLedger_perm_handoff` is why that costs no more than one chain).
@@ -350,8 +322,8 @@ omit [Fact (2 ^ 24 < p)] in
 The Memory counterpart of `stateLedger_perm_handoff`, and the premise is a *different kind* of thing
 — worth being explicit about rather than letting the symmetry of the statements hide it.
 
-State's chain condition is `pcChainProp`: a fact about adjacent rows that the trace layer already
-states, and one the machine's own step relation gives. Memory's `hregroup` is a **regrouping**: the
+State's chain is a fact about adjacent rows supplied by the machine's ordered step relation.
+Memory's `hregroup` is a **regrouping**: the
 emitted ledger is ordered by row and table, while the chains are per location, and which access
 belongs to which chain is determined by the addresses the messages carry. That is a fact about the
 particular trace, not about any chip and not about the ISA, so it is supplied here rather than
@@ -386,6 +358,37 @@ theorem stateLedger_perm_handoff_singleChain (trace : SupportedCoreTraceWitness 
         stateInstrLinks trace ++ stateBumpLinks trace, stateFinalToken trace))) :=
   stateLedger_perm_handoff trace hbinary hbump hchain
 
+/-- **The State hand-off in chronological form.**
+
+Instruction rows are physically stored table-by-table, and the StateBump table is a separate
+physical table.  Neither order is the execution order.  A compiler therefore supplies its one
+chronological link list together with the purely structural permutation which regroups the
+physical instruction/bump links into it.  The semantic obligation is stated only on that
+chronological list.
+
+This is the State analogue of `memoryLedger_perm_handoff`: State has one chain rather than a family
+of per-location chains, but it still needs an explicit physical-to-semantic regrouping. -/
+theorem stateLedger_perm_handoff_chronological (trace : SupportedCoreTraceWitness p)
+    (hbinary : ∀ d ∈ decodedInstructionRows (p := p) trace.witness.tables,
+      (d.toChipRow trace.witness.data).is_real = 0 ∨
+        (d.toChipRow trace.witness.data).is_real = 1)
+    (hbump : ∀ row ∈ (stateBumpTable trace.witness).table,
+      (stateBumpRow (stateBumpTable trace.witness) row).is_real = 0 ∨
+        (stateBumpRow (stateBumpTable trace.witness) row).is_real = 1)
+    (links : List (LookupKey × LookupKey))
+    (hregroup : (stateInstrLinks trace ++ stateBumpLinks trace).Perm links)
+    (hchain : IsHandoffChain (stateInitToken trace) links (stateFinalToken trace)) :
+    (active trace.stateLedger).Perm
+      (handoff (chainTokens (stateInitToken trace, links, stateFinalToken trace))) := by
+  have linkLedgerPerm :
+      ((stateInstrLinks trace ++ stateBumpLinks trace).flatMap
+          fun link => linkAccesses link.1 link.2).Perm
+        (links.flatMap fun link => linkAccesses link.1 link.2) :=
+    hregroup.flatMap fun _ _ => List.Perm.refl _
+  rw [active_stateLedger_eq trace hbinary hbump, List.append_assoc, ← List.flatMap_append]
+  refine (linkLedgerPerm.append_left _).trans ?_
+  exact (List.Perm.swap _ _ _).trans (chainLedger_perm_handoff _ _ _ hchain)
+
 
 /-! ## The closure's nonpositivity premise, pointwise
 
@@ -403,8 +406,8 @@ aggregate from it.
 **What deriving `ConsumersOnlyPull` itself would take, stated plainly.** It is not available from
 Clean's channel bookkeeping: `channelsWithGuarantees` / `channelsWithRequirements` record which
 channels a circuit owes *guarantees* and *requirements* on, not which polarity it emits with — a
-circuit in neither list could still push. Nor is it available from the trace-level Byte shadow
-(`Soundness/ByteConsistency.lean`'s `byteSend` carries `+is_real`, the pre-W11-flip orientation).
+circuit in neither list could still push. Nor is it available from the retired trace-level Byte
+shadow, which carried the pre-W11 `+is_real` orientation rather than the live consumer pull.
 What remains is the per-chip route `Proofs/Completeness/Closure.lean` describes and declines: for
 eight of the twenty-five chips the Byte pulls descend through the `CPUState` reader and the
 arithmetic operation subcircuits, so exposing them means extending each chip's `exposedChannels_eq`

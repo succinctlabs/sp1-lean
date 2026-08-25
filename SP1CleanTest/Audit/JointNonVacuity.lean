@@ -139,7 +139,7 @@ and the singleton keys are singletons. -/
 theorem anchorData_canonicalEncoding : Commit.CanonicalEncoding (p := SP1Prime) anchorData := by
   refine ⟨by native_decide, ?_, ?_, ?_,
     ⟨#v[0, 1, 0], by native_decide, rowValuesBelow_of_all _ (by native_decide)⟩,
-    ⟨#v[0, 1], by native_decide⟩⟩
+    ⟨#v[0, 1], by native_decide, rowValuesBelow_of_all _ (by native_decide)⟩⟩
   · rw [anchorData_romRows]
     intro row hrow
     rw [List.mem_singleton] at hrow

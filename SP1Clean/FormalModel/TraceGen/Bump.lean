@@ -1,5 +1,6 @@
 import SP1Clean.FormalModel.TraceGen.Readers
 import SP1Clean.FormalModel.Contracts.SystemChips
+import SP1Clean.Model.Semantics.AccessSchedule
 
 /-!
 # Trace generation — the two system-table bump rows
@@ -216,22 +217,6 @@ theorem stateBump_spec {e : StateBumpEvent} (h : e.WellFormed) :
 
 
 /-! ## MemoryBump -/
-
-/-- One register-record timestamp refresh: the record a `MemoryBumpChip` row pulls and re-pushes.
-The value is unchanged — a bump moves a record forward in time, it does not write. -/
-structure MemoryBumpEvent where
-  addr : ℕ
-  value : ℕ
-  prevTs : ℕ
-  currTs : ℕ
-
-/-- **When a refresh is one a bump row can carry.** The address is a register index, the record's
-timestamp strictly increases, and the refreshed timestamp stays inside the machine's 48-bit clock —
-which is what bounds the cross-window gap the comparison commits. -/
-structure MemoryBumpEvent.WellFormed (e : MemoryBumpEvent) : Prop where
-  addr : e.addr < 32
-  increases : e.prevTs < e.currTs
-  currLt : e.currTs < 2 ^ 48
 
 /-- SP1's `MemoryBumpChip` row for one refresh: the standard `MemoryAccessCols` carrier at the old
 and new timestamps, the refreshed clock's four canonical limbs, and the register index. -/

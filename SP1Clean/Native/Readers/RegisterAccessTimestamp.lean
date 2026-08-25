@@ -27,14 +27,14 @@ Each is a `byteChannel.pullIf` (multiplicity `-is_real`, **raw** value — post-
 `Requirements`): on a real row it hands soundness the channel's `Guarantees = ByteRowSpec` of the
 message (the in-circuit byte-op correctness), which the proof projects through
 `byteRowSpec_range`/`byteRowSpec_u8range_pair`; on padding (`mult = 0`) it owes and receives nothing.
-The guarantee is backed at the ensemble/balance level by the landed `ByteChip` provider
-(`Proofs/Chips/ByteChip/`, discharged via `Soundness/ByteConsistency.lean`'s
-`byteAccessValid_of_balance`). Background: `docs/bus-model.md` §5 (HISTORICAL — read its banner).
+The guarantee is backed at the ensemble/balance level by the landed Byte/Range providers
+(`Proofs/Chips/ByteChip/`) and the native provider recount. Background: `docs/bus-model.md` §5
+(HISTORICAL — read its banner).
 
 `clk_target` is the operand's access clock (`clk_low + 4/3/2` for op_a/op_b/op_c) — a cross-block
 input. The chip-witnessed columns are computed from it (`prev_low := clk_target - 1`, `diff := 0`, so the
 scaled numerator is `0`), which makes completeness hold for every `clk_target`. The `.memory`
-interactions are off-chip membership (trace-level, `Soundness/MemoryConsistency.lean`), so this
+interactions receive their global meaning from timed typed-memory grounding, so this
 sub-circuit emits no lookup for them. `Readers/RegisterAccessCols.lean` wraps this with `prev_value`
 and `RTypeReader` composes that 3× — factoring the register-access columns into sub-circuits is the
 idiomatic fix for the inline-22-column `circuit_proof_start` cost (each sub-circuit is a `circuit_norm`

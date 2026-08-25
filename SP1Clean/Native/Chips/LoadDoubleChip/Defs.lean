@@ -23,8 +23,8 @@ Output is the extracted `Columns` struct.
 The chip `Spec` is the composition of the sub-circuits' own `Spec`s + the proven `is_real`-binary fact +
 the `op_a != x0` gate; the load *meaning* (`rd = memory_access.prev_value`) is carried by the `ITypeReader`
 sub-`Spec` (its write value is the loaded word). The bus's cross-row offline-memory meaning
-(`prev_value = actual memory contents at the address`) lives at the trace level
-(`Soundness/MemoryConsistency.lean`). -/
+(`prev_value = actual memory contents at the address`) is derived by
+`Soundness/TypedMemory.lean`. -/
 
 namespace SP1Clean.LoadDoubleChip
 

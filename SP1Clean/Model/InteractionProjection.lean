@@ -3,12 +3,10 @@ import SP1Clean.Model.Channels
 
 /-! # Evaluating an emitted interaction to a trace-level `LookupAccess`
 
-The **"emitted = projection"** bridge (`docs/bus-model.md` §2/§7): a circuit's emitted
-`AbstractInteraction`s (expression-valued, over circuit `operations`) evaluate — through an `Environment` —
-to the trace-level `LookupAccess`es that the hand-written `Soundness/*Consistency.lean` projections
-(`stateLookups`/`memoryLookups`/`programLookups`/`byteLookups`) produce. This lets each `*Lookups` shadow be
-shown equal to `(interactionsWith channel ops).map (toAccess env)` — the val-image of what the circuit
-*actually emits* — rather than remaining a hand-authored shadow.
+Evaluation bridges for a circuit's emitted `AbstractInteraction`s (expression-valued, over circuit
+`operations`) to the integer-valued `LookupAccess` ledger used by completeness and exact-transport
+arguments. The live soundness path reads typed evaluated interactions directly; these kernels remain
+the orientation boundary for the integer ledger.
 
 The one subtlety is the **signed multiplicity**: a receive's emitted multiplicity `-is_real` evaluates in
 `ZMod p` to `p - is_real.val` (for `is_real = 1`, that's `p - 1`), which must map to `-1 : ℤ`. `signedVal`
@@ -21,12 +19,34 @@ open SP1Clean.LookupAccessList
 
 variable {p : ℕ} [NeZero p]
 
-/-- The `InteractionKind` of a channel, recovered from its `name` (the four buses this project models). -/
+/-- The `InteractionKind` of a channel, recovered from its `name` (the four buses this project
+models).
+
+The Byte case is deliberately explicit. Unknown channel names use the legacy `.State`
+compatibility bucket rather than `.Byte`: Byte and Program are the two provider-closure kinds, so
+classifying an unrecognised channel as Byte would let a future fifth channel enter that closure by
+default. The extracted full-AIR compatibility projection uses the same `.State` bucket for its
+reserved `"SP1Raw/…"` names (`Extracted.Interaction.toAccess`). -/
 def kindOf (name : String) : InteractionKind :=
   if name = "SP1Memory" then .Memory
   else if name = "SP1Program" then .Program
   else if name = "SP1State" then .State
-  else .Byte
+  else if name = "SP1Byte" then .Byte
+  else .State
+
+/-- A channel is classified as Byte exactly when it carries the canonical native Byte name. This
+is the fail-closed fact used by provider recounting: an unrecognised channel cannot silently become
+a preprocessed Byte demand. -/
+@[simp] theorem kindOf_eq_byte_iff (name : String) :
+    kindOf name = .Byte ↔ name = "SP1Byte" := by
+  simp only [kindOf]
+  split <;> rename_i hmemory
+  · subst name; simp
+  · split <;> rename_i hprogram
+    · subst name; simp
+    · split <;> rename_i hstate
+      · subst name; simp
+      · split <;> simp_all
 
 /-- The **signed** value of a field element: its centered representative in `(-p/2, p/2]`, as `ℤ`. For the
 `±is_real` multiplicities the buses use this is exactly `±is_real.val` (`signedVal_is_real`/`_neg_is_real`);
@@ -125,6 +145,45 @@ noncomputable def AbstractInteraction.toAccess (env : Environment (ZMod p))
     (i.msg.map (Expression.eval env)).toList.map ZMod.val,
     signedVal (Expression.eval env i.mult))
 
+/-- Project one evaluated Clean interaction into the Rust-facing orientation used by whole-chip
+faithfulness. Native Memory and Program channels are dualized because SP1's extracted AIR sends
+where the proof-oriented Clean circuits pull; State, Byte, and unexpected channels retain their
+literal Clean sign.
+
+The channel test is structural rather than name-based, matching `Faithful.nativeAccesses` exactly.
+In particular, a malformed fifth channel which merely reuses `"SP1Memory"` is retained as an
+unexpected interaction instead of being silently dualized. -/
+noncomputable def Interaction.toRustOrientedAccess (i : Interaction (ZMod p)) : LookupAccess :=
+  by
+    classical
+    exact if i.channel = Channels.memoryChannel.toRaw ∨
+        i.channel = Channels.programChannel.toRaw then
+      LookupAccessList.negMult (Interaction.toAccess i)
+    else
+      Interaction.toAccess i
+
+/-- Expression-level companion to `Interaction.toRustOrientedAccess`. -/
+noncomputable def AbstractInteraction.toRustOrientedAccess (env : Environment (ZMod p))
+    (i : AbstractInteraction (ZMod p)) : LookupAccess :=
+  by
+    classical
+    exact if i.channel = Channels.memoryChannel.toRaw ∨
+        i.channel = Channels.programChannel.toRaw then
+      LookupAccessList.negMult (AbstractInteraction.toAccess env i)
+    else
+      AbstractInteraction.toAccess env i
+
+omit [NeZero p] in
+/-- Evaluation commutes with the Rust-orientation projection. -/
+theorem interactionToRustOrientedAccess_eval (env : Environment (ZMod p))
+    (interaction : AbstractInteraction (ZMod p)) :
+    Interaction.toRustOrientedAccess (interaction.eval env) =
+      AbstractInteraction.toRustOrientedAccess env interaction := by
+  classical
+  simp only [Interaction.toRustOrientedAccess,
+    AbstractInteraction.toRustOrientedAccess, AbstractInteraction.eval,
+    Interaction.toAccess, AbstractInteraction.toAccess, Vector.toList]
+
 omit [NeZero p] in
 /-- The `toAccess`-image of **any** channel interaction: bus kind and table name from the channel
 `name`, the message's `toElements` list evaluated and then val-projected, and the centered signed
@@ -205,11 +264,7 @@ theorem toAccess_pushedIfValue {Message : TypeMap} [ProvableType Message]
       LookupAccessList.accessAt (msgToken channel msg) (signedVal gate) := rfl
 
 omit [NeZero p] in
-/-- **Kernel of the State "emitted = projection".** The `toAccess`-image of a pushed `stateChannel`
-message (post-#398 `circuit_norm` normal form: `pushIf`) is exactly the `stateLookups`-style
-`LookupAccess`: bus `.State`, table `"SP1State"`, the five message fields val-projected, and the signed
-multiplicity. This is the per-interaction computation the `stateLookups_eq_emitted` derived theorem maps
-over the recovered `interactionsWith` list. -/
+/-- The `toAccess` image of a pushed State message: its five fields and signed multiplicity. -/
 lemma toAccess_pushIf_state (env : Environment (ZMod p)) (mult : Expression (ZMod p))
     (msg : StateMsg (Expression (ZMod p))) :
     AbstractInteraction.toAccess env (pushedIf (channel := stateChannel) mult msg).toRaw =
@@ -312,10 +367,7 @@ lemma toAccess_pullIf_memory (env : Environment (ZMod p)) (gate : Expression (ZM
   rfl
 
 omit [NeZero p] in
-/-- **Kernel of the Program "emitted = projection".** The `toAccess`-image of a pushed `programChannel`
-message (a plain `Channel.emit`, default `toRaw`; post-#398 `circuit_norm` normal form: `pushIf`) is the
-16-field `programLookups`-style `LookupAccess`: bus `.Program`, table `"SP1Program"`, the sixteen fields
-val-projected, and the signed multiplicity. -/
+/-- The `toAccess` image of a pushed Program message: its sixteen fields and signed multiplicity. -/
 lemma toAccess_pushIf_program (env : Environment (ZMod p)) (mult : Expression (ZMod p))
     (msg : ProgramMsg (Expression (ZMod p))) :
     AbstractInteraction.toAccess env (pushedIf (channel := programChannel) mult msg).toRaw =

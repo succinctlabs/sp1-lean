@@ -107,7 +107,8 @@ private theorem providerComponent_channels_subset
     (componentMem : component ∈ Soundness.sp1ProviderTables (p := p)) :
     component.circuit.channels ⊆ (Soundness.sp1Ensemble (p := p)).channels := by
   rw [Soundness.sp1Ensemble_channels]
-  simp only [Soundness.sp1ProviderTables, List.mem_append] at componentMem
+  rw [Soundness.sp1ProviderTables_explicit] at componentMem
+  simp only [List.mem_append] at componentMem
   rcases componentMem with (componentMem | componentMem) | componentMem
   · fin_cases componentMem <;>
       simp [GeneralFormalCircuit.channels, ByteChip.U8Range.circuit, ByteChip.MSB.circuit,

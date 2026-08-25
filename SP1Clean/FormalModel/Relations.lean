@@ -8,8 +8,8 @@ execution witness.  Keeping both witnesses explicit avoids conflating an AIR the
 proof-system verifier theorem.
 
 Part of this API is written for the ArkLib verifier layer rather than for in-tree consumers:
-the composition lemmas (`Sound.trans`, `FunctionalRefinement.trans`), the functional target
-preimage, the language algebra
+the composition lemmas (`Sound.trans`, `FunctionalRefinement.trans`,
+`FunctionalCompleteness.trans`), the functional target preimage, the language algebra
 (`Sound.language_subset`, `Complete.language_subset`, `Correct.language_eq`,
 `language_eq_fst_image`), and the choice-based `Sound.extract`/`Sound.extract_valid` are
 deliberately declared ahead of that integration (`docs/roadmap.md`), so a reference census
@@ -121,6 +121,42 @@ def Complete {Public : Type u} {AIRWitness : Type v} {ExecutionWitness : Type w}
   ∀ statement executionWitness, execution statement executionWitness →
     ∃ airWitness, air statement airWitness
 
+/-- Constructive completeness between witness relations.
+
+This is the reverse-witness dual of `FunctionalRefinement`: the map constructs an AIR witness from
+the public statement and semantic execution witness alone, while `map_valid` proves that construction
+valid using the execution-relation hypothesis.  In particular, the witness constructor cannot depend
+on the proof that the execution relation holds. -/
+structure FunctionalCompleteness {Public : Type u} {AIRWitness : Type v}
+    {ExecutionWitness : Type w} (air : Relation Public AIRWitness)
+    (execution : Relation Public ExecutionWitness) where
+  map : Public → ExecutionWitness → AIRWitness
+  map_valid : ∀ statement executionWitness, execution statement executionWitness →
+    air statement (map statement executionWitness)
+
+/-- Forget the witness constructor and recover ordinary witness-producing completeness. -/
+theorem FunctionalCompleteness.complete {Public : Type u} {AIRWitness : Type v}
+    {ExecutionWitness : Type w} {air : Relation Public AIRWitness}
+    {execution : Relation Public ExecutionWitness}
+    (completeness : FunctionalCompleteness air execution) : Complete air execution :=
+  fun statement executionWitness valid =>
+    ⟨completeness.map statement executionWitness,
+      completeness.map_valid statement executionWitness valid⟩
+
+/-- Constructive completeness maps compose in the reverse witness direction without choice. -/
+def FunctionalCompleteness.trans {Public : Type u} {Witness₁ : Type v} {Witness₂ : Type w}
+    {Witness₃ : Type x} {relation₁ : Relation Public Witness₁}
+    {relation₂ : Relation Public Witness₂} {relation₃ : Relation Public Witness₃}
+    (completeness₁₂ : FunctionalCompleteness relation₁ relation₂)
+    (completeness₂₃ : FunctionalCompleteness relation₂ relation₃) :
+    FunctionalCompleteness relation₁ relation₃ where
+  map statement witness₃ :=
+    completeness₁₂.map statement (completeness₂₃.map statement witness₃)
+  map_valid statement witness₃ valid₃ :=
+    completeness₁₂.map_valid statement
+      (completeness₂₃.map statement witness₃)
+      (completeness₂₃.map_valid statement witness₃ valid₃)
+
 /-- Bidirectional correctness of two witness relations.  Soundness is the release-critical
 direction; whole-machine completeness may remain an explicitly disclosed admission while trace
 generation is being verified. -/
@@ -128,6 +164,34 @@ structure Correct {Public : Type u} {AIRWitness : Type v} {ExecutionWitness : Ty
     (air : Relation Public AIRWitness) (execution : Relation Public ExecutionWitness) : Prop where
   sound : Sound air execution
   complete : Complete air execution
+
+/-- Constructive bidirectional correctness of two witness relations.
+
+Both witness conversions are proof-independent total functions.  Keeping them together records the
+two executable halves of a correctness theorem without introducing choice in either direction. -/
+structure FunctionalCorrect {Public : Type u} {AIRWitness : Type v}
+    {ExecutionWitness : Type w} (air : Relation Public AIRWitness)
+    (execution : Relation Public ExecutionWitness) where
+  sound : FunctionalRefinement air execution
+  complete : FunctionalCompleteness air execution
+
+/-- Forget both witness maps and recover relational correctness. -/
+theorem FunctionalCorrect.correct {Public : Type u} {AIRWitness : Type v}
+    {ExecutionWitness : Type w} {air : Relation Public AIRWitness}
+    {execution : Relation Public ExecutionWitness}
+    (correct : FunctionalCorrect air execution) : Correct air execution where
+  sound := correct.sound.sound
+  complete := correct.complete.complete
+
+/-- Constructive bidirectional correctness composes without choice. -/
+def FunctionalCorrect.trans {Public : Type u} {Witness₁ : Type v} {Witness₂ : Type w}
+    {Witness₃ : Type x} {relation₁ : Relation Public Witness₁}
+    {relation₂ : Relation Public Witness₂} {relation₃ : Relation Public Witness₃}
+    (correct₁₂ : FunctionalCorrect relation₁ relation₂)
+    (correct₂₃ : FunctionalCorrect relation₂ relation₃) :
+    FunctionalCorrect relation₁ relation₃ where
+  sound := FunctionalRefinement.trans correct₁₂.sound correct₂₃.sound
+  complete := FunctionalCompleteness.trans correct₁₂.complete correct₂₃.complete
 
 /-- Witness-producing refinement composes.  This is the deterministic theorem used at the seam
 between an ArkLib extractor, SP1 AIR soundness, and the native execution relation. -/
@@ -169,11 +233,27 @@ theorem Complete.language_subset {Public : Type u} {AIRWitness : Type v} {Execut
     language execution ⊆ language air :=
   fun statement ⟨executionWitness, valid⟩ => complete statement executionWitness valid
 
+/-- Constructive completeness gives the converse public-language inclusion. -/
+theorem FunctionalCompleteness.language_subset {Public : Type u} {AIRWitness : Type v}
+    {ExecutionWitness : Type w} {air : Relation Public AIRWitness}
+    {execution : Relation Public ExecutionWitness}
+    (completeness : FunctionalCompleteness air execution) :
+    language execution ⊆ language air :=
+  Complete.language_subset completeness.complete
+
 theorem Correct.language_eq {Public : Type u} {AIRWitness : Type v} {ExecutionWitness : Type w}
     {air : Relation Public AIRWitness} {execution : Relation Public ExecutionWitness}
     (correct : Correct air execution) :
     language air = language execution :=
   Set.Subset.antisymm correct.sound.language_subset correct.complete.language_subset
+
+/-- Constructive correctness identifies the two public languages. -/
+theorem FunctionalCorrect.language_eq {Public : Type u} {AIRWitness : Type v}
+    {ExecutionWitness : Type w} {air : Relation Public AIRWitness}
+    {execution : Relation Public ExecutionWitness}
+    (correct : FunctionalCorrect air execution) :
+    language air = language execution :=
+  Correct.language_eq correct.correct
 
 /-- ArkLib's `Set.language` is the first projection of `asSet`; expose the equivalence without
 making the formal-model layer depend on ArkLib's namespace or protocol implementation. -/

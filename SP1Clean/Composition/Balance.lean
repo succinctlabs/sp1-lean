@@ -32,11 +32,11 @@ below `p/2` — but it is true of the traces, not of the relation, so it travels
 ## Scope
 
 This proves the payload-indexed statement: under the extracted balance and the multiplicity bound,
-every payload's signed multiplicity sum is zero. Turning that into
-`LookupAccessList.multiplicitySum … k = 0` for a projected *key* additionally needs the projection
-`payload ↦ key` to be injective — true, since each payload constructor lands on its own bus name and
-`ZMod.val` determines the element — and is left for the file that consumes it, together with the
-per-table access permutations of `Transport/Table.lean`. See `docs/roadmap.md`.
+every payload's signed multiplicity sum is zero. This arithmetic lemma is intentionally not promoted
+to balance of the reduced native ensemble: the full exact cluster contains system consumers absent
+from that ensemble, whose Byte/Range/Program multiplicities are recounted from the literal Clean
+ledger instead. The former unused payload-to-compatibility-key closure was retired with the dead bus
+projection stratum; `CoreArtifact.lean` states the remaining State/Memory integer balance explicitly.
 -/
 
 namespace SP1Clean.Composition

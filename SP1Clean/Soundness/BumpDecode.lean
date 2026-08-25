@@ -101,7 +101,8 @@ theorem tables_drop_stateBumpIndex (witness : EnsembleWitness (sp1Ensemble (p :=
     rw [← witness.same_length]
     simp [sp1Ensemble_tables, sp1Tables_length,
       sp1ProviderTables_length]
-  simp only [stateBumpIndex, instructionTableCount, stateSilentProviderTableCount]
+  simp only [stateBumpIndex, instructionTableCount, InstructionChipId.count_eq,
+    stateSilentProviderTableCount]
   rw [List.drop_eq_getElem_cons (by omega), List.drop_eq_nil_of_le (by omega)]
   rfl
 

@@ -5,7 +5,7 @@ import SP1Clean.Soundness.SupportedMachine
 A projection of `SupportedMachine.supportedChips`, gathering every chip that has a capstone-integration `Soundness.ChipKind`
 (defined next to its Sail bridge in `Chips/<Op>Chip/Bridge.lean`). `ChipKind p` is one type — the
 per-chip heterogeneity (its `Inputs`/`Cols` `TypeMap`s) lives *inside* each value — so `List (ChipKind p)`
-type-checks and `allChipKinds` is the semantic projection of the one grep-able descriptor.
+type-checks and `allChipKinds` is the semantic projection of the one grep-able realization map.
 
 This file is a compatibility projection / re-export hub, **not** a dispatch mechanism: the capstone dispatches each
 row generically via `r.kind.advance`. The registry exists for **auditability** — one entry ⇔ one
@@ -38,14 +38,15 @@ namespace SP1Clean.Soundness
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
 
-/-- Every chip with a capstone-integration `ChipKind`.  To wire a new chip, define its `kind` beside its
-Sail bridge and add one complete entry to `supportedChips`; do not add another independent list here. -/
+/-- Every chip with a capstone-integration `ChipKind`. To wire a new chip, extend the neutral
+`InstructionChipId` enumeration, define its Sail-adjacent `kind`, and add the corresponding
+`supportedChipFor` case; do not add another independent list here. -/
 def allChipKinds : List (ChipKind p) :=
   (supportedChips (p := p)).map (·.kind)
 
-/-- Regression guard: the wired-chip count is exactly 25. If a `kind` is added to / removed from
-`allChipKinds` without updating this, the `rfl` breaks — keeping the audit count honest. -/
-theorem allChipKinds_length : (allChipKinds (p := p)).length = 25 := rfl
+/-- Regression guard: the wired-chip count is inherited from the complete neutral identity list. -/
+theorem allChipKinds_length : (allChipKinds (p := p)).length = 25 := by
+  simpa [allChipKinds] using supportedChips_length (p := p)
 
 /-- **Full advance coverage (SC Phase 4, complete).** Every registered chip carries a populated
 `advance` field (`isSome`) — the 25/25 milestone: MUL/MULHSU (via the Move-2 guarded `inv_mul'`) and the

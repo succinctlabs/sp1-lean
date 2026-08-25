@@ -1050,69 +1050,19 @@ Bridge.lean` hit this when upstream #101's immediate-type bridges met a golfed c
 - **`/split-file`** — split an over-long file along namespace/section seams.
 - **`Skill(simplify)`** — a holistic reuse/altitude review pass on a file (invoked inside `/cleanup` Phase 6.5).
 
-## "emitted = projection": `<b>Lookups_eq_emitted` (proving a trace projection IS the emission)
+## Interaction projection and recovery kernels
 
-Goal: prove a hand-written trace-level projection (`Soundness/*Consistency.lean`'s `stateLookups`,
-`memoryLookups`, `programLookups`) equals the `toAccess`-image of what the circuit *actually emits* on that
-channel — turning the projection from a parallel shadow into a derived theorem. **State, Program, and Memory
-are DONE** (`stateLookups_eq_emitted`, `programLookups_eq_emitted`, `memoryLookups_eq_emitted`, all
-axiom-clean). **Only Byte remains** (its emits are *carried by* the `RAC ⊃ RAT` subcircuits + `pullIf`
-form — a recovery-*through*-nesting, not the drop-based recovery below).
+The former `Soundness/*Consistency.lean` integer `*Lookups` shadows and their
+`<bus>Lookups_eq_emitted` proofs were retired in 2026-08. Live soundness reads the actual typed Clean
+interaction ledger in `Soundness/TypedState.lean`, `TypedProgram.lean`, and `TypedMemory.lean`; do not
+introduce a parallel hand-written bus projection.
 
-Two foundations files: `Model/InteractionProjection.lean` (`AbstractInteraction.toAccess env`,
-`signedVal` = the centered representative for `-is_real`-valued mults, and the per-channel
-`toAccess_emitted_<msg>` kernels) and `Model/InteractionRecovery.lean` (the subcircuit-drop toolkit).
-
-**Kernel form (critical).** `Channel.emit` produces `_root_.emitted`, and `circuit_norm` unfolds the
-`@[circuit_norm] Channel.emitted` def to it — so the `toAccess_emitted_<msg>` kernels are stated on
-`emitted (channel := <chan>) mult msg` (the `_root_.emitted` form), **not** `chan.emitted`. This lets the
-kernel fire by `simp` directly, with no per-emit `rw [show … = chan.emitted … from rfl]` re-fold (which
-doesn't scale past 1 emit). Kernel proof: `simp only [..., emitted, ...]` then a trailing `simp` — but the
-9/16-field `toElements` unfold must be `simp only` (deterministic, linear); plain `simp` over the full set
-blows up at `whnf` for the bigger structs.
-
-**The recipe (worked for Program + Memory — a *composed* reader, `RTypeReader`):**
-1. **Drop the byte-only subcircuits.** `have hnil : ∀ inp o, interactionsWith <chan>
-   (RegisterAccessCols.elaborated.main inp o).2 = [] := by intro inp o; apply
-   interactionsWith_main_snd_eq_nil; simp [circuit_norm, ElaboratedCircuit.channels]`. The `.2`-form
-   `interactionsWith_main_snd_eq_nil` (InteractionRecovery) matches what `circuit_norm` leaves
-   (`(main … off).2`, since `Circuit.operations c off = (c off).2`); it discharges `<chan> ∉ circuit.channels`
-   from `ElaboratedCircuit.channels_subset` — needs the *symmetric* channel-distinctness
-   (`memoryChannel_eq_byteChannel_false` etc.) + `ElaboratedCircuit.channels` in the simp set.
-2. **Drop the `op_a_0 === 0` Equality gates.** `have heq := fun n inp =>
-   filter_interactions_formalAssertion_eq_nil (Gadgets.Equality.circuit id) <chan> (n := n) inp
-   List.not_mem_nil List.not_mem_nil` (the `===` desugars to `Gadgets.Equality.circuit id`, a
-   `FormalAssertion` with no channels; TypeMap is `id` not `field`; `List.not_mem_nil` takes the element
-   *implicitly* — no `_`).
-3. **Reduce `interactionsWith` to the target emits.** `simp only [<rdr>.main, circuit_norm, hnil, heq,
-   <otherchan>_eq_<chan>_false, if_false]` — the other bus's emits collapse via the explicit
-   channel-distinctness `= False` lemma + `if_false` (`circuit_norm` alone leaves the `if … = … then`).
-4. **Apply the kernel + bind.** `simp only [toAccess_emitted_<msg>]` then `simp [circuit_norm,
-   signedVal_is_real hp2 h_real, signedVal_neg_is_real hp2 h_real, <Lookups>, <Access>, h_*]`. Realization
-   hyps: WITNESSED columns as `env.get <offset> = r.cols.…` (`circuit_norm` turns `eval env (var ⟨off⟩)` into
-   `env.get off`); INPUT fields as `Expression.eval env input.… = …`; SUBCIRCUIT-output columns as
-   `Expression.eval env (RegisterAccessCols.elaborated.output ⟨…⟩ <off>).field = …` (these stay `eval env
-   (output …)`, NOT `env.get`). `hp2 : 2 < p` from `Fact (2^17 < p)`.
-
-**Byte (deferred — the different case; see `../architecture.md` §"Interaction half" and `../roadmap.md`).**
-Byte's emits are *the content* of the `RAC ⊃ RAT` subcircuits (they
-don't drop), so recovery must *recover* their emits through two levels of nesting (the State
-`exposedChannels` route composed through nesting), plus a `pullIf` kernel (mult `-is_real`,
-value-folded `is_real*value`). First the **byte faithfulness cleanup** removed the divergent reader byte
-checks (CPUState's 4 `pc`, `RegisterAccessCols`'s 4 `prev_value`) SP1 has no analog of — so the readers now
-emit exactly `ByteConsistency.byteRows`'s 8 checks, which is what makes byte `eq_emitted` well-posed.
-
-## `ChipAir` / `Machine` (the cross-chip bus aggregate)
-
-`Model/ChipAir.lean`: `ChipAir {name, perRow : Row → LookupAccessList, included}`, `Machine := List
-(ChipAir Row)`, `Machine.busAggregate`/`busBalance` over the *computable* `InteractionBus`
-core (never `noncomputable interactionsWith`). `multiplicitySum_busAggregate_cons` decomposes a machine's
-per-key sum into per-chip sums. (The bespoke per-bus `ChipAir`s + `Machine` that drove the retired
-`TraceValid` capstone lived in `Soundness/MachineConsistency.lean`, removed 2026-06-05; the surviving
-statement-layer infra is `Model/ChipAir.lean`, and the live cross-chip argument is the timed-grounding
-capstone, `Soundness/AIR.lean`.) **Gotcha:** `Machine` is an `abbrev` for `List`, so `m.busAggregate`
-dot-notation resolves to `List.busAggregate` — call `Machine.busAggregate m` explicitly. Statement layer
-only: it makes Σsends = Σreceives expressible; it does not derive the per-bus meaning (those stay threaded).
+Two lower-level tools remain useful. `Model/InteractionRecovery.lean` recovers or filters channel
+interactions through composed subcircuits. `Model/InteractionProjection.lean` evaluates an
+`AbstractInteraction` to the integer `LookupAccess` orientation used by completeness and exact
+transport (`AbstractInteraction.toAccess`, `signedVal`, and the per-message `toAccess_*` kernels).
+When proving a typed emission-shape theorem, prefer the compositional helpers in `TypedProgram` and
+the reader-local `<reader>_*Interactions` lemmas over unfolding a whole chip.
 
 ## Build & verification gotchas (partly a repeat from LEAN_SAIL_NOTES)
 

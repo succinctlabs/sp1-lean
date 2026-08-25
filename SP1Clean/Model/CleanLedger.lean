@@ -36,6 +36,14 @@ provider recounting and native channel balance must use this definition. -/
 def tableCleanAccesses (table : Table (ZMod p)) : LookupAccessList :=
   table.interactions.map Interaction.toAccess
 
+/-- The same literal evaluated Clean interactions in the Rust-facing orientation used by
+whole-chip faithfulness: Memory and Program are dualized, while State, Byte, and unexpected
+channels retain their Clean signs. `Composition.tableNativeAccesses` groups these interactions by
+channel; `tableNativeAccesses_perm_tableRustOrientedAccesses` proves that grouping changes only
+their order. -/
+noncomputable def tableRustOrientedAccesses (table : Table (ZMod p)) : LookupAccessList :=
+  table.interactions.map Interaction.toRustOrientedAccess
+
 /-- Concatenate the literal Clean ledgers of a list of tables, preserving table and row order. -/
 def tablesCleanAccesses (tables : List (Table (ZMod p))) : LookupAccessList :=
   tables.flatMap tableCleanAccesses

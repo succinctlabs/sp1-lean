@@ -983,11 +983,59 @@ theorem supported_core_native_sound (model : Machine.SP1MachineModel)
   rw [Machine.localExecutionClock_eq_ordinary ordinary]
   exact grounding.clockCount
 
+/-- **Exact supported ordinary-shard soundness.** The same native relation constructs the one
+proof-free `EventExecutionTrace` consumed by completeness: every transition is an official ordinary
+event, carries a successful canonical instruction route, and matches the public pc/clock endpoints.
+
+No representation premise is added to `SupportedCoreNativeRelation`.  Canonical program commitment
+implies the semantic program's image addresses are encodable, while the public verifier row supplies
+the boundary limb bounds. -/
+theorem supported_core_native_ordinary_sound (handler : Machine.SyscallHandler) :
+    WitnessRelation.Sound (SupportedCoreNativeRelation (p := p))
+      (SupportedOrdinaryShardExecutionRelation handler) := by
+  intro statement witness valid
+  obtain ⟨⟨publicInputEq, constraints, balanced⟩, ⟨initial, boundary⟩⟩ := valid
+  obtain ⟨rows, grounding⟩ :=
+    supported_core_witness_grounding statement witness initial publicInputEq constraints balanced
+      boundary
+  obtain ⟨execution, initialEq, stepsEq, finalPc, executionValid, clocked, finalClock,
+      ordinary, supported⟩ :=
+    eventExecution_of_groundedRows handler
+      (fun decoded : DecodedInstructionRow p => decoded.toChipRow witness.data)
+      witness.data statement.program initial rows
+      (supportedPcBits statement.publicValues.init_pc0 statement.publicValues.init_pc1
+        statement.publicValues.init_pc2)
+      (supportedPcBits statement.publicValues.final_pc0 statement.publicValues.final_pc1
+        statement.publicValues.final_pc2)
+      grounding.walk grounding.grounded boundary.codeMemoryCompatible boundary.initialPc
+      boundary.romLoaded boundary.configured
+      (Semantics.clkNat statement.publicValues.init_clk_high
+        statement.publicValues.init_clk_low)
+  refine ⟨execution, {
+    publicValuesWellFormed := ?_
+    programWellFormed := boundary.programWellFormed
+    programEncodable := boundary.programCommitted.encodable
+    romLoaded := ?_
+    configured := ?_
+    codeMemoryCompatible := ?_
+    segment := ?_
+    allOrdinary := ordinary
+    supported := supported }⟩
+  · rw [← publicInputEq]
+    exact witness_publicInput_limbBounds witness constraints balanced
+  · simpa only [initialEq] using boundary.romLoaded
+  · simpa only [initialEq] using boundary.configured
+  · rw [initialEq]
+    exact boundary.codeMemoryCompatible
+  · refine ⟨executionValid, clocked, ?_, finalPc, ?_⟩
+    · simpa only [initialEq] using boundary.initialPc
+    · exact finalClock.trans grounding.clockCount
+
 /-! ## Completeness boundary
 
 Whole-machine completeness is intentionally not inferred from the `completeness` field embedded in
 each `GeneralFormalCircuit`. `Soundness/AIRCompleteness.lean` proves
-`supported_core_native_complete` for `SupportedCoreTraceGeneratableExecutionRelation`: a canonical
+`supported_core_generated_trace_complete` for `SupportedCoreGeneratedTraceRelation`: a canonical
 trace record whose per-table routing facts, canonical nonnegative provider-count encodings, four
 exact centered-integer channel balances, public equality, and semantic boundary binding are
 supplied. It constructs every physical table row with the circuits' own witness generators. This is

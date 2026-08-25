@@ -126,6 +126,82 @@ def EventExecutionTrace.Clocked (initialClock : ℕ) (execution : EventExecution
 def EventExecutionTrace.steps (execution : EventExecutionTrace) : ℕ :=
   execution.transitions.length
 
+/-- The native 25-chip slice contains only ordinary Sail instructions. This predicate is stated on
+the proof-free trace so support checks and trace compilation never inspect a validity proof. -/
+def EventExecutionTrace.AllOrdinary (execution : EventExecutionTrace) : Prop :=
+  ∀ transition ∈ execution.transitions, transition.event = .ordinary
+
+/-- A valid transition list containing only ordinary events is exactly an official-Sail chain.
+The syscall handler disappears from the conclusion because no syscall constructor can occur. -/
+theorem EventTransitionsValid.sailChain_of_allOrdinary {handler : SyscallHandler}
+    {program : GuestProgram} {source : SailState} {transitions : List EventTransition}
+    (valid : EventTransitionsValid handler program source transitions)
+    (ordinary : ∀ transition ∈ transitions, transition.event = .ordinary) :
+    SailChain transitions.length source (stateAfterTransitions source transitions) := by
+  induction valid with
+  | nil state => exact .refl state
+  | @cons source transition rest step tail ih =>
+      have headOrdinary : transition.event = .ordinary := ordinary transition (by simp)
+      have restOrdinary : ∀ item ∈ rest, item.event = .ordinary :=
+        fun item itemMem => ordinary item (by simp [itemMem])
+      rcases transition with ⟨event, target⟩
+      simp only at headOrdinary
+      subst event
+      cases step with
+      | ordinary _ sailStep =>
+          simpa only [List.length_cons, stateAfterTransitions, List.foldl_cons,
+            Nat.succ_eq_add_one] using SailChain.step sailStep (ih restOrdinary)
+
+/-- The ordinary fragment of an event trace forgets directly to the canonical Sail-chain
+semantics; no parallel execution carrier is needed. -/
+theorem EventExecutionTrace.sailChain {handler : SyscallHandler} {program : GuestProgram}
+    (execution : EventExecutionTrace) (valid : execution.Valid handler program)
+    (ordinary : execution.AllOrdinary) :
+    SailChain execution.steps execution.initialState execution.finalState := by
+  simpa only [EventExecutionTrace.Valid, EventExecutionTrace.steps,
+    EventExecutionTrace.finalState] using valid.sailChain_of_allOrdinary ordinary
+
+/-- One proof-free transition together with the source state at which it occurs. The target remains
+the one stored by `EventTransition`; this is a derived chronological view, not a second trace. -/
+structure LocatedTransition where
+  source : SailState
+  transition : EventTransition
+
+/-- Attach each transition to its source state, threading targets in execution order. -/
+def locateTransitions : SailState → List EventTransition → List LocatedTransition
+  | _, [] => []
+  | source, transition :: rest =>
+      ⟨source, transition⟩ :: locateTransitions transition.target rest
+
+/-- The chronological transition view consumed by trace compilation. -/
+def EventExecutionTrace.locatedTransitions (execution : EventExecutionTrace) :
+    List LocatedTransition :=
+  locateTransitions execution.initialState execution.transitions
+
+@[simp] theorem locateTransitions_length (source : SailState)
+    (transitions : List EventTransition) :
+    (locateTransitions source transitions).length = transitions.length := by
+  induction transitions generalizing source with
+  | nil => rfl
+  | cons transition rest ih => simp [locateTransitions, ih]
+
+@[simp] theorem EventExecutionTrace.locatedTransitions_length
+    (execution : EventExecutionTrace) :
+    execution.locatedTransitions.length = execution.steps := by
+  simp [EventExecutionTrace.locatedTransitions, EventExecutionTrace.steps]
+
+@[simp] theorem locateTransitions_map_transition (source : SailState)
+    (transitions : List EventTransition) :
+    (locateTransitions source transitions).map LocatedTransition.transition = transitions := by
+  induction transitions generalizing source with
+  | nil => rfl
+  | cons transition rest ih => simp [locateTransitions, ih]
+
+@[simp] theorem EventExecutionTrace.locatedTransitions_map_transition
+    (execution : EventExecutionTrace) :
+    execution.locatedTransitions.map LocatedTransition.transition = execution.transitions := by
+  simp [EventExecutionTrace.locatedTransitions]
+
 /-- A direction offered at `source`: its observable event, target state, and proof that taking it is
 a valid step.  This makes invalid transitions unrepresentable in a PolyFun execution prefix. -/
 structure EventDirection (handler : SyscallHandler) (program : GuestProgram)
@@ -152,33 +228,135 @@ def eventMap (handler : SyscallHandler) (program : GuestProgram) :
     (eventSystem handler program).EventMap ExecutionEvent :=
   fun _ direction => direction.event
 
-/-- A finite eventful execution beginning at an explicit state. -/
-structure EventExecutionPrefix (handler : SyscallHandler) (program : GuestProgram)
-    (initialState : SailState) where
-  steps : ℕ
-  path : PFunctor.DynSystem.Prefix (eventSystem handler program) initialState steps
+/-- Read proof-free transitions from a PolyFun prefix. -/
+def prefixTransitions {handler : SyscallHandler} {program : GuestProgram} :
+    {source : SailState} → {steps : ℕ} →
+      PFunctor.DynSystem.Prefix (eventSystem handler program) source steps →
+        List EventTransition
+  | _, _, .nil => []
+  | _, _, .step direction tail =>
+      ⟨direction.event, direction.target⟩ :: prefixTransitions tail
 
-/-- The endpoint reached by an eventful execution prefix. -/
-def EventExecutionPrefix.finalState {handler : SyscallHandler} {program : GuestProgram}
-    {initialState : SailState} (execution : EventExecutionPrefix handler program initialState) :
-    SailState :=
-  execution.path.last
+/-- A checked proof-free transition list has a PolyFun prefix with exactly the same transitions.
+This is first proved propositionally because `EventTransitionsValid` lives in `Prop`; the data-level
+view below selects the prefix noncomputably without making validity proof data observable. -/
+theorem EventTransitionsValid.exists_prefix {handler : SyscallHandler} {program : GuestProgram}
+    {source : SailState} {transitions : List EventTransition}
+    (valid : EventTransitionsValid handler program source transitions) :
+    ∃ path : PFunctor.DynSystem.Prefix (eventSystem handler program) source transitions.length,
+      prefixTransitions path = transitions := by
+  induction valid with
+  | nil => exact ⟨.nil, rfl⟩
+  | cons transition step tail ih =>
+      rcases transition with ⟨event, target⟩
+      obtain ⟨path, pathTransitions⟩ := ih
+      refine ⟨.step ⟨event, target, step⟩ path, ?_⟩
+      exact congrArg (⟨event, target⟩ :: ·) pathTransitions
 
-/-- The event transcript of a finite execution prefix. -/
-def EventExecutionPrefix.events {handler : SyscallHandler} {program : GuestProgram}
-    {initialState : SailState} (execution : EventExecutionPrefix handler program initialState) :
-    List ExecutionEvent :=
-  execution.path.events (eventMap handler program)
+/-- Turn checked proof-free transitions directly into PolyFun's finite-orbit carrier. -/
+noncomputable def EventTransitionsValid.toPrefix {handler : SyscallHandler}
+    {program : GuestProgram} {source : SailState} {transitions : List EventTransition}
+    (valid : EventTransitionsValid handler program source transitions) :
+    PFunctor.DynSystem.Prefix (eventSystem handler program) source transitions.length :=
+  Classical.choose valid.exists_prefix
+
+@[simp] theorem EventTransitionsValid.prefixTransitions_toPrefix
+    {handler : SyscallHandler} {program : GuestProgram} {source : SailState}
+    {transitions : List EventTransition}
+    (valid : EventTransitionsValid handler program source transitions) :
+    prefixTransitions valid.toPrefix = transitions :=
+  Classical.choose_spec valid.exists_prefix
+
+/-- The PolyFun view of a valid proof-free execution trace. `EventExecutionTrace` remains the one
+public execution carrier; `Prefix` is created only when a generic operational theorem needs it. -/
+noncomputable def EventExecutionTrace.toPrefix {handler : SyscallHandler}
+    {program : GuestProgram} (execution : EventExecutionTrace)
+    (valid : execution.Valid handler program) :
+    PFunctor.DynSystem.Prefix (eventSystem handler program)
+      execution.initialState execution.transitions.length :=
+  valid.toPrefix
+
+/-- Forget the proof fields of a PolyFun prefix and recover the canonical proof-free trace. -/
+def EventExecutionTrace.ofPrefix {handler : SyscallHandler} {program : GuestProgram}
+    {initialState : SailState} {steps : ℕ}
+    (path : PFunctor.DynSystem.Prefix (eventSystem handler program) initialState steps) :
+    EventExecutionTrace where
+  initialState := initialState
+  transitions := prefixTransitions path
+
+@[simp] theorem prefixTransitions_length {handler : SyscallHandler} {program : GuestProgram}
+    {initialState : SailState} {steps : ℕ}
+    (path : PFunctor.DynSystem.Prefix (eventSystem handler program) initialState steps) :
+    (prefixTransitions path).length = steps := by
+  induction path with
+  | nil => rfl
+  | step _ _ ih => simp [prefixTransitions, ih]
+
+/-- The transitions read from a PolyFun prefix are valid by construction. -/
+theorem prefixTransitions_valid {handler : SyscallHandler} {program : GuestProgram}
+    {initialState : SailState} {steps : ℕ}
+    (path : PFunctor.DynSystem.Prefix (eventSystem handler program) initialState steps) :
+    EventTransitionsValid handler program initialState (prefixTransitions path) := by
+  induction path with
+  | nil => exact .nil _
+  | @step source steps direction tail ih =>
+      refine .cons ⟨direction.event, direction.target⟩ direction.valid ?_
+      simpa only [eventSystem, PFunctor.DynSystem.update_mk'] using ih
+
+/-- A PolyFun prefix converted to the proof-free carrier remains valid. -/
+theorem EventExecutionTrace.ofPrefix_valid {handler : SyscallHandler} {program : GuestProgram}
+    {initialState : SailState} {steps : ℕ}
+    (path : PFunctor.DynSystem.Prefix (eventSystem handler program) initialState steps) :
+    (EventExecutionTrace.ofPrefix path).Valid handler program :=
+  prefixTransitions_valid path
+
+/-- Folding the extracted transition targets reaches the PolyFun prefix's endpoint. -/
+theorem stateAfterTransitions_prefixTransitions {handler : SyscallHandler}
+    {program : GuestProgram} {initialState : SailState} {steps : ℕ}
+    (path : PFunctor.DynSystem.Prefix (eventSystem handler program) initialState steps) :
+    stateAfterTransitions initialState (prefixTransitions path) = path.last := by
+  induction path with
+  | nil => rfl
+  | @step source steps direction tail ih =>
+      change stateAfterTransitions direction.target (prefixTransitions tail) = tail.last
+      simpa only [eventSystem, PFunctor.DynSystem.update_mk'] using ih
+
+/-- Forgetting proof fields preserves the event transcript. -/
+theorem events_prefixTransitions {handler : SyscallHandler}
+    {program : GuestProgram} {initialState : SailState} {steps : ℕ}
+    (path : PFunctor.DynSystem.Prefix (eventSystem handler program) initialState steps) :
+    (prefixTransitions path).map EventTransition.event =
+      path.events (eventMap handler program) := by
+  induction path with
+  | nil => rfl
+  | step direction tail ih =>
+      change direction.event :: List.map EventTransition.event (prefixTransitions tail) =
+        direction.event :: tail.events (eventMap handler program)
+      exact congrArg (direction.event :: ·) ih
+
+theorem EventExecutionTrace.ofPrefix_finalState {handler : SyscallHandler}
+    {program : GuestProgram} {initialState : SailState} {steps : ℕ}
+    (path : PFunctor.DynSystem.Prefix (eventSystem handler program) initialState steps) :
+    (EventExecutionTrace.ofPrefix path).finalState = path.last :=
+  stateAfterTransitions_prefixTransitions path
+
+theorem EventExecutionTrace.ofPrefix_events {handler : SyscallHandler}
+    {program : GuestProgram} {initialState : SailState} {steps : ℕ}
+    (path : PFunctor.DynSystem.Prefix (eventSystem handler program) initialState steps) :
+    (EventExecutionTrace.ofPrefix path).events = path.events (eventMap handler program) :=
+  events_prefixTransitions path
+
+/-- Passing a valid proof-free trace through its PolyFun view loses only proof fields. -/
+@[simp] theorem EventExecutionTrace.ofPrefix_toPrefix {handler : SyscallHandler}
+    {program : GuestProgram} (execution : EventExecutionTrace)
+    (valid : execution.Valid handler program) :
+    EventExecutionTrace.ofPrefix (execution.toPrefix valid) = execution := by
+  cases execution
+  simp [EventExecutionTrace.ofPrefix, EventExecutionTrace.toPrefix]
 
 /-- Advance an interaction clock through an event transcript. -/
 def clockAfterEvents (initialClock : ℕ) (events : List ExecutionEvent) : ℕ :=
   events.foldl (fun clock event => clock + ExecutionEvent.duration event) initialClock
-
-/-- Final interaction clock of an eventful execution. -/
-def EventExecutionPrefix.finalClock {handler : SyscallHandler} {program : GuestProgram}
-    {initialState : SailState} (execution : EventExecutionPrefix handler program initialState)
-    (initialClock : ℕ) : ℕ :=
-  clockAfterEvents initialClock execution.events
 
 /-- Final interaction clock of a proof-free execution witness. -/
 def EventExecutionTrace.finalClock (execution : EventExecutionTrace)
@@ -197,14 +375,8 @@ def EventExecutionTrace.HaltsWith (program : GuestProgram) (exitCode : BitVec 64
       event.arg1 = exitCode ∧
       SP1Halted program exitCode execution.stateBeforeFinal
 
-theorem EventExecutionPrefix.events_length {handler : SyscallHandler}
-    {program : GuestProgram} {initialState : SailState}
-    (execution : EventExecutionPrefix handler program initialState) :
+theorem EventExecutionTrace.events_length (execution : EventExecutionTrace) :
     execution.events.length = execution.steps := by
-  obtain ⟨steps, path⟩ := execution
-  unfold EventExecutionPrefix.events
-  induction path with
-  | nil => rfl
-  | step _ tail ih => simp [ih]
+  simp [EventExecutionTrace.events, EventExecutionTrace.steps]
 
 end SP1Clean.Machine

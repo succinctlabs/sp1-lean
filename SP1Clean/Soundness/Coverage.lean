@@ -11,11 +11,13 @@ and which Sail op does it reach?" It mirrors SP1's two-part structure:
   `(opcode, rd == x0)` exactly as SP1 routes (ALU ops with `rd == x0` → `AluX0`; loads with
   `rd == x0` → `LoadX0`; otherwise by width).
 
-**Decidable auditing.** Each `ChipKind` carries function fields (no `DecidableEq`), so the audit guards
-route through the chip's `name : String` (added in `ChipRow.lean`): `routeName` is the `String`
-projection of `routeOf`, over which the covered/uncovered ledger, the partition of the opcode alphabet, and
-"routing reaches exactly the wired set" are all `by decide`. The `kind`-level table `coverage` is tied to
-the registry by `rfl` (`coverage.map (·.kind) = allChipKinds`).
+**Decidable auditing.** `Model/InstructionRouting.lean` selects a neutral `InstructionChipId`; only
+then does this layer realize that ID as a circuit-bearing descriptor. Each `ChipKind` carries function
+fields (no `DecidableEq`), so the audit guards route through the chip's `name : String` (added in
+`ChipRow.lean`): `routeName` is the `String` projection of `routeOf`, over which the covered/uncovered
+ledger, the partition of the opcode alphabet, and "routing reaches exactly the wired set" are all
+decidable. The `kind`-level table `coverage` is tied to the registry by `rfl`
+(`coverage.map (·.kind) = allChipKinds`).
 
 **Register vs immediate ALU forms.** Routing is keyed on `(opcode, rd == x0)` *only*, exactly as SP1's
 `tracing.rs`: the immediate ALU instructions (SLTI/SLTIU, XORI/ORI/ANDI, ADDIW) are **not** separate
@@ -36,7 +38,7 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
 /-! ## Routing (the `tracing.rs` mirror)
 
-Both functions search the one `SupportedMachine.supportedChips` descriptor: `routeName` projects its
+Both functions realize the pure `routeId` result through `supportedChipFor`: `routeName` projects its
 human-readable name and `routeOf` its actual `ChipKind p`. -/
 
 /-- The instruction → chip-**name** routing: the decidable projection of SP1's `tracing.rs` opcode dispatch,
@@ -57,6 +59,17 @@ theorem routeName_eq (op : Opcode) (rdIsX0 : Bool) :
     routeName (p := p) op rdIsX0 = ((routeOf (p := p) op rdIsX0).map (·.name)) := by
   unfold routeName routeOf
   cases routeChip (p := p) op rdIsX0 <;> rfl
+
+/-- Name projection cannot change whether the pure router selected an identity. Keeping this folded
+prevents decidable coverage audits from normalizing circuit-bearing `supportedChipFor` values. -/
+@[simp] theorem routeName_isSome (op : Opcode) (rdIsX0 : Bool) :
+    (routeName (p := p) op rdIsX0).isSome = (routeId op rdIsX0).isSome := by
+  simp [routeName, routeChip]
+
+/-- The corresponding failure projection. -/
+@[simp] theorem routeName_isNone (op : Opcode) (rdIsX0 : Bool) :
+    (routeName (p := p) op rdIsX0).isNone = (routeId op rdIsX0).isNone := by
+  simp [routeName, routeChip]
 
 /-! ## The covered / uncovered ledger (over the full `Opcode` alphabet) -/
 
@@ -88,16 +101,16 @@ theorem covered_iff_routed : ∀ op ∈ Opcode.all,
     (op ∈ coveredOpcodes ↔
       ((routeName (p := p) op false).isSome ∨ (routeName (p := p) op true).isSome)) := by
   intro op _
-  cases op <;>
-    simp [coveredOpcodes, routeName, routeChip, supportedChips, SupportedChip.claims, RdGuard.holds]
+  rw [routeName_isSome, routeName_isSome]
+  cases op <;> decide
 
 /-- Uncovered ⟺ routes nowhere (for either `rd`). -/
 theorem uncovered_iff_unrouted : ∀ op ∈ Opcode.all,
     (op ∈ uncoveredOpcodes ↔
       ((routeName (p := p) op false).isNone ∧ (routeName (p := p) op true).isNone)) := by
   intro op _
-  cases op <;>
-    simp [uncoveredOpcodes, routeName, routeChip, supportedChips, SupportedChip.claims, RdGuard.holds]
+  rw [routeName_isNone, routeName_isNone]
+  cases op <;> decide
 
 /-! ## Routing reaches exactly the wired chip set -/
 
@@ -131,8 +144,11 @@ private theorem routeName_mem_wired {op : Opcode} {rdIsX0 : Bool} {nm : String}
     (h : routeName (p := p) op rdIsX0 = some nm) : nm ∈ wiredNames (p := p) := by
   unfold routeName at h
   obtain ⟨chip, hchip, rfl⟩ := Option.map_eq_some_iff.mp h
+  unfold routeChip at hchip
+  obtain ⟨id, _hid, rfl⟩ := Option.map_eq_some_iff.mp hchip
   simp only [wiredNames, List.mem_map]
-  exact ⟨chip, List.mem_of_find?_eq_some hchip, rfl⟩
+  exact ⟨supportedChipFor id,
+    List.mem_map.mpr ⟨id, InstructionChipId.mem_all id, rfl⟩, rfl⟩
 
 /-- Routing never reaches a non-wired chip… -/
 theorem reachable_subset_wired :

@@ -1,266 +1,238 @@
-# Handoff: per-shard completeness + soundness for an honest SP1 model
+# Handoff: one native shard model for soundness and completeness
 
-**Audience: us, on another machine, with no context.** Written 2026-08-24, at the end of the
-August provider-closure/hand-off arc (branch `dtumad/provider-closure`, 31 commits).
+**Audience: us, on another machine, with no context.** Updated 2026-08-24 after the
+bus-representation and shard-model consolidation on `dtumad/provider-closure`.
 
-Read [`overview.md`](../overview.md) for orientation; this file assumes it. What follows is a
-decision log: what is proved, what is assumed and why, what is open, and which mistakes cost real
-time. The architectural argument that came out of this arc is separate:
-[`../proposals/bus-representation-consolidation.md`](../proposals/bus-representation-consolidation.md).
+Read [`overview.md`](../overview.md) and [`architecture.md`](../architecture.md) first. The design
+record for this cleanup is
+[`bus-representation-consolidation.md`](../proposals/bus-representation-consolidation.md).
 
-## 1. What the program is
+## 1. Outcome
 
-Two theorems about one shard, in opposite directions, and the gap between them.
+Soundness and completeness now share one operational witness and one physical native witness.  The
+forward theorem is closed for the exact image on which the deterministic compiler's semantic and
+capacity obligations hold; it no longer starts from an existential or hand-assembled trace.
 
-**Soundness** — `supported_core_native_sound` (`SP1Clean/Soundness/AIR.lean:972`). Closed.
-
-```
-WitnessRelation.Sound (SupportedCoreNativeRelation p) (SupportedCoreLocalExecutionRelation model)
-```
-
-Any witness the native relation accepts yields a genuine shard-local Sail execution.
-`sorryAx`-free; carries the Sail platform hooks and `bv_decide` constants its 25 bridges retain.
-
-**Completeness** — `sp1Ensemble_statement_of_structural_balance`
-(`SP1Clean/Soundness/AIRCompleteness.lean:339`). Conditional.
-
-```
-(statement) (trace) (wf : WellFormed) (fit : CountsFit) (hsupply : SuppliesDemand)
-(hnonpos) (stateKeys memoryKeys) (hstate) (hmemory) (hlen) (publicEq)
-  → (sp1Ensemble p).Statement statement.publicValues
+```text
+                     supported_core_native_ordinary_sound
+native Clean AIR  -------------------------------------------->  exact ordinary shard
+     ^                                                               |
+     | supported_core_native_functionalCompleteness                   | nativeTrace
+     |                                                               | (total, proof-independent)
+     +---------------- native admissible image <----------------------+
 ```
 
-A well-formed generated trace assembles into a witness whose channels balance, hence into the
-ensemble's public statement.
+The exact target is `Execution.SupportedOrdinaryShardExecutionRelation`. Its witness is the single
+proof-free `Machine.EventExecutionTrace`; validity supplies the official event-step semantics,
+normal retirement, the ordinary eight-tick schedule, public endpoints, committed-program boundary,
+and a successful route through the canonical 25-chip profile for every transition.
 
-**The gap, stated honestly.** Completeness starts from a *generated trace*, not from an arbitrary
-Sail execution. The file says so itself (`AIRCompleteness.lean:8–14`): *"this theorem validates the
-AIR assembly performed by a trace generator, but it does not construct that trace from an arbitrary
-Sail execution."* The generator side reaches only ALU: `sailRun_addTable_constraints` /
-`sailRun_subTable_constraints` (`Proofs/Completeness/AluGeneration.lean`) over
-`aluStepsFrom` (`FormalModel/TraceGen/SailAlu.lean`). Two chips of twenty-five.
+The released direction theorems are:
 
-**"Honest" means:** every premise is either (a) a caller obligation a real prover genuinely owes, or
-(b) named as a residue in §2. Not: "the theorem has few hypotheses."
+- `supported_core_native_ordinary_sound` is closed. Every witness accepted by
+  `SupportedCoreNativeRelation` produces an exact supported ordinary event trace.
+- `supported_core_native_functionalCompleteness` is closed from
+  `SupportedCoreNativeAdmissibleExecutionRelation`.  Its map is literally the deterministic
+  `nativeTrace statement execution`; it is independent of the proof of admissibility.
+- `supported_core_native_complete` is the existential projection of that functional theorem.
+- `sp1Ensemble_statement_of_supported_execution` exposes the underlying Clean
+  `Ensemble.Statement` directly.
 
-## 2. State of play
+`SupportedCoreNativeAdmissibleExecutionRelation` is not a renamed AIR witness condition.  It is the
+exact ordinary Sail relation, the pinned Core row budget, the named field-free compiler/readiness
+facts for that same execution, and `NativeTraceFootprint.Fits` on the actual emitted interactions.
+In particular it contains neither channel balance nor table constraints; both are conclusions.
 
-### Proved
+This closes whole-ensemble completeness for the honest deterministic compiler image.  It does not
+yet prove that every witness of the broader exact ordinary relation lies in that image.  Therefore
+there is deliberately no unconditional `WitnessRelation.Correct` or public-language-equality
+theorem: soundness targets the broader exact relation, while completeness currently has the
+explicitly narrower admissible source. In particular, the broader relation is unbounded and cannot
+yield `WithinCoreShardLimit` or the physical `< p` footprint merely by discharging readiness.
 
-| Thing | Where |
-|---|---|
-| Soundness capstone | `Soundness/AIR.lean:972` |
-| Two structural bus mechanisms, separated | `Soundness/AIRCompleteness.lean:161` (closure), `:193` (hand-off) |
-| Hand-off algebra, `[propext]` only | `Model/InteractionBus.lean` — `chainLedger_perm_handoff`, `multiChainLedger_perm_handoff` |
-| Byte+Program closure balance | `Proofs/Completeness/ClosureRealization.lean:677` `byteProgram_balanced` |
-| State hand-off from the chip ledger | `Proofs/Completeness/ChipLedger.lean:287` `stateLedger_perm_handoff` |
-| Memory hand-off | `ChipLedger.lean:365` `memoryLedger_perm_handoff` |
-| Bus ledger = channel ledger (both buses) | `ChipLedger.lean` — `stateLedger_eq_channelLedger`, `memoryLedger_eq_channelLedger` |
-| 8 provider tables' Clean accesses | `Proofs/Completeness/ProviderTables.lean` |
-| Window-crossing bumps are *events*, spec'd | `FormalModel/TraceGen/Bump.lean` — `stateBump_spec`, `memoryBump_spec` |
-| ALU generator + its constraint theorems | `FormalModel/TraceGen/{GenState,AluGenerator,SailAlu}.lean`, `Proofs/Completeness/AluGeneration.lean` |
+The older `supported_core_native_sound` remains useful as the broader local-Sail target. The exact
+ordinary theorem is the one completeness should use: its source excludes unsupported instructions
+and host-handled syscalls by construction.
 
-### Assumed — and legitimately so
+## 2. The shared formal model
 
-These are obligations a real prover owes. Do not treat them as debt.
+Two layers are now explicit.
 
-- **`hlen`** — `∀ channel, (interactionsWith channel).length < p`. The shard-size bound. Clean's own
-  `.lake/packages/Clean/Clean/Air/Balance.lean:25` carries the same guard; it is what makes
-  field balance imply ℤ balance.
-- **`WellFormed`** (36 fields, `Proofs/Completeness/Assembly.lean:172`) — the generator's contract.
-  Each field is a promise about the trace it built.
-- **`CountsFit`** — provider multiplicities fit the field. Same character as `hlen`.
-  `CountsFit.providerMultiplicitiesFit` coerces it to the older predicate; see §4.
-- **`publicEq`** — the trace's public input is the statement's. Definitional plumbing.
+1. `Machine.EventExecutionTrace` is the only proof-free operational execution carrier. A valid
+   ordinary trace converts directly to `SailChain`, and a valid trace also has a direct PolyFun
+   prefix view. There is no second custom prefix or completeness-only instruction trace.
+2. `DecodedInstructionRow`, `ChipRow`, and `RowView` are physical codecs for a Clean witness. They
+   remain dependent and field-valued because that information is real at the AIR boundary; they are
+   not an alternative execution semantics.
 
-### Assumed — residues. These *should* be theorems.
+The compiler's field-free access schedules and State/Memory histories are derived views of the one
+operational trace, not another execution witness.  Their agreement with built rows is either proved
+in the dedicated agreement modules or remains an explicit `NativeTraceReady` field; they must not
+be promoted into an independently supplied timeline.
 
-| Residue | Where | Why it is open |
-|---|---|---|
-| `hbinary` (`is_real ∈ {0,1}` on decoded rows) | `ChipLedger.lean:203`, `:288`, `:376` | The seam. Completeness *built* these rows; `RTypeEvent.toAddInputs_is_real` (`FormalModel/TraceGen/Inputs.lean:393`) gives `is_real = 1` by `rfl`. Nothing carries that across `Array (ZMod p)`. |
-| `ConsumersOnlyPull` → `hnonpos` | `ChipLedger.lean:419`, discharged by `:427` | Byte-bus polarity. Program's counterpart *is* proved 25/25 (`Soundness/TypedProgram.lean:717`); Byte's is not. Needs a per-chip subcircuit traversal — `Proofs/Completeness/Closure.lean:20–32` describes it and declines. No upstream idiom exists (§3). |
-| `hchain` / `hregroup` (Memory) | premise of `memoryLedger_perm_handoff` | Regrouping the emitted ledger into per-location chains is a fact about a *particular trace*, not about any chip. Consolidation will not make it derivable. |
-| `hstate` / `hmemory` at the capstone | `AIRCompleteness.lean:345–348` | **Provable today. Not wired.** See §5 item 1. |
+`FormalModel/SupportedShard.lean` owns the exact semantic relation below `Soundness/`, so both proof
+directions can depend on it. Its `SupportedDecodedTransition` retains the decoded instruction and
+selected `InstructionChipId` as evidence, not as another stored trace.  The deterministic compiler
+retains each `LocatedTransition` beside its decoded instruction and generated event; this is a
+certified view of the operational trace, not a second execution semantics.
 
-### Open
+## 3. Registries and table identity
 
-- **23 of 25 chips have no generator.** Only Add and Sub.
-- **No completeness-side registry.** `Proofs/Completeness/Assembly.lean:231`'s `tables` is a hand-written 53-element
-  literal choosing `Table.build` vs `Table.buildHinted` by hand. Soundness derives everything from
-  `supportedChips.map`. They agree by `rfl` (`tables_map_component`, `:309`) — reorder the literal
-  and it breaks.
-- **The soundness/completeness seam.** `Component.rowInput_buildRow` (`ToClean/Air/TableBuild.lean:214`)
-  closes the `Inputs` half generically. **`rowOutput_buildRow` does not exist** — grepped across
-  `ToClean/` and `.lake/packages/Clean/` — so nothing characterises the *general* `Cols` after
-  `buildRow` except the circuit's own `Spec`. That turns out not to block the seam: the part the bus
-  ledger reads is `rfl` via `directOutput_eq`. See next action 6.
-- **`decode` width.** `Model/SailDecode.lean`'s eighteen witnesses are each one hard-coded 32-bit
-  word. The program quantifier's width is a separate decision.
+The former repeated 25- and 53-way literals have one neutral source of truth.
 
-## 3. Decisions taken, with reasons
+- `Model/InstructionChipId.lean` owns the 25 instruction identities and canonical order.
+- `Model/InstructionRouting.lean` owns the pure opcode and `rd = x0` route.
+- `Soundness/SupportedMachine.lean` realizes each identity with its verified `ChipKind` and Clean
+  circuit. Opcode claims and guards are derived from the neutral route rather than stored again.
+- `Model/ProviderTableId.lean` owns the six Byte providers, all 17 Range widths, Program,
+  MemoryInit/MemoryFinalize, MemoryBump, and StateBump, plus their native table positions.
 
-Recorded so they are not relitigated.
+Both native ensemble construction and completeness assembly map these registries. The extracted
+instruction witness is now an indexed dependent bundle,
+`ExtractedInstructionRows.forId : (id : InstructionChipId) -> List (ExtractedCols p id)`, rather
+than a hand-maintained structure with 25 named fields. Transport, constraints, and interaction
+ledgers are pointwise over the same identity and flattened in `InstructionChipId.all` order.
 
-**`active`, not the raw ledger, in the hand-off obligation.** `stateLedger` includes padding rows'
-multiplicity-0 accesses; `handoff` emits only ±1. So `stateLedger.Perm (handoff keys)` is **false for
-any padded trace**. Both halves are witnessed, not argued:
-`SP1CleanTest/Audit/ActiveTraceNonVacuity.lean` builds `activePaddedTrace` (one JAL padding row) and
-proves `activePaddedTrace_stateHandoff_raw_false` *and* `activePaddedTrace_stateHandoff` by
-`native_decide`.
+This is a format invariant: adding or reordering a chip must change the neutral registry and then
+break the proofs that expose the corresponding physical order. A new positional list elsewhere is
+an architectural regression.
 
-**Per-key sums (`SuppliesDemand`), not list equality (`ClosureRealized`).** The first attempt required
-the provider list to match the demand list. A JAL shard emits nine unit-multiplicity range-16 rows
-where the closure aggregates them into one `⟨0,9⟩`. Both are honest providers. `ClosureRealized` was
-replaced by `SuppliesDemand` (`ClosureRealization.lean:644`), which compares per-key sums.
+## 4. Bus and ledger model
 
-**Two mechanisms, not one.** Byte/Program *close* (providers supply aggregate demand — needs `Nodup`,
-nonpositivity, coverage). State/Memory *hand off* (tokens created once, consumed once — needs **no**
-side condition). Forcing a uniform treatment is what made the earlier attempts long.
+There are exactly two primary representations because the two proof directions need different
+information.
 
-**Bumps are events, not rows.** Phase 2 changed `SupportedCoreTraceWitness`'s bump fields from row
-lists to `StateBumpEvent`/`MemoryBumpEvent` (`FormalModel/TraceGen/Bump.lean`), so their `Spec` is a
-theorem rather than a generator promise. **`verification-report.md` §7.4 and `roadmap.md` P3 are stale
-on this** — they still describe bump rows as assumed input lists.
+- **Typed soundness view:** evaluated `TypedInteraction`s retain structured
+  `StateMsg`/`MemoryMsg`/`ProgramMsg` values. Grounding reads this view.
+- **Computable completeness view:** `LookupAccess`, `tableCleanAccesses`, and the generated trace's
+  full ledger retain natural payloads and centered signed-integer multiplicities. Recounting and
+  executable conformance read this view.
 
-**`decode` kept abstract.** Widening the program quantifier is orthogonal to bus balance; mixing them
-would have made both harder.
+`Interaction.toAccess` is the bridge. Clean orientation is canonical in the native library. The
+opposite Memory/Program polarity of the Rust oracle is named by `tableRustOrientedAccesses`, with
+`tableNativeAccesses_perm_tableRustOrientedAccesses` proving the whole-table correspondence. This
+keeps the extracted orientation fact at one boundary rather than recreating a second native ledger.
 
-**Memory's per-row terms kept folded.** Unfolding them triggers the `whnf`-into-expensive-values
-failure mode Clean documents (`doc/performance-problems.md`). See `circuit_output_fold` in memory.
+Two further distinctions remain load-bearing:
 
-**The ten-family assembly was abandoned.** Three builder-specific State-ledger forms were written
-before the row-level one that subsumes them; they were deleted rather than kept as near-duplicates.
-Repeatedly, estimated 25-wide sweeps turned out unnecessary because a registry-wide fact already
-existed — `supportedChip_stateEmissionShape` (`Soundness/TypedState.lean:703`),
-`typedEnsembleStateInteractions_eq` (`TypedState.lean:865`),
-`typedEnsembleMemoryInteractions_eq` (`TypedMemoryBalance.lean:174`).
-**Look for the registry-wide fact before starting a sweep.**
+- Clean proves balance in the field; completeness reasons about centered signed integers.
+  `Model/BalanceBridge.lean` is therefore an essential representation boundary, not duplication.
+- Byte/Program provider closure and State/Memory hand-off are different combinatorial mechanisms.
+  Closure supplies aggregated demand per key; hand-off proves a token is consumed and recreated in
+  order. They share the ledger carrier, not the proof principle.
 
-## 4. Corrections and traps
+The raw-channel classifier now fails closed for provider recounting. `kindOf` has an explicit Byte
+case, `kindOf_eq_byte_iff` proves that only `"SP1Byte"` enters the Byte bucket, and unknown/raw names
+use the reserved State compatibility bucket. A future fifth channel cannot silently become Byte
+demand.
 
-Each of these cost time. They are recorded so the next reader does not pay again.
+## 5. Deterministic compiler and closed assembly
 
-**`omega` and the hand-off residue — I was wrong twice.** I reported that `omega` did not close the
-residue and recorded it so it would not be retried. That report was worthless in both directions: the
-run where `omega` appeared to succeed had a `sorry` from an overlapping edit; the run where it failed
-was against an un-normalized goal. **Neither run was evidence.** If you need to know, re-measure on a
-clean tree.
+The construction is split into narrow layers:
 
-**I reproved a lemma that was one import away — `signedVal_neg`.** In `active_stateLedger_eq`
-(`ChipLedger.lean:202–276`), lines `:243–271` build a local `hneg` for the *binary-only* case of
-`signedVal (-x) = -signedVal x` and then thread it through two hand-written
-`rw [show … from List.flatMap_congr …]` blocks. `signedVal_neg`
-(`Model/InteractionProjection.lean:80`) already proves it for **every** `x`, no binarity, and the
-module is in scope — `signedVal_neg_is_real` is used four lines away. ~28 lines should collapse to
-`simp only [signedVal_neg hp]`. Check for the general lemma before writing the special case.
+1. `InstructionEvent.lean` compiles all 25 routed instruction families from the official decoded
+   Sail transition.  Events are dependent on `InstructionChipId`, so a row cannot be placed in the
+   wrong table.
+2. `AccessPlan.lean` extracts one field-free `RAM,C,B,A` access plan.  `AccessSchedule.lean` stamps
+   it against one frontier and inserts register `MemoryBump` rows at 24-bit-window crossings.
+3. `ExecutionCompiler.lean` folds the chronological `locatedTransitions`, retaining the source
+   transition beside its compiled event and access schedule.  The table partition is a derived
+   `EventBuckets.ofChronological` view.
+4. `MemoryHistory.lean` and `StateHistory.lean` derive the two hand-off histories.
+5. `NativeTraceCompiler.lean` builds the 25 instruction tables, Memory init/final, MemoryBump,
+   StateBump, and the one public verifier boundary.  There is zero native instruction padding.
+6. `CanonicalClosure.lean` reads the literal consumer ledger and constructs exactly the demanded
+   Byte, Range, and Program providers.  `FieldClosure.lean` proves their balance directly in the
+   field; the retired `2 * multiplicity <= p` restriction is absent.
+7. `NativeCompleteness.lean` combines provider closure with State/Memory hand-off, derives every
+   table's constraints and all four channel balances, and packages the functional capstone.
 
-**The composition blocker was `List.map_cons`, not the projection.** The goal held
-`List.map (fun x => toAccess x.raw)` over `TypedInteraction` structure literals. The `.raw` projection
-could not fire because `List.map` never distributed. Adding `List.map_cons` / `List.map_nil` to the
-simp set fixed it. `toAccess_pulledIfValue` / `toAccess_pushedIfValue` are deliberately **not**
-`@[simp]` — they fire only where wanted.
+The `SupportedCoreTraceWitness` stores the public `SP1PublicIO` boundary once.  The witness public
+input, State endpoint messages, semantic boundary, and completeness statement are all projections
+of that value; the previous four duplicated clock/PC fields are gone.
 
-**The Clean polarity shortcut does not exist.** I proposed deriving `ConsumersOnlyPull` from "a channel
-in `channelsWithGuarantees` but not `channelsWithRequirements` is only pulled." Reading
-`Subcircuit.ChannelsLawful` shows those lists record guarantee/requirement *obligations*, not polarity.
-More broadly: `grep -rn "IsPush\|IsPull\|Direction\|polarity"` over `.lake/packages/Clean/` returns
-**zero hits**, and the one upstream attempt at an explicit direction token (PRs #337/#339,
-`Direction::Send`) was **closed unmerged**. There is nothing to adopt.
+The lower `AIRCompleteness.lean` theorem remains as a useful generated-trace assembly lemma, under
+the unambiguous names `supported_core_generated_trace_*`.  It is no longer presented as semantic
+execution completeness.
 
-**`byteSend` is pre-flip.** `Soundness/ByteConsistency.lean:60` uses multiplicity `+is_real` — a
-*send*. Circuits emit `byteChannel.pullIf` (`−is_real`) after W11. There is no `byteLookups_eq_emitted`
-and at that sign it would be **false**. `Model/Channels.lean:83` nonetheless claims the byte pull "is
-discharged from bus balance (`byteAccessValid_of_balance`)" — **that claim is unbacked**; the premise
-of `byteAccessValid_of_balance` (`ByteConsistency.lean:123`) is not derivable from the live bus,
-because `isConsistentBalanced_map_negMult` (`Model/InteractionBus.lean:308`) needs the *whole* list
-negated and only the consumer half is.
+## 6. What was retired
 
-**Memory is stale by the same W11 flip as Byte, and that had gone unremarked.**
-`memoryLookups` (`MemoryConsistency.lean:55`) emits op_a read-prior at `+ir` and the write at `−ir`
-(`:67–75`); the live reader (`Native/Readers/ALUTypeReaderImmutable.lean:69–74`) pulls the read-prior
-(`−is_real`) and pushes the read-back (`+is_real`) — exactly inverted. It also gates op_c additively
-(`is_real - imm_c`) where `memoryLookups` gates multiplicatively. `MemoryGlobal.lean` and all of
-`MemoryIsU64.lean` are built on the stale one. Separately, `MemoryIsU64`'s conclusion is superseded:
-`isU64` is now a per-row channel guarantee (`Model/Channels.lean:52`), proved by the pusher and
-derived by the puller.
+A second import/declaration-use audit removed the obsolete parallel bus stratum: about 2,491 lines
+from the retired modules and module halves, including the whole of
 
-**`SP1Clean/Soundness/MemoryConsistency.lean:165–173` states a falsehood.** It claims `memoryLookups` (`:55`, pre-W11) and
-`memoryReadLookups` (`:174`, current) are related by `negMult`-invariance. False three ways: 6 entries
-vs 5 (the `rd` write lives in `Readers/RegisterWrite`), different gates (`is_real*(1−imm_b/c)` vs plain
-`is_real`), and the provider half is not negated in any of the nine downstream premises. Also the
-theorem named `memoryLookups_eq_emitted` (`:210`) is about `memoryReadLookups`. **No unsoundness** —
-nothing in a capstone closure consumes any of it.
+- `Soundness/{ByteConsistency,MemoryConsistency,MemoryIsU64,MemoryGlobal}.lean`;
+- `Soundness/ProgramProviderSpike.lean`;
+- `Model/ChipAir.lean`;
+- `Composition/ExactBalance.lean`; and
+- `Soundness/{StateConsistency,ProgramConsistency}.lean` after moving their five live access
+  declarations to `Soundness/RowView.lean`.
 
-**`CountsFit` duplicates `ProviderMultiplicitiesFit`.** I introduced it. `CountsFit.providerMultiplicitiesFit`
-is the coercion; the relationship is documented at the definition. Do not add a third.
+The deletion also removed `TraceLookupConsistent` and the unused Byte/Program ledger aliases. The
+retired Byte and Memory lookup shadows predated the W11 polarity change and contained claims that
+did not match the live Clean interactions. They were unreachable from a capstone, so deleting them
+removed misleading models without weakening a released theorem.
 
-**Naming collisions to know about.** `programAccess` already exists in `SP1Clean.Soundness` as an
-unrelated `RowView` notion; the ledger one is `programRowAccess`. Range's `onlyChannel` is stated over
-`component n hn` in `Ledger.lean` but `componentFor width` in the trace — `onlyChannel_rangeComponentFor`
-restates it at the goal's spelling.
+Do not recreate `*Consistency` lookup lists beside the actual Clean ledger. New row-facing access
+vocabulary belongs in `RowView`; global arguments must use either the typed interaction view or the
+computable ledger view above.
 
-**Lean syntax traps hit this month.** `omit` goes *before* the docstring, not between docstring and
-theorem; and `omit` on a variable the statement references fails ("cannot omit referenced section
-variable").
+## 7. The remaining gap to a shared semantic language
 
-**Census discipline.** `scripts/run_audit.sh --update` refuses a dirty tree. Probe counts in
-`docs/snapshots/axiom-ledger.md` must match the census (currently 863 main / 70 test / 933 released).
-A guardrail hook blocks suppressing stderr on Lean script invocations.
+The old abstract `SupportedCoreLanguageCompletenessCertificate` API was removed.  It admitted maps
+that could ignore the supplied execution and therefore did not express compiler fidelity.  The live
+boundary is the concrete `Execution.NativeCompilerReady` plus the small named invariants in
+`NativeTraceReady`, all indexed by the actual output of `compileExecution`.
 
-## 5. Next actions, in dependency order
+The all-25 compiler, bump placement, provider recount, public-boundary projection, and final AIR map
+are implemented. What remains on the compiler side is proving every residual `NativeTraceReady`
+group on the intended capacity-bounded subset of `SupportedOrdinaryShardExecutionRelation`:
 
-**1. Collapse the redundant `signedVal_neg` block. One file, ~28 lines, no restamp.**
-`ChipLedger.lean:243–271` reproves a binary-only `signedVal (-x) = -signedVal x` and threads it by
-hand; `Model/InteractionProjection.lean:80` has the general lemma. See §4. Do it first — it is the
-cheapest thing here and it confirms the analysis is grounded in the code.
+- compiler success and registry-wide validity of each generated per-chip event;
+- State chronology/bump readiness and the built-instruction-row projection;
+- canonical Memory addresses, record chronology, physical-ledger agreement, and initial-state
+  genesis content;
+- Byte consumer polarity and Byte/Program demand servability for the literal generated ledger;
+- Program-row projection plus stability of the decoder across the configured-state class required
+  by `ProgTruth`; and
+- the actual emitted interaction count being below the field characteristic.
 
-**2. Wire `ChipLedger` into `AIRCompleteness`. Also free.**
-`Proofs/Completeness/ChipLedger.lean`'s only importer is `SP1Clean.lean:529`.
-`AIRCompleteness.lean` imports `Assembly`, `Ledger`, `ClosureRealization`, `BalanceBridge`, `AIR` —
-**not** `ChipLedger`. So `stateLedger_perm_handoff` and `memoryLedger_perm_handoff` are never composed
-with `balanced_of_closure_and_handoff`, and `hstate`/`hmemory` stay free hypotheses of a capstone that
-can prove them. Add the import (stratum 9 → 10, legal; `scripts/check_layering.sh` is the gate) or move
-the two theorems down. **Corrects an earlier report of mine that said both buses "now feed
-`balancedOn_of_handoff` directly" — they *can*; nothing wires them.**
+Some of these are deterministic representation lemmas and should leave the readiness bundle as
+their agreement modules mature; others are genuine semantic source restrictions.  The API should
+not describe only the latter while still assuming the former.
 
-**3. Add the orientation bridge (M3).** One lemma:
-`tableNativeAccesses = (tableCleanAccesses …).map (negMult on Memory and Program)`. Joins the whole
-`Faithful/` + `Composition/` family to `Proofs/Completeness/`. `negMult` and `perm_filter_by_kind`
-(`Model/InteractionBus.lean:424`) exist to make it short. Argued in the proposal doc §P3.
+The last item is intentionally a footprint property, not a provider multiplicity convention.  The
+first three are semantic inverse/refinement lemmas.  They must be proved from the official Sail
+step or added as precise source-language restrictions; they must not be replaced with an
+existential AIR witness.
 
-**4. Retire the dead stratum.** ~2,400 lines, no re-proving — see the proposal doc §P2 for the list and
-the two false claims it removes. Blocked on one decision: six live files cite `docs/bus-model.md`
-section numbers for rationale, so either re-home that text or accept a historical doc outliving its
-code.
+Deriving those facts remains necessary, but completeness cannot simply be widened to the current
+unbounded exact relation: its Core row cap and physical `< p` premise have no counterpart in the
+soundness conclusion. A `WitnessRelation.Correct` capstone therefore needs a shared
+capacity-bounded semantic relation on both directions, or equivalent strengthening/weakening
+lemmas that make the two domains coincide. Until then, public-language equality would be an
+overclaim even though all 53 native tables and the verifier row are covered by the current theorem.
 
-**5. Fix the `kindOf` raw-arm divergence (~10 lines).** `Extracted.Interaction.toAccess`'s `.raw` arm
-emits `InteractionKind.State` with a `"SP1Raw/…"` name, but `kindOf`
-(`Model/InteractionProjection.lean:25–29`) falls back to `.Byte` for unrecognised names — so
-`(keyOf a).1 = kindOf (keyOf a).2.1`, which every `filterKind` argument relies on, is false there.
-Unreachable today (four channels only); unsafe because `.Byte` is the *fallback*. Proposal doc §P4a.
+## 8. Separate upstream and cryptographic boundaries
 
-**6. Do the mechanical half of the seam (~450 lines).** The `Cols` question is answered: the general
-`Cols` is constrained only by `Spec`, but the part the bus ledger reads is free — `rowInput_buildRow`
-closes the `Inputs` half generically, and the `is_real`/state/adapter passthrough is `rfl` via the
-`directOutput_eq` family (31 files carry one). Only control-flow `next_pc` needs `Spec`, which
-`buildRow_spec_requirements` (`ToClean/Air/TableBuild.lean:280`) already delivers at a built row.
-Worth doing on its own merits: it restates the hand-off premise over *events* instead of over an
-opaque `decodeRow` of a `buildRow`, which is the difference between an auditor being able to read it
-and not. Proposal doc §P5.
+This handoff concerns the 53-table native proof architecture. It does not close the exact v6.4.0
+34-table/6-table Rust AIR refinement bundle. `CoreAIRRefinementObligations` still has to derive the
+native provider/boundary facts from the six Core system tables before unqualified `sp1_air_sound` is
+available.
 
-**7. Then either** extend the generator past Add/Sub, **or** do the `SupportedChip` registry work.
-The genuinely hard remainder — discharging `IsHandoffChain` from a `SailChain` over events, and
-Memory's `hregroup` — is the deferred mathematics and deserves its own budget (plausibly 1,000–1,700
-lines together). Do not fold it into the same pass as item 6.
+It also does not prove cryptographic verifier completeness or soundness. ArkLib must authenticate
+the extracted AIR witness and retain the probabilistic error bound. Do not turn either the compiler
+certificate or the exact-AIR refinement bundle into an unconditional verifier claim.
 
-## Corrections owed to existing docs
+## 9. Maintenance rules learned from the cleanup
 
-Named here, not fixed — each needs its owner's judgement.
-
-| Doc | Correction |
-|---|---|
-| `docs/verification-report.md` §7.4 | Bump rows described as assumed input-row lists. They are events now; the rows are derived. |
-| `docs/roadmap.md` P3 | Same staleness. |
-| `SP1Clean/Model/Channels.lean:83` | Claims the byte pull is discharged by `byteAccessValid_of_balance`. Unbacked (§4). |
-| `SP1Clean/Soundness/MemoryConsistency.lean:165–173` | Prose states a false relation (§4). |
-| `docs/agents/clean-upstream.md` | `ToClean/` resident inventory is missing four files. |
+- Search for a registry-wide theorem before writing a 25-chip sweep.
+- Keep expensive circuit `Spec` values folded; use explicit rewrite lemmas across spellings.
+- Use `rowInput_buildRow` for the generic input half of generated rows; use the chip's `Spec` only
+  for output facts it genuinely determines.
+- Do not infer push/pull polarity from Clean's guarantee/requirement lists. Polarity lives in the
+  interaction multiplicity.
+- Keep aggregate provider multiplicities out of binary-only lemmas.  Canonical closure now proves
+  Byte/Range/Program balance directly in the field; only the actual interaction-list length must be
+  below `p`.
+- Run the root-index and layering gates after any registry or module move. The final campaign must
+  still finish with a clean `lake build SP1Clean`, `lake test`, and the audit census.

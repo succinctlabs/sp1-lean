@@ -22,8 +22,8 @@ immediate). Output is the native `Columns` struct.
 The chip `Spec` is the composition of the sub-circuits' own `Spec`s + the proven `is_real`-binary fact;
 the store *meaning* (the new memory word pushed at the address is the rs2 word
 `adapter.op_a_memory.prev_value`) is carried by `MemoryAccess`'s `new_value` input being the rs2 read
-value, with the bus's cross-row offline-memory meaning living at the trace level
-(`Soundness/MemoryConsistency.lean`). Unlike LoadDouble there is **no** chip-level `op_a_0 = 0` gate —
+value, with the bus's cross-row offline-memory meaning derived by `Soundness/TypedMemory.lean`.
+Unlike LoadDouble there is **no** chip-level `op_a_0 = 0` gate —
 op_a is a source read, and the `op_a_0` zeroing of the *read* `x0` value lives inside the immutable
 reader's `Spec`. -/
 

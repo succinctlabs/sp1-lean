@@ -64,10 +64,12 @@ The former non-injective opcode problems for Mul, LoadDouble, LoadX0, StoreDoubl
 cases are closed in the current 25/25 registry. The generated instruction committed by the Program row,
 rather than an opcode-only inverse, pins the instruction seen by Sail.
 
-`Soundness/SupportedMachine.lean` is the single source of truth for the circuit, `ChipKind`, opcode list,
-and `rd` guard. `allChipKinds`, coverage, routing, and the ensemble's instruction tables are projections of
-that descriptor. `LocalExecution.lean` dispatches a grounded row by its registered kind and invokes
-`advance`; adding a chip does not add a new capstone case split.
+`Model/InstructionChipId.lean` fixes the neutral identity and physical order of the 25 instruction
+tables. `Soundness/SupportedMachine.lean` maps each identity to its circuit, `ChipKind`, opcode list,
+and `rd` guard without pulling those dependent objects into the Model layer. `allChipKinds`, coverage,
+routing, and the ensemble's instruction tables are projections of that realization. Provider and
+boundary tables retain separate identities. `LocalExecution.lean` dispatches a grounded row by its
+registered kind and invokes `advance`; adding a chip does not add a new capstone case split.
 
 ## Relationship to the grounding engine
 

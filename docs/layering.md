@@ -53,6 +53,27 @@ deliberately (AGENTS.md sanctions it) because the soundness layer consumes it, w
 belongs to the substrate — and `Model/` is measurably clean, with zero imports into any higher pillar.
 When namespace and path disagree, one of them is wrong; deciding which requires reading the file.
 
+## Representation ownership
+
+Layer direction is not enough if two strata independently model the same data. The following
+ownership rules complement the three import laws:
+
+- `Model/Machine/EventExecution.lean` owns proof-free execution traces; PolyFun prefixes and Sail
+  chains are certified views of that carrier, not parallel witness types.
+- The field-free access schedules and State/Memory histories are derived compiler views of
+  `EventExecutionTrace`, not standalone execution witnesses.  Their physical-row agreement must be
+  proved or remain a named `NativeTraceReady` seam; an unbridged vocabulary is representation
+  duplication, not layering.
+- `Model/InstructionChipId.lean` owns instruction-table identity and order;
+  `Model/InstructionRouting.lean` owns pure routing. Higher registries realize those definitions.
+- typed interactions are the soundness primary and computable `LookupAccess` ledgers are the
+  completeness primary. `Interaction.toAccess` is the only semantic bridge between them; extracted
+  Rust sign orientation is an explicit projection above that bridge.
+
+These rules are review invariants today. Repeated 25-arm literals, independent opcode lists, or a
+new trace/ledger carrier should be presumed duplication until its information content is shown to
+differ.
+
 ## The strata
 
 Defined in `scripts/layering.txt`, keyed on module path with globs where a directory straddles. Every
@@ -78,8 +99,9 @@ ordering below is supported by measured import counts, not by intent.
 - `Proofs/Chips/<X>/` holds three strata. `Defs`/`Formal` are chip-level; `Bridge.lean` needs
   `Soundness.ChipRow` and the Sail advance layer; `Contracts.lean` needs `Soundness.TypedMemory`,
   whose own closure reaches all 25 chips. The latter two already declare `namespace SP1Clean.Soundness`.
-- `Soundness/` holds three. `RowView.lean` reaches nothing above stratum 3; `AIRCompleteness.lean`
-  sits above `Proofs/Completeness/`; the rest is the machine.
+- `Soundness/` holds three. `RowView.lean` reaches nothing above stratum 3;
+  `AIRCompleteness.lean` and `NativeCompleteness.lean` sit above `Proofs/Completeness/`; the rest is
+  the machine.
 - `Faithful/` held two until 2026-08. The composition half — the exact→native artifact — is now its
   own top-level pillar, `SP1Clean/Composition/`, so the directory names match the strata and the
   Faithful ↔ Soundness mutual pair is gone. `Faithful/SupportedMachine.lean` stayed behind: its

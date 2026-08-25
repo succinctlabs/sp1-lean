@@ -123,7 +123,7 @@ Mirror-rust layout under `SP1Clean/`:
   incl. `MemoryMsg.ClkBound` and the reader-level `Readers.ClkDiscipline`, the memory-clock discipline),
   `Channels.lean` (plain Clean channels: State `True`, Program `RowSpec`, Memory `isU64 ∧ ClkBound`,
   Byte `ByteRowSpec`),
-  `InteractionBus/Projection/Recovery.lean`, `ChipAir.lean`, `SP1Constraint.lean`, `ByteTable.lean`, and
+  `InteractionBus/Projection/Recovery.lean`, `SP1Constraint.lean`, `ByteTable.lean`, and
   the **semantic-execution substrate** `Semantics/` — `GuestProgram.lean` (the `GuestProgram` +
   `IsInitialState`/`SailStep`/`SailChain`/`SP1Halted` Sail execution model), `ProgramCommitment.lean`
   (`progOf : ProverData → GuestProgram`, the committed program), `MicroTime.lean` (bus-clock ↔ step
@@ -196,7 +196,10 @@ Mirror-rust layout under `SP1Clean/`:
   `FlatOperation.witgen` + the symbolic row map and matched cell-for-cell, all 25 chips) + the Rust
   reference-interpreter differential (`scripts/run_interp_diff.sh`). The gate re-runs in CI
   (`check_witgen_export.sh --regen` in the test job).
-- **`Soundness/`** — the whole-machine layer: per-bus `{State,Byte,Program,Memory}Consistency.lean`;
+- **`Soundness/`** — the whole-machine layer: `RowView.lean` carries the live normalized
+  `StateAccess`/`ProgramAccess` vocabulary, while `TypedState.lean`, `TypedProgram.lean`, and
+  `TypedMemory.lean` read the actual Clean interaction ledger (the obsolete parallel
+  `*Consistency.lean` lookup shadows were retired);
   `ChipRow.lean` (the `ChipKind` structure-of-functions — each chip registers one `kind`, carrying a
   `name` = its SP1 `MachineAir::name`) + `ChipRegistry.lean` (`allChipKinds`); `SP1Ensemble.lean`
   (`sp1Ensemble` — a plain Clean `Ensemble`, 25 chips + 28 boundary/provider tables: six Byte
@@ -233,8 +236,14 @@ Mirror-rust layout under `SP1Clean/`:
   auditable instruction-coverage layer — `Coverage.lean` (+ the opcode enum itself at
   `Model/Opcode.lean`, namespace `SP1Clean.Soundness` per the decoupling rule) (the `Opcode → chip → Sail`
   routing table mirroring SP1's `tracing.rs`/`RiscvAir`). The former `InstructionTrace.lean` name-only
-  row-routing shadow and `Completeness.lean` routing scaffold were retired in favor of witness decoding,
-  timed grounding, and the relation-level completeness boundary in `AIR.lean`. The bespoke
+  row-routing shadow and `Completeness.lean` routing scaffold were retired in favor of witness decoding
+  and timed grounding. The converse is now the proof-independent all-25 compiler under
+  `Proofs/Completeness/{InstructionEvent,ExecutionCompiler,NativeTraceCompiler}.lean` plus the
+  stratum-10 `Soundness/NativeCompleteness.lean` capstone: it constructs all 53 tables and proves
+  constraints/four-channel balance on `SupportedCoreNativeAdmissibleExecutionRelation`. Widening that
+  compiler domain remains named semantic-readiness/footprint work. Public-language equality also
+  requires aligning soundness and completeness on one capacity-bounded semantic relation: the
+  current exact soundness target is unbounded. No such equality is claimed yet. The bespoke
   `MachineSoundness`/`MachineConsistency` `TraceValid` capstone was retired 2026-06-05.
   `Soundness/CoreAIR.lean` is the exact v6.4.0 deterministic boundary: its `_of_obligations`
   combinators consume the `.execution` cluster only and expose the unclosed field-by-field proof bundle.

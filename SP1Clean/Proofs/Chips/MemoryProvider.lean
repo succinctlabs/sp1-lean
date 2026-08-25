@@ -34,8 +34,8 @@ open SP1Clean.LookupAccessList
 variable {p : ℕ} [NeZero p]
 
 /-- One memory-boundary record: the clock components, the three 16-bit address limbs, and the value
-`Word` — the meaningful columns of the Memory-bus key (mirrors `Soundness/MemoryConsistency.lean`'s
-`memoryLookups`/`memAccessLookups` 9-tuple). For a register boundary `addr1 = addr2 = 0` (the register
+`Word` — the meaningful columns of the canonical arity-nine `MemoryMsg`. For a register boundary
+`addr1 = addr2 = 0` (the register
 index in `addr0`); for a real RAM boundary all three limbs are the 48-bit address. -/
 structure MemInitRow (F : Type) where
   clk_high : F

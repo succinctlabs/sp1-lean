@@ -482,7 +482,7 @@ deriving ProvableStruct
 `Faithful/CPUState.lean`'s `cpustate_constraints_faithful` (under `is_real = 1`). Soundness *derives* these
 from the byte-bus pull `Guarantees` (`ByteRowSpec`); completeness *consumes* them to discharge the pulls.
 The composing chip, which witnesses the `cols` block with a padding-safe clock, establishes them on real
-rows. The cross-row PC chain stays at the trace level (`Soundness/StateConsistency.lean`). -/
+rows. Cross-row execution is derived from the typed State ledger by ranked grounding. -/
 def Spec (input : Inputs (ZMod p)) : Prop :=
   input.is_real = 1 →
     ((input.cols.clk_0_16 - 1) * (8 : ZMod p)⁻¹).val < 2 ^ 13 ∧ input.cols.clk_16_24.val < 2 ^ 8

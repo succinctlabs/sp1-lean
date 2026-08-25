@@ -10,7 +10,8 @@ Program bus: every CPU row `send`s its fetched `(pc, opcode, operands)` tuple ga
 balances them. Its preprocessed trace contains **only valid decoded ROM rows** — so the register-index
 bounds (`op_* < 32`), the pc bounds, and the opcode `trusted_instr` decode that the *sender* cannot prove
 locally (`Model/BusMessages.lean`'s `ProgramMsg.Spec` defers them as *received* facts) hold for every
-real fetch, exactly what `Soundness/ProgramConsistency.lean`'s `TraceProgramLink` threads.
+real fetch. The live machine derives committed-ROM membership through the typed Program provider and
+grounding layer (`Soundness/TypedProgram.lean`).
 
 This module models the receiver's side natively, the Program-bus sibling of
 `Proofs/Chips/ByteChip/Provider.lean`: the
@@ -30,7 +31,7 @@ variable {p : ℕ} [NeZero p]
 /-- One decoded program-ROM row: the three pc limbs, the opcode, the `op_a` register operand, the `op_b`
 and `op_c` operands as full `Word`s (their low limbs are register indices; the high limbs carry an
 immediate), the `op_a_0` zero flag, and the `imm_b`/`imm_c` immediate flags — the meaningful columns of the
-Program-bus key (mirrors `Soundness/ProgramConsistency.lean`'s `programLookups` 16-tuple). A pure R-type
+Program-bus key (the canonical 16-field Program interaction tuple). A pure R-type
 fetch has `op_b = #v[idx, 0, 0, 0]`, `op_c = #v[idx, 0, 0, 0]`, `imm_b = imm_c = 0`; a J-type fetch
 (JAL/AUIPC) has `op_b`/`op_c` full immediates with `imm_b = imm_c = 1`. -/
 structure ProgramRow (F : Type) where
@@ -45,8 +46,8 @@ structure ProgramRow (F : Type) where
   op_a_0 : F
   imm_c : F
 
-/-- The val-projected Program-bus key of a program row — the 16-tuple `programLookups` sends, with the
-meaningful fields (`op_b`/`op_c` as their four limbs, plus `imm_b`/`imm_c`) through `ZMod.val`. -/
+/-- The val-projected Program-bus key of a program row — the canonical 16-tuple, with the meaningful
+fields (`op_b`/`op_c` as their four limbs, plus `imm_b`/`imm_c`) through `ZMod.val`. -/
 def programRowKey (row : ProgramRow (ZMod p)) : LookupKey :=
   (.Program, "SP1Program",
     [row.pc0.val, row.pc1.val, row.pc2.val, row.opcode.val, row.op_a.val,
@@ -82,8 +83,8 @@ theorem programRow_eq_of_key {r1 r2 : ProgramRow (ZMod p)} (h : programRowKey r1
 
 /-- The **rich ROM-membership predicate** SP1's program/decode chip establishes for every received row —
 the *received* facts `Model/BusMessages.lean`'s `ProgramMsg.Spec` defers: the register indices are
-`< 32` (5-bit, from instruction decode), the pc limbs are `< 2^16`, and `op_a_0` is boolean. Instantiating
-`programConsistent_of_balance` with this is what hands those bounds to every real instruction fetch. -/
+`< 32` (5-bit, from instruction decode), the pc limbs are `< 2^16`, and `op_a_0` is boolean. The native
+Program provider proves the corresponding row-local channel guarantee for every real fetch. -/
 def ProgramRowSpec (row : ProgramRow (ZMod p)) : Prop :=
   row.op_a.val < 32 ∧ row.op_b[0].val < 32 ∧ row.op_c[0].val < 32 ∧
   row.pc0.val < 2 ^ 16 ∧ row.pc1.val < 2 ^ 16 ∧ row.pc2.val < 2 ^ 16 ∧

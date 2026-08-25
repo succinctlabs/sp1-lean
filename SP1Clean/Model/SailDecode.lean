@@ -109,6 +109,19 @@ cluster of the cascade (arms 5–33). Every proof is the same six-line walk; onl
 decoded instruction differ. The M-extension families (MUL/MULW/DIV/DIVW/REM/REMW, arms 45–50)
 additionally require the `misa.M` pin and their own unsticks — see the section below. -/
 
+/-- The fixed RV64 `ECALL` word.  This decoder fact is used only negatively by the ordinary-shard
+bridge: a successful supported Program-row projection cannot be this constructor. -/
+theorem decode_ECALL (s : SailState) (hs : s.isInitialized)
+    (hpriv : s.regs.get? Register.cur_privilege = some Privilege.Machine)
+    (hseccfg :
+      BitVec.ofNat 1 ((s.regs.get Register.mseccfg (hs Register.mseccfg)).toNat >>> 10) = 0#1) :
+    (ext_decode 0x00000073#32).run s = .ok (instruction.ECALL ()) s := by
+  conv_lhs => whnf
+  rw [cePause_apply]
+  conv_lhs => whnf
+  rw [ceZicfilp_bind_apply s hs hpriv hseccfg]
+  conv_lhs => whnf
+
 /-- `ADD x1, x2, x3` (R-type). -/
 theorem decode_ADD (s : SailState) (hs : s.isInitialized)
     (hpriv : s.regs.get? Register.cur_privilege = some Privilege.Machine)

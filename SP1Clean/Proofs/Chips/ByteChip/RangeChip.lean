@@ -19,8 +19,8 @@ preprocessed family; four hand-picked tables leave valid shift rows without a na
 Clean has no "trusted preprocessed table" primitive for channels, so a finished-`byteChannel` **provider
 must re-prove each pushed row valid in-circuit** — the `ByteRowSpec` membership predicate
 (`Model/ByteTable.lean`), here `a.val < 2^bits` via `byteRowSpec_range`. This is strictly more work than
-SP1's preprocessing (where validity is definitional), but it replaces the trusted byte-bus balance
-assumption (`Soundness/ByteConsistency.lean`'s `TraceByteLink`) with a Lean proof.
+SP1's preprocessing (where validity is definitional), but it supplies the local guarantee needed by
+the native balanced ensemble with a Lean proof.
 
 ## Fixed-width family
 

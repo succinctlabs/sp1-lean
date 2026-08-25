@@ -64,17 +64,18 @@ lemma lsbBit_toJalrInputs (e : ITypeEvent) :
 /--
 **A well-formed `JALR` event with a legal target builds a row the honest prover can complete.**
 Every conjunct of `JalrChip.ProverAssumptions` at the built input row follows from
-`ITypeEvent.WellFormed` together with `htgt : e.JalrTargets`, with no residual side condition.
+`ITypeEvent.WellFormedJalr` together with `htgt : e.JalrTargets`, including the
+`jalr x0, rs1, imm` form, with no residual side condition.
 
 The `data` and `hint` are arbitrary: `Jalr`'s prover contract reads neither.
 -/
-theorem proverAssumptions_of_event {e : ITypeEvent} (h : e.WellFormed) (htgt : e.JalrTargets)
+theorem proverAssumptions_of_event {e : ITypeEvent} (h : e.WellFormedJalr) (htgt : e.JalrTargets)
     (data : ProverData (ZMod p)) (hint : ProverHint (ZMod p)) :
     ProverAssumptions (e.toJalrInputs (p := p)) data hint := by
   obtain ⟨htgt48, htgt4, hlink⟩ := htgt
   have hpc : e.pc < 2 ^ 48 := h.pc_lt
   refine ⟨wordOfNat_isU64 _, ?_, cpuStateCols_pcWord_isU64 e.clk e.pc,
-    fun _ => wordOfNat_isU64 _, Or.inr rfl, iTypeReaderCols_op_a_0_eq_zero h.opA_ne_zero,
+    fun _ => wordOfNat_isU64 _, Or.inr rfl, ?_,
     cpuState_spec e.clk e.pc h.clk_mod _ _ _,
     registerAccessCols_spec_opA h.clk_mod h.prevTsA_lt,
     registerAccessCols_spec_opB h.clk_mod h.prevTsB_lt, ?_, ?_, ?_,
@@ -85,6 +86,10 @@ theorem proverAssumptions_of_event {e : ITypeEvent} (h : e.WellFormed) (htgt : e
   · show Word.isU64 (rs1WordI (e.toJalrInputs (p := p)))
     rw [rs1WordI_toJalrInputs]
     exact wordOfNat_isU64 _
+  -- real JALR rows may either write an ordinary destination or discard the link at x0
+  · by_cases hzero : e.opA = 0
+    · exact Or.inr ⟨rfl, iTypeReaderCols_op_a_0_eq_one hzero⟩
+    · exact Or.inl (iTypeReaderCols_op_a_0_eq_zero hzero)
   -- the uncleared jump target is a program counter: 48 bits, so its committed high limb is zero
   · rw [jumpTargetWord_toJalrInputs]
     exact wordOfNat_three_eq_zero htgt48
@@ -106,7 +111,7 @@ theorem proverAssumptions_padding (data : ProverData (ZMod p)) (hint : ProverHin
   have hzero : Word.isU64 (#v[0, 0, 0, 0] : Word (ZMod p)) :=
     Word.isU64_of_cases (by simp) (by simp) (by simp) (by simp)
   have hne : ¬((0 : ZMod p) = 1) := zero_ne_one
-  refine ⟨hzero, hzero, hzero, fun hr => absurd hr hne, Or.inl rfl, rfl,
+  refine ⟨hzero, hzero, hzero, fun hr => absurd hr hne, Or.inl rfl, Or.inl rfl,
     fun hr => absurd hr hne, fun hr => absurd hr hne, fun hr => absurd hr hne, ?_, ?_,
     fun hr => absurd hr hne, fun hr => absurd hr hne, fun hr => absurd hr hne⟩ <;>
     simp [jumpTargetWord, linkTargetWord, rs1WordI, jalrPaddingInputs, zeroCPUStateCols,
@@ -126,7 +131,7 @@ def traceInputs (events : List ITypeEvent) (padding : ℕ) : List (Inputs (ZMod 
 /-- Every row of a built trace — event row or padding row — satisfies the chip's honest-prover
 contract. -/
 theorem proverAssumptions_of_mem_traceInputs {events : List ITypeEvent} {padding : ℕ}
-    (h : ∀ e ∈ events, e.WellFormed ∧ e.JalrTargets) (data : ProverData (ZMod p))
+    (h : ∀ e ∈ events, e.WellFormedJalr ∧ e.JalrTargets) (data : ProverData (ZMod p))
     (hint : ProverHint (ZMod p)) :
     ∀ input ∈ traceInputs (p := p) events padding, ProverAssumptions input data hint := by
   intro input hin
@@ -140,7 +145,7 @@ theorem proverAssumptions_of_mem_traceInputs {events : List ITypeEvent} {padding
 circuit evaluates to zero on every built row, and no static lookup is left unchecked. -/
 theorem traceTable_constraints (events : List ITypeEvent) (padding : ℕ)
     (data : ProverData (ZMod p)) (hint : ProverHint (ZMod p))
-    (h : ∀ e ∈ events, e.WellFormed ∧ e.JalrTargets) :
+    (h : ∀ e ∈ events, e.WellFormedJalr ∧ e.JalrTargets) :
     (Air.Flat.Table.build (component (p := p)) (traceInputs events padding) data
       hint).Constraints :=
   Air.Flat.Table.build_constraints _ _ _ _ computableWitnesses
@@ -150,7 +155,7 @@ theorem traceTable_constraints (events : List ITypeEvent) (padding : ℕ)
 Memory, Program and Byte channels carries the payload its channel promises. -/
 theorem traceTable_guarantees (events : List ITypeEvent) (padding : ℕ)
     (data : ProverData (ZMod p)) (hint : ProverHint (ZMod p))
-    (h : ∀ e ∈ events, e.WellFormed ∧ e.JalrTargets) :
+    (h : ∀ e ∈ events, e.WellFormedJalr ∧ e.JalrTargets) :
     (Air.Flat.Table.build (component (p := p)) (traceInputs events padding) data
       hint).Guarantees :=
   Air.Flat.Table.build_guarantees _ _ _ _ computableWitnesses

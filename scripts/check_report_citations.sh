@@ -52,7 +52,7 @@ check_decl SP1Clean/Composition/CoreEnsemble.lean \
 check_decl SP1Clean/Composition/CoreArtifact.lean \
   "exactNativeArtifact_supportedCoreNativeRelation"
 check_decl SP1Clean/Soundness/SP1Ensemble.lean "sp1Ensemble"
-check_decl SP1Clean/Soundness/AIRCompleteness.lean "supported_core_native_complete"
+check_decl SP1Clean/Soundness/NativeCompleteness.lean "supported_core_native_complete"
 check_decl SP1CleanTest/Audit/ActiveTraceNonVacuity.lean \
   "active_real_decoded_instruction_row_count"
 check_decl SP1Clean/FormalModel/Contracts/DivRem.lean "Case"

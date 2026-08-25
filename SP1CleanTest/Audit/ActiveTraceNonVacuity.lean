@@ -11,7 +11,7 @@ and JAL row.
 The semantic event and provider lists are deliberately hand-assembled in a
 `SupportedCoreTraceWitness`; this file is not claiming a verified full trace generator.  Its physical
 tables, however, are assembled through each circuit's own witness builder, and
-`supported_core_native_complete` checks every resulting row before yielding the native AIR relation
+`supported_core_generated_trace_complete` checks every resulting row before yielding the native AIR relation
 consumed by soundness.  The explicit active-row counts prevent this regression from silently
 collapsing back to the boundary-only case.
 -/
@@ -92,55 +92,40 @@ def activeRomEntry : RomEntry :=
 def activeMemoryInit : MemRecordEntry := ⟨0, 0, 0, true⟩
 def activeMemoryFinalize : MemRecordEntry := ⟨0, 0, 5, true⟩
 
+/-- The one-event instruction registry: only the JAL table receives an occurrence. -/
+def activeInstructionEvents : (id : InstructionChipId) → List id.Event
+  | .jal => [activeEvent]
+  | .add | .addi | .addw | .sub | .subw | .bitwise | .lt | .shiftLeft | .shiftRight |
+      .jalr | .branch | .uType | .loadByte | .loadHalf | .loadWord | .loadDouble |
+      .loadX0 | .storeByte | .storeHalf | .storeWord | .storeDouble | .mul | .divRem |
+      .aluX0 => []
+
+/-- The active shard's provider occurrences, indexed by the physical provider registry. -/
+def activeProviderOccurrences : (id : ProviderTableId) → List id.Occurrence
+  | .byte .u8Range => activeU8Entries
+  | .byte .msb => []
+  | .byte .andByte => []
+  | .byte .orByte => []
+  | .byte .xorByte => []
+  | .byte .ltu => []
+  | .range width => activeRangeEntries width
+  | .program => [activeRomEntry]
+  | .memoryInit => [activeMemoryInit]
+  | .memoryFinalize => [activeMemoryFinalize]
+  | .memoryBump => []
+  | .stateBump => []
+
 /-! ## The hand-assembled trace source -/
 
 /-- A hand-assembled semantic source for one active JAL row, no padding, the exact provider
 occurrences above, and public endpoints matching the row's State pull/push (`clk 1 → 9`, self-loop
 pc). `SupportedCoreTraceWitness.tables` turns these records into physical circuit-built rows. -/
 def activeTrace : SupportedCoreTraceWitness SP1Prime where
-  addEvents := []; addPadding := 0
-  addiEvents := []; addiPadding := 0
-  addwEvents := []; addwPadding := 0
-  subEvents := []; subPadding := 0
-  subwEvents := []; subwPadding := 0
-  bitwiseEvents := []; bitwisePadding := 0
-  ltEvents := []; ltPadding := 0
-  shiftLeftEvents := []; shiftLeftPadding := 0
-  shiftRightEvents := []; shiftRightPadding := 0
-  jalEvents := [activeEvent]; jalPadding := 0
-  jalrEvents := []; jalrPadding := 0
-  branchEvents := []; branchPadding := 0
-  uTypeEvents := []; uTypePadding := 0
-  loadByteEvents := []
-  loadHalfEvents := []
-  loadWordEvents := []
-  loadDoubleEvents := []
-  loadX0Events := []
-  storeByteEvents := []
-  storeHalfEvents := []
-  storeWordEvents := []
-  storeDoubleEvents := []
-  mulEvents := []; mulPadding := 0
-  divRemEvents := []; divRemPadding := 0
-  aluX0Events := []; aluX0Padding := 0
-  u8RangeEntries := activeU8Entries
-  msbEntries := []
-  andByteEntries := []
-  orByteEntries := []
-  xorByteEntries := []
-  ltuEntries := []
-  rangeEntries := activeRangeEntries
-  romEntries := [activeRomEntry]
-  memoryInitEntries := [activeMemoryInit]
-  memoryFinalizeEntries := [activeMemoryFinalize]
-  memoryBumpEvents := []
-  stateBumpEvents := []
+  instructionEvents := activeInstructionEvents
+  providerOccurrences := activeProviderOccurrences
   data := anchorData
   hint := anchorHint
-  initClk := 1
-  initPc := 65536
-  finalClk := 9
-  finalPc := 65536
+  boundary := boundaryInputs 1 65536 9 65536
 
 /-- The public statement proved by the active shard. -/
 def activeStatement : SupportedCoreStatement SP1Prime :=
@@ -148,29 +133,41 @@ def activeStatement : SupportedCoreStatement SP1Prime :=
 
 /-- The hand-assembled instruction-event count is exactly one. -/
 theorem active_instruction_count :
-    activeTrace.addEvents.length + activeTrace.addiEvents.length +
-      activeTrace.addwEvents.length + activeTrace.subEvents.length +
-      activeTrace.subwEvents.length + activeTrace.bitwiseEvents.length +
-      activeTrace.ltEvents.length + activeTrace.shiftLeftEvents.length +
-      activeTrace.shiftRightEvents.length + activeTrace.jalEvents.length +
-      activeTrace.jalrEvents.length + activeTrace.branchEvents.length +
-      activeTrace.uTypeEvents.length + activeTrace.loadByteEvents.length +
-      activeTrace.loadHalfEvents.length + activeTrace.loadWordEvents.length +
-      activeTrace.loadDoubleEvents.length + activeTrace.loadX0Events.length +
-      activeTrace.storeByteEvents.length + activeTrace.storeHalfEvents.length +
-      activeTrace.storeWordEvents.length + activeTrace.storeDoubleEvents.length +
-      activeTrace.mulEvents.length + activeTrace.divRemEvents.length +
-      activeTrace.aluX0Events.length = 1 := by native_decide
+    (activeTrace.instructionEvents .add).length +
+      (activeTrace.instructionEvents .addi).length +
+      (activeTrace.instructionEvents .addw).length +
+      (activeTrace.instructionEvents .sub).length +
+      (activeTrace.instructionEvents .subw).length +
+      (activeTrace.instructionEvents .bitwise).length +
+      (activeTrace.instructionEvents .lt).length +
+      (activeTrace.instructionEvents .shiftLeft).length +
+      (activeTrace.instructionEvents .shiftRight).length +
+      (activeTrace.instructionEvents .jal).length +
+      (activeTrace.instructionEvents .jalr).length +
+      (activeTrace.instructionEvents .branch).length +
+      (activeTrace.instructionEvents .uType).length +
+      (activeTrace.instructionEvents .loadByte).length +
+      (activeTrace.instructionEvents .loadHalf).length +
+      (activeTrace.instructionEvents .loadWord).length +
+      (activeTrace.instructionEvents .loadDouble).length +
+      (activeTrace.instructionEvents .loadX0).length +
+      (activeTrace.instructionEvents .storeByte).length +
+      (activeTrace.instructionEvents .storeHalf).length +
+      (activeTrace.instructionEvents .storeWord).length +
+      (activeTrace.instructionEvents .storeDouble).length +
+      (activeTrace.instructionEvents .mul).length +
+      (activeTrace.instructionEvents .divRem).length +
+      (activeTrace.instructionEvents .aluX0).length = 1 := by native_decide
 
 /-- The sole source event is the one active JAL row. -/
-theorem active_jal_row_count : activeTrace.jalEvents.length = 1 := by native_decide
+theorem active_jal_row_count : (activeTrace.instructionEvents .jal).length = 1 := by native_decide
 
 /-- The canonical heterogeneous decoder therefore sees exactly one physical instruction row. -/
 theorem active_decoded_instruction_row_count :
     (decodedInstructionRows activeTrace.witness.tables).length = 1 := by rfl
 
 private def activeJalDescriptor : SupportedChip SP1Prime :=
-  ⟨JalChip.kind, JalChip.circuit, rfl, [.JAL], .any⟩
+  supportedChipFor .jal
 
 private def activeDecodedJalRow : DecodedInstructionRow SP1Prime where
   chip := activeJalDescriptor
@@ -200,7 +197,7 @@ theorem active_real_decoded_instruction_row_count :
   simp [activeDecodedJalRow_is_real]
 
 /-- In particular, the active instruction table cannot regress to the empty trace. -/
-theorem active_jal_rows_nonempty : activeTrace.jalEvents ≠ [] := by native_decide
+theorem active_jal_rows_nonempty : activeTrace.instructionEvents .jal ≠ [] := by native_decide
 
 private theorem activeU8Entries_wellFormed :
     ∀ e ∈ activeU8Entries, e.WellFormed := by
@@ -231,100 +228,61 @@ private theorem activeRange16Entries_wellFormed :
 
 /-- All instruction and provider occurrences are admitted by their semantic builders. -/
 theorem activeTrace_wellFormed : activeTrace.WellFormed where
-  add := by simp [activeTrace]
-  addi := by simp [activeTrace]
-  addw := by simp [activeTrace]
-  sub := by simp [activeTrace]
-  subw := by simp [activeTrace]
-  bitwise := by simp [activeTrace]
-  lt := by simp [activeTrace]
-  shiftLeft := by simp [activeTrace]
-  shiftRight := by simp [activeTrace]
-  jal := by
-    intro e he
-    simp only [activeTrace] at he
-    rw [List.mem_singleton] at he
-    subst e
-    exact ⟨activeEvent_wellFormed, activeEvent_targets⟩
-  jalr := by simp [activeTrace]
-  branch := by simp [activeTrace]
-  uType := by simp [activeTrace]
-  loadByte := by simp [activeTrace]
-  loadHalf := by simp [activeTrace]
-  loadWord := by simp [activeTrace]
-  loadDouble := by simp [activeTrace]
-  loadX0 := by simp [activeTrace]
-  storeByte := by simp [activeTrace]
-  storeHalf := by simp [activeTrace]
-  storeWord := by simp [activeTrace]
-  storeDouble := by simp [activeTrace]
-  mul := by simp [activeTrace]
-  divRem := by simp [activeTrace]
-  aluX0 := by simp [activeTrace]
-  u8Range := activeU8Entries_wellFormed
-  msb := by simp [activeTrace]
-  andByte := by simp [activeTrace]
-  orByte := by simp [activeTrace]
-  xorByte := by simp [activeTrace]
-  ltu := by simp [activeTrace]
-  range := by
-    intro width e he
-    by_cases h13 : width = activeWidth13
-    · subst width
-      simp only [activeTrace, activeRangeEntries] at he
-      exact activeRange13Entries_wellFormed e he
-    · by_cases h14 : width = activeWidth14
-      · subst width
-        simp [activeTrace, activeRangeEntries, activeWidth13, activeWidth14] at he
-        exact activeRange14Entries_wellFormed e he
-      · by_cases h16 : width = activeWidth16
+  instruction := by
+    intro id e he
+    cases id <;>
+      simp_all [activeTrace, activeInstructionEvents, InstructionChipId.Valid,
+        activeEvent_wellFormed, activeEvent_targets]
+  provider := by
+    intro id e he
+    cases id with
+    | byte provider =>
+        cases provider with
+        | u8Range =>
+            simp only [activeTrace, activeProviderOccurrences] at he
+            fin_cases he <;>
+              norm_num [ProviderTableId.Valid, ByteEntry.WellFormed]
+        | msb | andByte | orByte | xorByte | ltu =>
+            simp [activeTrace, activeProviderOccurrences] at he
+    | range width =>
+        by_cases h13 : width = activeWidth13
         · subst width
-          simp [activeTrace, activeRangeEntries, activeWidth13, activeWidth14,
-            activeWidth16] at he
-          exact activeRange16Entries_wellFormed e he
-        · simp [activeTrace, activeRangeEntries, h13, h14, h16] at he
-  rom := by
-    intro e he
-    simp only [activeTrace] at he
-    rw [List.mem_singleton] at he
-    subst e
-    exact ⟨by norm_num [activeRomEntry], Or.inr rfl⟩
-  memoryInit := by
-    intro e he
-    simp only [activeTrace] at he
-    rw [List.mem_singleton] at he
-    subst e
-    rfl
-  memoryBump := by simp [activeTrace]
-  stateBump := by simp [activeTrace]
-
-/-- All aggregate-capable provider entries use canonical positive field counts. -/
-theorem activeTrace_providerMultiplicitiesFit :
-    activeTrace.ProviderMultiplicitiesFit := by
-  constructor
-  case range =>
-    intro width e he
-    by_cases h13 : width = activeWidth13
-    · subst width
-      simp [activeTrace, activeRangeEntries, activeRange13Entries] at he
-      subst e
-      norm_num [TraceGen.RangeEntry.MultiplicityFits, SP1Prime]
-    · by_cases h14 : width = activeWidth14
-      · subst width
-        simp [activeTrace, activeRangeEntries, activeRange14Entries, activeWidth13,
-          activeWidth14] at he
+          simp only [activeTrace, activeProviderOccurrences, activeRangeEntries] at he
+          fin_cases he
+          norm_num [ProviderTableId.Valid, RangeEntry.WellFormed, activeWidth13]
+        · by_cases h14 : width = activeWidth14
+          · subst width
+            simp [activeTrace, activeProviderOccurrences, activeRangeEntries,
+              activeWidth13, activeWidth14] at he
+            fin_cases he
+            norm_num [ProviderTableId.Valid, RangeEntry.WellFormed, activeWidth14]
+          · by_cases h16 : width = activeWidth16
+            · subst width
+              simp [activeTrace, activeProviderOccurrences, activeRangeEntries,
+                activeWidth13, activeWidth14, activeWidth16] at he
+              fin_cases he <;>
+                norm_num [ProviderTableId.Valid, RangeEntry.WellFormed, activeWidth16]
+            · have hocc : activeTrace.providerOccurrences (.range width) = [] := by
+                simp [activeTrace, activeProviderOccurrences, activeRangeEntries, h13, h14, h16]
+                rfl
+              rw [hocc] at he
+              exact absurd he List.not_mem_nil
+    | program =>
+        simp only [activeTrace, activeProviderOccurrences, List.mem_singleton] at he
         subst e
-        norm_num [TraceGen.RangeEntry.MultiplicityFits, SP1Prime]
-      · by_cases h16 : width = activeWidth16
-        · subst width
-          simp [activeTrace, activeRangeEntries, activeRange16Entries, activeWidth13,
-            activeWidth14, activeWidth16] at he
-          rcases he with rfl | rfl | rfl | rfl <;>
-            norm_num [TraceGen.RangeEntry.MultiplicityFits, SP1Prime]
-        · simp [activeTrace, activeRangeEntries, h13, h14, h16] at he
-  all_goals
-    simp [activeTrace, activeU8Entries, activeRomEntry, TraceGen.ByteEntry.MultiplicityFits,
-      TraceGen.RomEntry.MultiplicityFits, SP1Prime]
+        exact (by
+          change activeRomEntry.WellFormed
+          exact ⟨by norm_num [activeRomEntry], Or.inr rfl⟩)
+    | memoryInit =>
+        simp only [activeTrace, activeProviderOccurrences, List.mem_singleton] at he
+        subst e
+        change activeMemoryInit.WellFormedInit
+        rfl
+    | memoryFinalize =>
+        change True
+        trivial
+    | memoryBump | stateBump => simp [activeTrace, activeProviderOccurrences] at he
+  boundary := boundaryInputs_limbBounds _ _ _ _
 
 /-! ## Circuit-built provider tables -/
 
@@ -456,7 +414,7 @@ private theorem activeRangeTables_interactionsWith (ch : RawChannel (ZMod SP1Pri
     simp [SupportedCoreTraceWitness.rangeTables, RangeChip.allWidths]
   have entriesAtOtherIndex (i : ℕ) (bound : i < activeTrace.rangeTables.length)
       (not13 : i ≠ 13) (not14 : i ≠ 14) (not16 : i ≠ 16) :
-      activeTrace.rangeEntries RangeChip.allWidths[i] = [] := by
+      activeTrace.providerOccurrences (.range RangeChip.allWidths[i]) = [] := by
     rw [rangeTablesLength] at bound
     interval_cases i <;> first
       | exact (not13 rfl).elim
@@ -468,7 +426,8 @@ private theorem activeRangeTables_interactionsWith (ch : RawChannel (ZMod SP1Pri
       activeTrace.rangeTables[i].interactionsWith ch = [] := by
     simp only [SupportedCoreTraceWitness.rangeTables, List.getElem_map]
     convert rangeTable_interactionsWith_nil_of_entries_eq_nil
-      RangeChip.allWidths[i] (activeTrace.rangeEntries RangeChip.allWidths[i])
+      RangeChip.allWidths[i]
+        (activeTrace.providerOccurrences (.range RangeChip.allWidths[i]))
         (entriesAtOtherIndex i bound not13 not14 not16) ch using 1
     simp only [activeTrace]
     rfl
@@ -858,35 +817,6 @@ theorem activeTrace_memoryHandoff :
       (LookupAccessList.handoff activeMemoryTokens) := by
   native_decide
 
-/-! ### Why the obligation is stated over `active` — a shard that shows it
-
-`activeTrace` pads nothing (every `*Padding := 0`), so on it the `active` filter is the identity and
-the two anchors above would hold with or without it. That makes them silent about the one thing
-`active` is there for, so here is a shard that is not silent.
-
-`activePaddedTrace` is `activeTrace` with a single JAL padding row. A padding row still *emits* its
-State and Memory accesses — at multiplicity `0` (`stateLookups_padding`) — so the raw ledger gains
-two entries that no token's life contains. The pair below is the demonstration: **the raw
-permutation is false and the `active` one is true**, on the same shard, for the same tokens.
-
-Without `active` the hand-off obligation would be unprovable for every trace that pads, which is
-every real trace. -/
-
-/-- The same shard with one padding row. -/
-def activePaddedTrace : SupportedCoreTraceWitness SP1Prime :=
-  { activeTrace with jalPadding := 1 }
-
-/-- A padding row's accesses really are in the raw ledger, and really are not a token's life. -/
-theorem activePaddedTrace_stateHandoff_raw_false :
-    ¬ activePaddedTrace.stateLedger.Perm (LookupAccessList.handoff activeStateTokens) := by
-  native_decide
-
-/-- Dropping the zero-multiplicity entries recovers exactly the same two tokens. -/
-theorem activePaddedTrace_stateHandoff :
-    (LookupAccessList.active activePaddedTrace.stateLedger).Perm
-      (LookupAccessList.handoff activeStateTokens) := by
-  native_decide
-
 theorem activeTrace_balanced : activeTrace.Balanced := by
   intro channel hchannel
   rw [sp1Ensemble_channels] at hchannel
@@ -1144,9 +1074,9 @@ theorem activeTrace_semanticBoundaryBinding :
 /-! ## Active relation and AIR witness -/
 
 /-- The complete trace-source relation witness with one circuit-built active instruction row. -/
-theorem activeTrace_traceGeneratable :
-    SupportedCoreTraceGeneratableExecutionRelation activeStatement activeTrace :=
-  ⟨activeTrace_wellFormed, activeTrace_providerMultiplicitiesFit, activeTrace_balanced,
+theorem activeTrace_generatedTrace :
+    SupportedCoreGeneratedTraceRelation activeStatement activeTrace :=
+  ⟨activeTrace_wellFormed, activeTrace.witness_balancedChannels activeTrace_balanced,
     activeTrace_public_eq,
     activeTrace_semanticBoundaryBinding⟩
 

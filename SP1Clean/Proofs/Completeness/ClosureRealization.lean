@@ -251,9 +251,12 @@ theorem cells_eq_sixteen {k : LookupKey} (h : k.2.2.length = 16) :
   match l, h with
   | [a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15], _ => rfl
 
-/-- A Program key an honest ROM provider can supply: its pc and operand limbs really are 16-bit
-limbs, and the five cells the provider passes through unchecked fit the field's headroom. -/
+/-- A Program key an honest ROM provider can supply: its row-level provider inputs are valid, its
+pc and operand limbs really are 16-bit limbs, and the five field cells the provider passes through
+unchecked fit the field's headroom.  The first conjunct is load-bearing for completeness:
+`RomEntry.WellFormed` requires both the destination-register bound and the `op_a_0` bit. -/
 def ProgramServable (k : LookupKey) : Prop :=
+  (cell k 4 < 32 ∧ (cell k 13 = 0 ∨ cell k 13 = 1)) ∧
   (cell k 0 < 2 ^ 16 ∧
     cell k 1 < 2 ^ 16 ∧
     cell k 2 < 2 ^ 16 ∧
@@ -300,7 +303,7 @@ theorem wordLimbs {a b c d : ℕ} (ha : a < 2 ^ 16) (hb : b < 2 ^ 16) (hc : c < 
 theorem program_round (k : LookupKey) (m : ℕ)
     (hsel : IsProgramKey k = true) (hserv : ProgramServable k) :
     programEntryAccess (romEntryOfKey k m) = accessAt k (m : ℤ) := by
-  obtain ⟨⟨h0, h1, h2, h5, h6, h7, h8, h9, h10, h11, h12⟩, _⟩ := hserv
+  obtain ⟨_, ⟨h0, h1, h2, h5, h6, h7, h8, h9, h10, h11, h12⟩, _⟩ := hserv
   obtain ⟨p0, p1, p2⟩ := pcLimbs h0 h1 h2
   obtain ⟨b0, b1, b2, b3⟩ := wordLimbs h5 h6 h7 h8
   obtain ⟨c0, c1, c2, c3⟩ := wordLimbs h9 h10 h11 h12
@@ -359,14 +362,15 @@ multiplicity that can balance a key is that key's recount. Stating it as a predi
 rebuilding the record keeps `SupportedCoreTraceWitness` and every existing construction of it
 untouched. -/
 structure ClosureRealized : Prop where
-  u8Range : trace.u8RangeEntries = trace.closureU8RangeEntries
-  msb : trace.msbEntries = trace.closureMsbEntries
-  andByte : trace.andByteEntries = trace.closureAndByteEntries
-  orByte : trace.orByteEntries = trace.closureOrByteEntries
-  xorByte : trace.xorByteEntries = trace.closureXorByteEntries
-  ltu : trace.ltuEntries = trace.closureLtuEntries
-  range : ∀ width, trace.rangeEntries width = trace.closureRangeEntries width
-  rom : trace.romEntries = trace.closureRomEntries
+  u8Range : trace.providerOccurrences (.byte .u8Range) = trace.closureU8RangeEntries
+  msb : trace.providerOccurrences (.byte .msb) = trace.closureMsbEntries
+  andByte : trace.providerOccurrences (.byte .andByte) = trace.closureAndByteEntries
+  orByte : trace.providerOccurrences (.byte .orByte) = trace.closureOrByteEntries
+  xorByte : trace.providerOccurrences (.byte .xorByte) = trace.closureXorByteEntries
+  ltu : trace.providerOccurrences (.byte .ltu) = trace.closureLtuEntries
+  range : ∀ width,
+    trace.providerOccurrences (.range width) = trace.closureRangeEntries width
+  rom : trace.providerOccurrences .program = trace.closureRomEntries
 
 /-- **Every key the shard demands is one an honest provider can supply.**
 
@@ -797,9 +801,9 @@ decides `RawChannel` equality classically. So a bus-local obligation belongs on 
 ledger*, where on a concrete shard it is a closed term an evaluator reduces, rather than on the
 channel projection, where it is not.
 
-These four are that formulation. `stateLedger` and `memoryLedger` are the ones a hand-off obligation
-is stated over; the byte and program halves are here for symmetry and for reading a shard's ledger
-apart. -/
+`stateLedger` and `memoryLedger` are the two views on which hand-off obligations are stated. Byte
+and Program closure works directly from `skeletonLedger` and its selected keys, so separate named
+filters would only duplicate that projection. -/
 
 /-- The State bus's half of a trace's ledger. -/
 def stateLedger : LookupAccessList :=
@@ -809,14 +813,6 @@ def stateLedger : LookupAccessList :=
 def memoryLedger : LookupAccessList :=
   trace.fullLedger.filter fun a => a.1 = InteractionKind.Memory
 
-/-- The Byte bus's half (all six opcode tables and all seventeen Range widths). -/
-def byteLedger : LookupAccessList :=
-  trace.fullLedger.filter fun a => a.1 = InteractionKind.Byte
-
-/-- The Program bus's half. -/
-def programLedger : LookupAccessList :=
-  trace.fullLedger.filter fun a => a.1 = InteractionKind.Program
-
 /-- **A bus-local hand-off obligation discharges that channel's `isConsistentBalanced`.**
 
 Three steps: the orientation bridge takes the channel projection to the whole ledger,
@@ -824,7 +820,7 @@ Three steps: the orientation bridge takes the channel projection to the whole le
 the zero-multiplicity entries — where the permutation lives.
 
 **The `active` filter is not cosmetic.** Padding rows emit their State and Memory accesses at
-multiplicity `0` (`stateLookups_padding`, `memoryLookups_padding`), and `handoff` contains only
+multiplicity `0`, while `handoff` contains only
 `±1` entries, so a permutation stated on the raw filtered ledger is false for any trace with
 padding — which is every real trace. `active` is what makes the obligation the true one. -/
 theorem channelLedger_isConsistentBalanced_of_handoff

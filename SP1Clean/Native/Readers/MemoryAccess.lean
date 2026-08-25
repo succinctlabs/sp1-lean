@@ -24,8 +24,8 @@ previous timestamp is a `pullIf` (mult `−is_real`, deriving its `isU64 ∧ Clk
 at the current timestamp `(clk_high, clk_low + 1)` is a `pushIf` (`+is_real`, proving the guarantee) —
 SP1's Rust *sends* the prior (`+`) and *receives* the new (`−`), matched up to the per-channel
 multiplicity negation bridged in the Faithful anchors.
-The bus's cross-row meaning (offline-memory, last-write-wins) is the trace level
-(`Soundness/MemoryConsistency.lean`); this primitive supplies the per-row monotonicity + emission. -/
+The bus's cross-row meaning (offline-memory, last-write-wins) is derived by
+`Soundness/TypedMemory.lean`; this primitive supplies the per-row monotonicity + emission. -/
 
 namespace SP1Clean.Readers.MemoryAccess
 

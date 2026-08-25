@@ -277,6 +277,42 @@ structure WellFormed (e : ITypeEvent) : Prop where
 
 end ITypeEvent
 
+/-! ## The JALR event boundary
+
+`ITypeEvent.WellFormed` describes destination-writing rows whose destination is nonzero.  JALR is
+also routed to its own chip when `rd = x0`; in that case the link write is gated off and the
+I-type reader must instead see the architectural zero value in the displaced-record slot. -/
+
+namespace ITypeEvent
+
+/-- Well-formed execution data for a JALR row, including the `rd = x0` form. -/
+structure WellFormedJalr (e : ITypeEvent) : Prop where
+  clk_mod : e.clk % 8 = 1
+  pc_lt : e.pc < 2 ^ 48
+  opA_lt : e.opA < 32
+  opB_lt : e.opB < 32
+  imm_lt : e.imm < 2 ^ 64
+  b_lt : e.b < 2 ^ 64
+  prevA_lt : e.prevA < 2 ^ 64
+  prevA_eq_zero : e.opA = 0 → e.prevA = 0
+  prevTsA_lt : e.prevTsA < e.clk + 4
+  prevTsB_lt : e.prevTsB < e.clk + 3
+
+/-- The historical nonzero-destination boundary embeds into the complete JALR boundary. -/
+theorem WellFormed.toWellFormedJalr {e : ITypeEvent} (h : e.WellFormed) : e.WellFormedJalr where
+  clk_mod := h.clk_mod
+  pc_lt := h.pc_lt
+  opA_lt := h.opA_lt
+  opB_lt := h.opB_lt
+  imm_lt := h.imm_lt
+  b_lt := h.b_lt
+  prevA_lt := h.prevA_lt
+  prevA_eq_zero hzero := absurd hzero h.opA_ne_zero
+  prevTsA_lt := h.prevTsA_lt
+  prevTsB_lt := h.prevTsB_lt
+
+end ITypeEvent
+
 /-! ## The ALU-type family
 
 `Extracted.ALUTypeReader`: the immediate-capable ALU adapter. `op_a` is written and `op_b` read as

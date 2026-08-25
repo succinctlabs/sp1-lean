@@ -78,7 +78,102 @@ puts it. Exported here, not redefined, so this file's call sites and the complet
 one definition. An `export` rather than an `abbrev`: `abbrev` is reducible and unfolds before the
 rewrites below can match on the name. -/
 export SP1Clean (tableCleanAccesses tablesCleanAccesses tablesCleanAccesses_append
-  interactionToAccess_eval tableCleanAccesses_build tableCleanAccesses_build_map_singleton)
+  tableRustOrientedAccesses interactionToAccess_eval interactionToRustOrientedAccess_eval
+  tableCleanAccesses_build tableCleanAccesses_build_map_singleton)
+
+/-! ## Rust-facing orientation is only a stable partition
+
+`Faithful.nativeAccesses` presents a row in State/Byte/Memory/Program/unexpected channel order and
+dualizes the Memory and Program groups. The literal Clean ledger preserves emission order. The
+following two lemmas make the previously implicit seam explicit: after applying the same
+Memory/Program dualization to each literal Clean interaction, the two lists differ only by a
+permutation. No interaction is added or discarded, including unexpected channels. -/
+
+private theorem nativeAccesses_perm_map_toRustOrientedAccess
+    (env : Environment (ZMod p)) (ops : Operations (ZMod p)) :
+    (nativeAccesses env ops).Perm
+      (ops.interactions.map (AbstractInteraction.toRustOrientedAccess env)) := by
+  classical
+  unfold nativeAccesses unexpectedInteractions Operations.interactionsWith
+  generalize ops.interactions = interactions
+  induction interactions with
+  | nil => simp
+  | cons interaction interactions ih =>
+      simp only [List.map_map, Function.comp_def] at ih
+      simp at ih
+      let state := (interactions.filter
+        (fun i => i.channel = Channels.stateChannel.toRaw)).map
+          (AbstractInteraction.toAccess env)
+      let byte := (interactions.filter
+        (fun i => i.channel = Channels.byteChannel.toRaw)).map
+          (AbstractInteraction.toAccess env)
+      let memory := (interactions.filter
+        (fun i => i.channel = Channels.memoryChannel.toRaw)).map fun i =>
+          LookupAccessList.negMult (AbstractInteraction.toAccess env i)
+      let program := (interactions.filter
+        (fun i => i.channel = Channels.programChannel.toRaw)).map fun i =>
+          LookupAccessList.negMult (AbstractInteraction.toAccess env i)
+      let unexpected := (interactions.filter fun i =>
+        !decide (i.channel = Channels.stateChannel.toRaw) &&
+          (!decide (i.channel = Channels.byteChannel.toRaw) &&
+            (!decide (i.channel = Channels.memoryChannel.toRaw) &&
+              !decide (i.channel = Channels.programChannel.toRaw)))).map
+                (AbstractInteraction.toAccess env)
+      have ihNamed : (state ++ byte ++ memory ++ program ++ unexpected).Perm
+          (interactions.map (AbstractInteraction.toRustOrientedAccess env)) := by
+        simpa [state, byte, memory, program, unexpected, List.map_map,
+          Function.comp_def] using ih
+      by_cases hstate : interaction.channel = Channels.stateChannel.toRaw
+      · simpa [hstate, AbstractInteraction.toRustOrientedAccess,
+          Channels.stateChannel_eq_byteChannel_false,
+          Channels.stateChannel_eq_memoryChannel_false,
+          Channels.stateChannel_eq_programChannel_false, List.map_map, Function.comp_def] using
+          ihNamed.cons (AbstractInteraction.toAccess env interaction)
+      · by_cases hbyte : interaction.channel = Channels.byteChannel.toRaw
+        · have ih' : (state ++ (byte ++ memory ++ program ++ unexpected)).Perm
+              (interactions.map (AbstractInteraction.toRustOrientedAccess env)) := by
+            simpa [List.append_assoc] using ihNamed
+          simpa [hstate, hbyte, AbstractInteraction.toRustOrientedAccess,
+            Channels.byteChannel_eq_stateChannel_false,
+            Channels.byteChannel_eq_memoryChannel_false,
+            Channels.byteChannel_eq_programChannel_false, state, byte, memory, program,
+            unexpected, List.append_assoc, List.map_map, Function.comp_def] using
+            ((List.perm_middle (l₁ := state)
+              (l₂ := byte ++ memory ++ program ++ unexpected)).trans
+              (ih'.cons (AbstractInteraction.toAccess env interaction)))
+        · by_cases hmemory : interaction.channel = Channels.memoryChannel.toRaw
+          · have ih' : ((state ++ byte) ++ (memory ++ program ++ unexpected)).Perm
+                (interactions.map (AbstractInteraction.toRustOrientedAccess env)) := by
+              simpa [List.append_assoc] using ihNamed
+            simpa [hstate, hbyte, hmemory, AbstractInteraction.toRustOrientedAccess,
+              Channels.memoryChannel_eq_stateChannel_false,
+              Channels.memoryChannel_eq_byteChannel_false,
+              Channels.memoryChannel_eq_programChannel_false, state, byte, memory, program,
+              unexpected, List.append_assoc, List.map_map, Function.comp_def] using
+              ((List.perm_middle (l₁ := state ++ byte)).trans
+                (ih'.cons (LookupAccessList.negMult
+                  (AbstractInteraction.toAccess env interaction))))
+          · by_cases hprogram : interaction.channel = Channels.programChannel.toRaw
+            · have ih' : (((state ++ byte) ++ memory) ++ (program ++ unexpected)).Perm
+                  (interactions.map (AbstractInteraction.toRustOrientedAccess env)) := by
+                simpa [List.append_assoc] using ihNamed
+              simpa [hstate, hbyte, hmemory, hprogram,
+                AbstractInteraction.toRustOrientedAccess,
+                Channels.programChannel_eq_stateChannel_false,
+                Channels.programChannel_eq_byteChannel_false,
+                Channels.programChannel_eq_memoryChannel_false, state, byte, memory, program,
+                unexpected, List.append_assoc, List.map_map, Function.comp_def] using
+                ((List.perm_middle (l₁ := (state ++ byte) ++ memory)).trans
+                  (ih'.cons (LookupAccessList.negMult
+                    (AbstractInteraction.toAccess env interaction))))
+            · have ih' : ((((state ++ byte) ++ memory) ++ program) ++ unexpected).Perm
+                  (interactions.map (AbstractInteraction.toRustOrientedAccess env)) := by
+                simpa [List.append_assoc] using ihNamed
+              simpa [hstate, hbyte, hmemory, hprogram,
+                AbstractInteraction.toRustOrientedAccess, List.append_assoc, List.map_map,
+                Function.comp_def, state, byte, memory, program, unexpected] using
+                ((List.perm_middle (l₁ := ((state ++ byte) ++ memory) ++ program)).trans
+                  (ih'.cons (AbstractInteraction.toAccess env interaction)))
 
 /-- Project all physical rows of a native table through the same complete access vocabulary used
 by the whole-chip faithfulness anchors.  This definition is shared by row-for-row chip transports
@@ -86,6 +181,21 @@ and by the constructive provider redistributions. -/
 noncomputable def tableNativeAccesses (table : Table (ZMod p)) : LookupAccessList :=
   table.table.flatMap fun row =>
     nativeAccesses (table.environment row) table.component.operations
+
+/-- The faithfulness-facing table ledger is the literal evaluated Clean ledger with exactly the
+Memory/Program polarity convention applied. `nativeAccesses`' channel grouping changes only order;
+in particular, its unexpected tail neither drops nor invents an interaction. -/
+theorem tableNativeAccesses_perm_tableRustOrientedAccesses (table : Table (ZMod p)) :
+    (tableNativeAccesses table).Perm (tableRustOrientedAccesses table) := by
+  classical
+  unfold tableNativeAccesses tableRustOrientedAccesses Air.Flat.Table.interactions
+  simp only [List.map_flatMap]
+  apply List.Perm.flatMap (List.Perm.refl table.table)
+  intro row _
+  simpa only [Operations.interactionValues, List.map_map, Function.comp_def,
+    interactionToRustOrientedAccess_eval] using
+    nativeAccesses_perm_map_toRustOrientedAccess
+      (table.environment row) table.component.operations
 
 /-- Active filtering distributes over a list of whole-table ledgers while leaving each table's
 component and operation tree opaque. -/

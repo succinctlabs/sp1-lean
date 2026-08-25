@@ -10,10 +10,8 @@ import Clean.Utils.Tactics.ProvableStructDeriving
 
 The shared Clean `Channel`s that the readers/chips `push`/`pull` to model SP1's cross-chip
 interaction buses (`builder.send`/`receive`). Each `Channel` here is the Lean analog of one SP1
-`InteractionKind`; emitting on it is the *real* in-circuit bus (vs. the hand-written trace-level
-`*Lookups` shadows in `Soundness/`), so that `Soundness/*Consistency.lean` can eventually be
-re-pointed at `Operations.interactionsWith <channel>` and the projections become theorems
-(`interactionsWith_eq_of_mem_exposedChannels`). See `docs/bus-model.md`.
+`InteractionKind`; emitting on it is the real in-circuit bus consumed directly by the typed
+grounding layer. See `docs/architecture.md`.
 
 This module carries the **State** bus and the **Byte** bus (SP1's preprocessed `ByteChip`,
 `Model/ByteTable.lean`), plus the **Program** and **Memory** channels. -/
@@ -45,8 +43,9 @@ operand `isU64` is *derived* by the consuming chip rather than carried as a chip
 precondition — the byte/program-bus model. SP1's Rust *sends* the read-prior (`+is_real`); our pull emits
 `−is_real`, so our Memory interactions match SP1's extracted oracle **up to per-channel multiplicity
 negation** (a sound LogUp sign symmetry, bridged in the `Faithful/*` Memory anchors). The cross-row
-offline-memory *value-correctness* (read = last write) stays trace-level (`Soundness/MemoryConsistency.lean`);
-this channel carries only the value's `isU64`. The `name` matches the `"SP1Memory"` key in `memoryLookups`. -/
+offline-memory *value-correctness* (read = last write) is derived globally by the timed typed-memory
+grounding layer (`Soundness/TypedMemory.lean`); this channel carries only the local `isU64` and clock
+facts. The `name` matches the `"SP1Memory"` interaction key. -/
 def memoryChannel : Channel (ZMod p) MemoryMsg where
   name := "SP1Memory"
   Guarantees msg _ := MemoryMsg.isU64 msg ∧ MemoryMsg.ClkBound msg
@@ -58,7 +57,7 @@ provider now `pushIf`-pushes valid program rows (proving `ProgramMsg.RowSpec`) a
 Rust genuinely *sends* program (`+1`); our pull emits `−1`, so our Program interactions match SP1's
 extracted oracle **up to per-channel multiplicity negation** (a sound LogUp sign symmetry — the balance is
 invariant under negating one channel's multiplicities; the divergence is bridged, FV-checked, in the
-`Faithful/*` Program anchors). The `name` matches the `"SP1Program"` key in `programLookups`.
+`Faithful/*` Program anchors). The channel name is the upstream table identity `"SP1Program"`.
 
 The channel carries only the structural `RowSpec`.  Agreement with the committed ROM (`ProgTruth`) is
 derived globally from the provider table, program commitment, and interaction balance; it is not a
@@ -80,7 +79,8 @@ Gating is **multiplicity-gated** (`Channel.pullIf`, mult `-is_real`), faithful t
 (`mult = 0`) drops out of the LogUp sum entirely (`mult / fingerprint(values)` with `mult = 0`), owing
 nothing — post-#398 a receive owes no `Requirements` at all (`docs/bus-model.md` §7). The provider side is
 `Proofs/Chips/ByteChip/` (pushes the table, proves each row); with it landed, the pull's justification
-is discharged from bus balance (`Soundness/ByteConsistency.lean`'s `byteAccessValid_of_balance`). Pulled by
+is closed by the native Byte/Range providers and ensemble balance; the exact/native artifact recounts
+their demand in `Composition/PreprocessedProviders.lean`. Pulled by
 `Readers/{CPUState,RegisterAccessTimestamp,RegisterAccessCols,RTypeReader}.lean`. -/
 def byteChannel : Channel (ZMod p) ByteRow where
   name := "SP1Byte"

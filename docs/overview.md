@@ -110,16 +110,20 @@ Jalr, Branch, UType, five load tables, four store tables, Mul, DivRem, and AluX0
 of the exact `CoreProfile.instructionTables` list. It also tracks the physical order of the native
 `supportedChips` registry.
 
-The generator-relative completeness layer now includes Bitwise/Lt/Addw/ShiftLeft/ShiftRight
-immediate forms and UType/JAL
-rows targeting x0. Its source contract is precise: `WellFormed`, aggregate-provider
-`ProviderMultiplicitiesFit` bounds (`2 * m ≤ p`), exact centered-integer per-key `BalancedOn` with a
-separate interaction-count bound `< p`, public-value equality, and `SemanticBoundaryBinding`. Its
-remaining scope gap is machine-level rather than per-row: no theorem yet turns every supported Sail
-execution into such a trace, and the large-shard generator does not yet derive StateBump/MemoryBump
-inputs at window crossings. The active anchor hand-assembles one semantic trace record; its physical
-rows are circuit-generated, and its matching provider occurrences close all four buses around the
-one real decoded row.
+The native completeness layer now has a proof-independent compiler for all 25 instruction tables.
+It folds the one operational `EventExecutionTrace`, inserts the required State/Memory refreshes,
+constructs both Memory boundaries, and closes Byte/Range/Program demand from the trace's own Clean
+ledger. Provider balance is proved directly in the field, so the old `2 * multiplicity ≤ p`
+restriction is gone; only the actual interaction-list footprint `< p` remains.
+
+`supported_core_native_functionalCompleteness` proves the resulting 53-table witness satisfies the
+same native relation consumed by soundness on `SupportedCoreNativeAdmissibleExecutionRelation`.
+That source includes the exact ordinary execution, Core row budget, and named residual semantic
+readiness facts for the deterministic compiler output. The remaining scope gap is proving those
+facts on an appropriate capacity-bounded semantic source and using the same source for soundness;
+the present unbounded exact relation cannot itself imply the Core row limit or physical `< p`
+footprint. This is not missing tables, bump placement, provider closure, or an existential trace
+generator.
 
 `ChipFaithful` is a whole-row statement. For every adversarial Rust row it proves equivalence between:
 
@@ -216,8 +220,9 @@ missing bridge is the global interpretation concentrated in
 `SyscallCore`, `SyscallInstrs`, `MemoryLocal`, `Global`, and the authenticated preprocessing/public
 blocks. It must derive the artifact's named Range13-quotient→Range16 and raw-Global→typed-Memory
 transformations, the native boundary/program meaning, the 8-tick ordinary and 264-tick syscall
-schedule facts, and an explicit host-handler contract. The `ExactBalance` and access-permutation
-lemmas are reusable ingredients. `CoreArtifact` consumes an explicit recount contract to derive Byte
+schedule facts, and an explicit host-handler contract. The exact/native table access-permutation
+lemmas are reusable ingredients; the unused full-exact-payload key-balance closure was retired.
+`CoreArtifact` consumes an explicit recount contract to derive Byte
 (including Range) and Program integer balance; `ExactNativeGlobalContract` retains all-channel count
 bounds, State/Memory integer balance, and semantic binding. No joint inhabitance anchor for those
 contracts and valid exact clusters exists. The bridge reuses the 25
@@ -280,11 +285,10 @@ memory that stores write to; for a guest that overwrites its own code the two ge
 the theorem simply does not apply. Self-modifying programs are excluded by assumption, not proved
 impossible.
 
-Three named link predicates (`TraceStateLink`, `TraceByteLink`, `TraceMemClkValid`) appear in the
-standalone per-bus consistency modules as their honestly-stated premises. They are **not** premises
-of `supported_core_native_sound`: the capstone's premise surface is exactly the two relation
-conjuncts above plus the `UsesOrdinarySchedule` schedule hypothesis, and no module on its proof
-path references the link predicates.
+The former standalone per-bus `Trace*Link` predicates and integer `*Lookups` shadows have been
+retired. The capstone reads typed Clean interactions directly through `TypedState`, `TypedProgram`,
+and `TypedMemory`; its premise surface remains the two relation conjuncts above plus the
+`UsesOrdinarySchedule` schedule hypothesis.
 
 ## Reproduce the current checkpoint
 

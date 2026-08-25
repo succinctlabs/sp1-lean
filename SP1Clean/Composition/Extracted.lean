@@ -52,36 +52,39 @@ local instance transportExtractedFieldBound : Fact (2 ^ 17 < p) :=
 
 variable {Digest : Type}
 
-/-- **The extracted witness's instruction rows**, read off table by table. Each field is the
-table's row list with the preprocessed half dropped — instruction tables have preprocessed width
-zero, so nothing is discarded that any assertion reads. -/
+/-- Read the extracted witness rows selected by one stable instruction identity. Instruction
+tables have preprocessed width zero, so mapping `main` discards nothing any assertion reads. -/
+def extractedRowsFor (witness : Witness (SP1Clean.CoreAIR.Current.Row p)) :
+    (id : InstructionChipId) → List (ExtractedCols p id)
+  | .add => (witness.trace.rows .add).map (·.main)
+  | .addi => (witness.trace.rows .addi).map (·.main)
+  | .addw => (witness.trace.rows .addw).map (·.main)
+  | .sub => (witness.trace.rows .sub).map (·.main)
+  | .subw => (witness.trace.rows .subw).map (·.main)
+  | .bitwise => (witness.trace.rows .bitwise).map (·.main)
+  | .lt => (witness.trace.rows .lt).map (·.main)
+  | .shiftLeft => (witness.trace.rows .shiftLeft).map (·.main)
+  | .shiftRight => (witness.trace.rows .shiftRight).map (·.main)
+  | .jal => (witness.trace.rows .jal).map (·.main)
+  | .jalr => (witness.trace.rows .jalr).map (·.main)
+  | .branch => (witness.trace.rows .branch).map (·.main)
+  | .uType => (witness.trace.rows .uType).map (·.main)
+  | .loadByte => (witness.trace.rows .loadByte).map (·.main)
+  | .loadHalf => (witness.trace.rows .loadHalf).map (·.main)
+  | .loadWord => (witness.trace.rows .loadWord).map (·.main)
+  | .loadDouble => (witness.trace.rows .loadDouble).map (·.main)
+  | .loadX0 => (witness.trace.rows .loadX0).map (·.main)
+  | .storeByte => (witness.trace.rows .storeByte).map (·.main)
+  | .storeHalf => (witness.trace.rows .storeHalf).map (·.main)
+  | .storeWord => (witness.trace.rows .storeWord).map (·.main)
+  | .storeDouble => (witness.trace.rows .storeDouble).map (·.main)
+  | .mul => (witness.trace.rows .mul).map (·.main)
+  | .divRem => (witness.trace.rows .divRem).map (·.main)
+  | .aluX0 => (witness.trace.rows .aluX0).map (·.main)
+
+/-- **The extracted witness's instruction rows**, indexed by the neutral instruction identity. -/
 def extractedInstructionRows (witness : Witness (SP1Clean.CoreAIR.Current.Row p)) :
-    ExtractedInstructionRows p where
-  add := (witness.trace.rows .add).map (·.main)
-  addi := (witness.trace.rows .addi).map (·.main)
-  addw := (witness.trace.rows .addw).map (·.main)
-  sub := (witness.trace.rows .sub).map (·.main)
-  subw := (witness.trace.rows .subw).map (·.main)
-  bitwise := (witness.trace.rows .bitwise).map (·.main)
-  lt := (witness.trace.rows .lt).map (·.main)
-  shiftLeft := (witness.trace.rows .shiftLeft).map (·.main)
-  shiftRight := (witness.trace.rows .shiftRight).map (·.main)
-  jal := (witness.trace.rows .jal).map (·.main)
-  jalr := (witness.trace.rows .jalr).map (·.main)
-  branch := (witness.trace.rows .branch).map (·.main)
-  uType := (witness.trace.rows .uType).map (·.main)
-  loadByte := (witness.trace.rows .loadByte).map (·.main)
-  loadHalf := (witness.trace.rows .loadHalf).map (·.main)
-  loadWord := (witness.trace.rows .loadWord).map (·.main)
-  loadDouble := (witness.trace.rows .loadDouble).map (·.main)
-  loadX0 := (witness.trace.rows .loadX0).map (·.main)
-  storeByte := (witness.trace.rows .storeByte).map (·.main)
-  storeHalf := (witness.trace.rows .storeHalf).map (·.main)
-  storeWord := (witness.trace.rows .storeWord).map (·.main)
-  storeDouble := (witness.trace.rows .storeDouble).map (·.main)
-  mul := (witness.trace.rows .mul).map (·.main)
-  divRem := (witness.trace.rows .divRem).map (·.main)
-  aluX0 := (witness.trace.rows .aluX0).map (·.main)
+    ExtractedInstructionRows p := ⟨extractedRowsFor witness⟩
 
 /--
 **A valid extracted Core AIR witness satisfies the transport's validity premise.**
@@ -99,107 +102,84 @@ theorem extractedInstructionRows_valid
       row ∈ witness.trace.rows table →
         List.Forall (· = 0) (SP1Clean.CoreAIR.Current.assertions statement.publicValues table row) :=
     valid.2.2.1
-  refine {
-  add := by
-    intro rustCols hmem
+  refine ⟨?_⟩
+  intro id rustCols hmem
+  cases id with
+  | add =>
     obtain ⟨row, hrow, rfl⟩ := List.mem_map.mp hmem
     exact rowAsserts .add row hrow
-  addi := by
-    intro rustCols hmem
+  | addi =>
     obtain ⟨row, hrow, rfl⟩ := List.mem_map.mp hmem
     exact rowAsserts .addi row hrow
-  addw := by
-    intro rustCols hmem
+  | addw =>
     obtain ⟨row, hrow, rfl⟩ := List.mem_map.mp hmem
     exact rowAsserts .addw row hrow
-  sub := by
-    intro rustCols hmem
+  | sub =>
     obtain ⟨row, hrow, rfl⟩ := List.mem_map.mp hmem
     exact rowAsserts .sub row hrow
-  subw := by
-    intro rustCols hmem
+  | subw =>
     obtain ⟨row, hrow, rfl⟩ := List.mem_map.mp hmem
     exact rowAsserts .subw row hrow
-  bitwise := by
-    intro rustCols hmem
+  | bitwise =>
     obtain ⟨row, hrow, rfl⟩ := List.mem_map.mp hmem
     exact rowAsserts .bitwise row hrow
-  lt := by
-    intro rustCols hmem
+  | lt =>
     obtain ⟨row, hrow, rfl⟩ := List.mem_map.mp hmem
     exact rowAsserts .lt row hrow
-  shiftLeft := by
-    intro rustCols hmem
+  | shiftLeft =>
     obtain ⟨row, hrow, rfl⟩ := List.mem_map.mp hmem
     exact rowAsserts .shiftLeft row hrow
-  shiftRight := by
-    intro rustCols hmem
+  | shiftRight =>
     obtain ⟨row, hrow, rfl⟩ := List.mem_map.mp hmem
     exact rowAsserts .shiftRight row hrow
-  jal := by
-    intro rustCols hmem
+  | jal =>
     obtain ⟨row, hrow, rfl⟩ := List.mem_map.mp hmem
     exact rowAsserts .jal row hrow
-  jalr := by
-    intro rustCols hmem
+  | jalr =>
     obtain ⟨row, hrow, rfl⟩ := List.mem_map.mp hmem
     exact rowAsserts .jalr row hrow
-  branch := by
-    intro rustCols hmem
+  | branch =>
     obtain ⟨row, hrow, rfl⟩ := List.mem_map.mp hmem
     exact rowAsserts .branch row hrow
-  uType := by
-    intro rustCols hmem
+  | uType =>
     obtain ⟨row, hrow, rfl⟩ := List.mem_map.mp hmem
     exact rowAsserts .uType row hrow
-  loadByte := by
-    intro rustCols hmem
+  | loadByte =>
     obtain ⟨row, hrow, rfl⟩ := List.mem_map.mp hmem
     exact rowAsserts .loadByte row hrow
-  loadHalf := by
-    intro rustCols hmem
+  | loadHalf =>
     obtain ⟨row, hrow, rfl⟩ := List.mem_map.mp hmem
     exact rowAsserts .loadHalf row hrow
-  loadWord := by
-    intro rustCols hmem
+  | loadWord =>
     obtain ⟨row, hrow, rfl⟩ := List.mem_map.mp hmem
     exact rowAsserts .loadWord row hrow
-  loadDouble := by
-    intro rustCols hmem
+  | loadDouble =>
     obtain ⟨row, hrow, rfl⟩ := List.mem_map.mp hmem
     exact rowAsserts .loadDouble row hrow
-  loadX0 := by
-    intro rustCols hmem
+  | loadX0 =>
     obtain ⟨row, hrow, rfl⟩ := List.mem_map.mp hmem
     exact rowAsserts .loadX0 row hrow
-  storeByte := by
-    intro rustCols hmem
+  | storeByte =>
     obtain ⟨row, hrow, rfl⟩ := List.mem_map.mp hmem
     exact rowAsserts .storeByte row hrow
-  storeHalf := by
-    intro rustCols hmem
+  | storeHalf =>
     obtain ⟨row, hrow, rfl⟩ := List.mem_map.mp hmem
     exact rowAsserts .storeHalf row hrow
-  storeWord := by
-    intro rustCols hmem
+  | storeWord =>
     obtain ⟨row, hrow, rfl⟩ := List.mem_map.mp hmem
     exact rowAsserts .storeWord row hrow
-  storeDouble := by
-    intro rustCols hmem
+  | storeDouble =>
     obtain ⟨row, hrow, rfl⟩ := List.mem_map.mp hmem
     exact rowAsserts .storeDouble row hrow
-  mul := by
-    intro rustCols hmem
+  | mul =>
     obtain ⟨row, hrow, rfl⟩ := List.mem_map.mp hmem
     exact rowAsserts .mul row hrow
-  divRem := by
-    intro rustCols hmem
+  | divRem =>
     obtain ⟨row, hrow, rfl⟩ := List.mem_map.mp hmem
     exact rowAsserts .divRem row hrow
-  aluX0 := by
-    intro rustCols hmem
+  | aluX0 =>
     obtain ⟨row, hrow, rfl⟩ := List.mem_map.mp hmem
-    exact rowAsserts .aluX0 row hrow }
+    exact rowAsserts .aluX0 row hrow
 
 /--
 **The headline table-level transport: a valid extracted shard yields twenty-five valid native

@@ -3,11 +3,11 @@ import SP1CleanTest.Audit.JointNonVacuity
 
 /-! # Non-vacuity of the machine-completeness hypothesis
 
-`supported_core_native_complete` (`Soundness/AIRCompleteness.lean`) says every well-formed,
+`supported_core_generated_trace_complete` (`Soundness/AIRCompleteness.lean`) says every well-formed,
 balanced, boundary-bound generated trace has a native ensemble witness satisfying
 `SupportedCoreNativeRelation`. A completeness theorem is worth exactly as much as its hypothesis is
 satisfiable, so this file exhibits a trace
-that satisfies `SupportedCoreTraceGeneratableExecutionRelation` in full — the same question
+that satisfies `SupportedCoreGeneratedTraceRelation` in full — the same question
 `Audit/JointNonVacuity.lean` answers for the soundness side, asked of the converse relation.
 
 ## The trace
@@ -19,14 +19,14 @@ push are the same State message and cancel.
 
 Since W3's split-limb public values the verifier also pulls twelve Byte-bus range checks, so two
 provider tables carry occurrences: the width-16 entry list supplies four `⟨1⟩` and six `⟨0⟩`
-unit-count
-entries, and `u8RangeEntries` supplies two `⟨0, 0⟩` unit-count entries. Provider counts are now
+unit-count entries, and `providerOccurrences (.byte .u8Range)` supplies two `⟨0, 0⟩`
+unit-count entries. Provider counts are now
 explicit inputs, so this per-occurrence representation is a choice of this regression; the
 hand-built sibling in `JointNonVacuity.lean` exercises the equivalent aggregated representation.
 
 ## What this witnesses, and what it does not
 
-It witnesses that the hypothesis bundle of `supported_core_native_complete` is jointly satisfiable
+It witnesses that the hypothesis bundle of `supported_core_generated_trace_complete` is jointly satisfiable
 — well-formedness, four-bus balance, the public-value match, and the semantic boundary binding, all
 at the concrete prime with the committed one-instruction program. It does **not** witness a
 non-empty generated shard itself. The sibling `ActiveTraceNonVacuity.lean` supplies one
@@ -55,6 +55,24 @@ def anchorRangeEntries (width : RangeChip.Width) : List TraceGen.RangeEntry :=
     [⟨1, 1⟩, ⟨1, 1⟩, ⟨1, 1⟩, ⟨1, 1⟩, ⟨0, 1⟩, ⟨0, 1⟩, ⟨0, 1⟩, ⟨0, 1⟩, ⟨0, 1⟩, ⟨0, 1⟩]
   else []
 
+/-- The boundary-only shard routes no semantic event to any instruction table. -/
+def anchorInstructionEvents : (id : InstructionChipId) → List id.Event := fun _ => []
+
+/-- The boundary-only shard's provider occurrences, indexed by the physical provider registry. -/
+def anchorProviderOccurrences : (id : ProviderTableId) → List id.Occurrence
+  | .byte .u8Range => [⟨0, 0, 1⟩, ⟨0, 0, 1⟩]
+  | .byte .msb => []
+  | .byte .andByte => []
+  | .byte .orByte => []
+  | .byte .xorByte => []
+  | .byte .ltu => []
+  | .range width => anchorRangeEntries width
+  | .program => []
+  | .memoryInit => []
+  | .memoryFinalize => []
+  | .memoryBump => []
+  | .stateBump => []
+
 /--
 **The boundary-only generated trace.** Twenty-five empty instruction tables, twenty-six empty
 provider/boundary tables, and the two byte providers whose occurrences cancel the verifier's
@@ -64,49 +82,14 @@ remaining limbs zero), and two `⟨0, 0⟩` byte-pair occurrences (the two `⟨3
 middle clock limbs, both zero).
 -/
 def anchorTrace : SupportedCoreTraceWitness SP1Prime where
-  addEvents := []; addPadding := 0
-  addiEvents := []; addiPadding := 0
-  addwEvents := []; addwPadding := 0
-  subEvents := []; subPadding := 0
-  subwEvents := []; subwPadding := 0
-  bitwiseEvents := []; bitwisePadding := 0
-  ltEvents := []; ltPadding := 0
-  shiftLeftEvents := []; shiftLeftPadding := 0
-  shiftRightEvents := []; shiftRightPadding := 0
-  jalEvents := []; jalPadding := 0
-  jalrEvents := []; jalrPadding := 0
-  branchEvents := []; branchPadding := 0
-  uTypeEvents := []; uTypePadding := 0
-  loadByteEvents := []
-  loadHalfEvents := []
-  loadWordEvents := []
-  loadDoubleEvents := []
-  loadX0Events := []
-  storeByteEvents := []
-  storeHalfEvents := []
-  storeWordEvents := []
-  storeDoubleEvents := []
-  mulEvents := []; mulPadding := 0
-  divRemEvents := []; divRemPadding := 0
-  aluX0Events := []; aluX0Padding := 0
-  u8RangeEntries := [⟨0, 0, 1⟩, ⟨0, 0, 1⟩]
-  msbEntries := []
-  andByteEntries := []
-  orByteEntries := []
-  xorByteEntries := []
-  ltuEntries := []
-  rangeEntries := anchorRangeEntries
-  romEntries := []
-  memoryInitEntries := []
-  memoryFinalizeEntries := []
-  memoryBumpEvents := []
-  stateBumpEvents := []
+  instructionEvents := anchorInstructionEvents
+  providerOccurrences := anchorProviderOccurrences
   data := anchorData
   hint := anchorHint
-  initClk := 1
-  initPc := 65536
-  finalClk := 1
-  finalPc := 65536
+  boundary := boundaryInputs 1 65536 1 65536
+
+theorem anchorTrace_rangeOccurrences (width : RangeChip.Width) :
+    anchorTrace.providerOccurrences (.range width) = anchorRangeEntries width := rfl
 
 /-- The trace's public boundary row is the joint anchor's public values: limbing clock `1` and pc
 `0x10000` at both ends reproduces `pv` cell for cell. -/
@@ -122,38 +105,28 @@ providers' occurrences: `⟨0, 0, 1⟩` is a byte pair and `⟨1, 1⟩`/`⟨0, 1
 
 theorem anchorTrace_wellFormed : anchorTrace.WellFormed := by
   constructor
-  case range =>
-    intro width e he
-    by_cases hwidth : width = width16
-    · subst width
-      simp only [anchorTrace, anchorRangeEntries] at he
-      simp only [TraceGen.RangeEntry.WellFormed, width16]
-      fin_cases he <;> norm_num
-    · simp [anchorTrace, anchorRangeEntries, hwidth] at he
-  all_goals intro e he
-  all_goals first
-    | exact absurd he List.not_mem_nil
-    | (rcases List.mem_cons.mp he with rfl | he
-       · exact ⟨by norm_num, by norm_num⟩
-       · rcases List.mem_cons.mp he with rfl | he
-         · exact ⟨by norm_num, by norm_num⟩
-         · exact absurd he List.not_mem_nil)
-
-/-- Every explicit natural provider count is a canonical positive centered-field representative. -/
-theorem anchorTrace_providerMultiplicitiesFit :
-    anchorTrace.ProviderMultiplicitiesFit := by
-  constructor
-  case range =>
-    intro width e he
-    by_cases hwidth : width = width16
-    · subst width
-      simp only [anchorTrace, anchorRangeEntries] at he
-      fin_cases he <;> norm_num [TraceGen.RangeEntry.MultiplicityFits, SP1Prime]
-    · simp [anchorTrace, anchorRangeEntries, hwidth] at he
-  all_goals
-    simp [anchorTrace, TraceGen.ByteEntry.MultiplicityFits,
-      TraceGen.RomEntry.MultiplicityFits, SP1Prime]
-
+  · intro id e he
+    cases id <;> simp [anchorTrace, anchorInstructionEvents] at he
+  · intro id e he
+    cases id with
+    | byte provider =>
+        cases provider <;>
+          simp_all [anchorTrace, anchorProviderOccurrences, ProviderTableId.Valid,
+            TraceGen.ByteEntry.WellFormed]
+    | range width =>
+        by_cases hwidth : width = width16
+        · subst width
+          simp only [anchorTrace, anchorProviderOccurrences, anchorRangeEntries] at he
+          fin_cases he <;>
+            norm_num [ProviderTableId.Valid, TraceGen.RangeEntry.WellFormed, width16]
+        · have hocc : anchorTrace.providerOccurrences (.range width) = [] := by
+            rw [anchorTrace_rangeOccurrences, anchorRangeEntries, if_neg hwidth]
+            rfl
+          rw [hocc] at he
+          exact absurd he List.not_mem_nil
+    | program | memoryInit | memoryFinalize | memoryBump | stateBump =>
+        simp [anchorTrace, anchorProviderOccurrences] at he
+  · exact boundaryInputs_limbBounds _ _ _ _
 
 /-! ## The assembled tables
 
@@ -164,12 +137,46 @@ can speak about them. -/
 /-- The built `U8Range` table: two unit-count rows checking the byte pair `(0, 0)`. -/
 def u8RangeBuilt : Table (ZMod SP1Prime) :=
   Table.build ByteChip.U8Range.component
-    (ByteChip.U8Range.traceInputs anchorTrace.u8RangeEntries) anchorData anchorHint
+    (ByteChip.U8Range.traceInputs
+      (anchorTrace.providerOccurrences (.byte .u8Range))) anchorData anchorHint
 
 /-- The built 16-bit `RangeChip` table: ten unit-count rows, four checking `a = 1` and six `a = 0`. -/
 def range16Built : Table (ZMod SP1Prime) :=
   Table.build (RangeChip.componentFor width16)
-    (RangeChip.traceInputs (anchorTrace.rangeEntries width16)) anchorData anchorHint
+    (RangeChip.traceInputs (anchorTrace.providerOccurrences (.range width16))) anchorData anchorHint
+
+/-- One indexed range table is the named width-16 table or is physically empty. Keeping the
+dependent occurrence projection folded makes this a stable rewrite boundary for `rangeTables`. -/
+theorem anchorRangeBuilt_interactionsWith (width : RangeChip.Width)
+    (ch : RawChannel (ZMod SP1Prime)) :
+    (Table.build (RangeChip.componentFor width)
+      (RangeChip.traceInputs (anchorTrace.providerOccurrences (.range width)))
+      anchorTrace.data anchorTrace.hint).interactionsWith ch =
+        if width = width16 then range16Built.interactionsWith ch else [] := by
+  by_cases hwidth : width = width16
+  · subst width
+    rfl
+  · rw [if_neg hwidth]
+    have hocc : anchorTrace.providerOccurrences (.range width) = [] := by
+      rw [anchorTrace_rangeOccurrences, anchorRangeEntries, if_neg hwidth]
+      rfl
+    rw [hocc]
+    rfl
+
+/-- The same rewrite after the registry projection has reduced to its semantic range list. -/
+theorem anchorRangeEntriesBuilt_interactionsWith (width : RangeChip.Width)
+    (ch : RawChannel (ZMod SP1Prime)) :
+    (Table.build (RangeChip.componentFor width)
+      (RangeChip.traceInputs (anchorRangeEntries width)) anchorTrace.data anchorTrace.hint).interactionsWith
+        ch = if width = width16 then range16Built.interactionsWith ch else [] := by
+  by_cases hwidth : width = width16
+  · subst width
+    rfl
+  · rw [if_neg hwidth]
+    have hentries : anchorRangeEntries width = [] := by
+      simp [anchorRangeEntries, hwidth]
+    rw [hentries]
+    rfl
 
 /-- A table built from no occurrences contributes nothing to any channel. -/
 theorem nilTable (c : Component (ZMod SP1Prime)) (ch : RawChannel (ZMod SP1Prime)) :
@@ -240,8 +247,7 @@ theorem anchorTrace_interactionsWith_split (ch : RawChannel (ZMod SP1Prime)) :
   simp only [List.flatMap_append, List.flatMap_cons, List.flatMap_nil, nilTable, nilTableHinted,
     List.nil_append, List.append_nil]
   simp [SupportedCoreTraceWitness.rangeTables, RangeChip.allWidths, List.finRange_succ,
-    anchorTrace, anchorRangeEntries, range16Built, width16]
-  simp only [nilRangeTable, List.nil_append]
+    anchorRangeBuilt_interactionsWith, width16]
 
 /-! ## The verifier row
 
@@ -422,25 +428,25 @@ theorem anchorTrace_boundaryFacts : InitialBoundaryFacts stmt anchorTrace.witnes
 
 /--
 **Non-vacuity of the machine-completeness hypothesis.** The boundary-only generated shard satisfies
-`SupportedCoreTraceGeneratableExecutionRelation` in full: every occurrence is well-formed, the four
+`SupportedCoreGeneratedTraceRelation` in full: every occurrence is well-formed, the four
 buses balance (State by equal public endpoints, Byte message-for-message against the two built
 providers, Program and Memory untouched), the public boundary row is the statement's, and the
 boundary tables bind to the committed one-instruction program and the concrete configured initial
 Sail state.
 
-So `supported_core_native_complete` is not vacuously true of an unsatisfiable relation, and
+So `supported_core_generated_trace_complete` is not vacuously true of an unsatisfiable relation, and
 applying it to this trace yields a `SupportedCoreNativeRelation` witness — the generated twin of
 `Audit/JointNonVacuity.lean`'s hand-built one.
 -/
-theorem traceGeneratableRelation_nonvacuous :
-    SupportedCoreTraceGeneratableExecutionRelation (p := SP1Prime) stmt anchorTrace :=
-  ⟨anchorTrace_wellFormed, anchorTrace_providerMultiplicitiesFit, anchorTrace_balanced,
+theorem generatedTraceRelation_nonvacuous :
+    SupportedCoreGeneratedTraceRelation (p := SP1Prime) stmt anchorTrace :=
+  ⟨anchorTrace_wellFormed, anchorTrace.witness_balancedChannels anchorTrace_balanced,
    anchorTrace_publicValues,
    ⟨anchorState, anchorTrace_boundaryFacts⟩⟩
 
 /-- The completeness capstone applied to the generated shard: a valid AIR witness exists. -/
 theorem anchorTrace_yields_airWitness :
     ∃ airWitness, SupportedCoreNativeRelation (p := SP1Prime) stmt airWitness :=
-  supported_core_native_complete stmt anchorTrace traceGeneratableRelation_nonvacuous
+  supported_core_generated_trace_complete stmt anchorTrace generatedTraceRelation_nonvacuous
 
 end SP1Clean.Audit.TraceNonVacuity

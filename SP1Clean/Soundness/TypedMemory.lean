@@ -287,12 +287,12 @@ theorem registerOperandPullShape_of_circuit (kind : ChipKind p)
       kind.provableInputs kind.provableCols)
     (spec_eq : @GeneralFormalCircuit.Spec (ZMod p) kind.Inputs kind.Cols inferInstance
       kind.provableInputs kind.provableCols circuit = kind.chipSpec)
-    (opcodes : List Opcode) (rdGuard : RdGuard)
+    (id : InstructionChipId)
     (selector : kind.Inputs (ZMod p) → ZMod p)
     (selector_eq : ∀ input output, (kind.view input output).is_real = selector input)
     (shape : @CircuitRegisterOperandPullShape p _ kind.Inputs kind.Cols
       kind.provableInputs kind.provableCols circuit kind.view selector kind.advanceReady) :
-    RegisterOperandPullShape ⟨kind, circuit, spec_eq, opcodes, rdGuard⟩ := by
+    RegisterOperandPullShape ⟨id, kind, circuit, spec_eq⟩ := by
   letI : ProvableType kind.Inputs := kind.provableInputs
   letI : ProvableType kind.Cols := kind.provableCols
   constructor
@@ -317,15 +317,15 @@ theorem registerOperandPullShape_of_circuitContract (kind : ChipKind p)
       kind.provableInputs kind.provableCols)
     (spec_eq : @GeneralFormalCircuit.Spec (ZMod p) kind.Inputs kind.Cols inferInstance
       kind.provableInputs kind.provableCols circuit = kind.chipSpec)
-    (opcodes : List Opcode) (rdGuard : RdGuard)
+    (id : InstructionChipId)
     (selector : kind.Inputs (ZMod p) → ZMod p)
     (selector_eq : ∀ input output, (kind.view input output).is_real = selector input)
     (contract : @CircuitRegisterOperandPullContract p _ kind.Inputs kind.Cols
       kind.provableInputs kind.provableCols circuit kind.view selector) :
-    RegisterOperandPullShape ⟨kind, circuit, spec_eq, opcodes, rdGuard⟩ := by
+    RegisterOperandPullShape ⟨id, kind, circuit, spec_eq⟩ := by
   letI : ProvableType kind.Inputs := kind.provableInputs
   letI : ProvableType kind.Cols := kind.provableCols
-  apply registerOperandPullShape_of_circuit kind circuit spec_eq opcodes rdGuard selector
+  apply registerOperandPullShape_of_circuit kind circuit spec_eq id selector
     selector_eq
   exact circuitRegisterOperandPullShape_of_exposure circuit kind.view selector
     kind.advanceReady contract
