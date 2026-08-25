@@ -394,19 +394,19 @@ def canonicalClosure : SupportedCoreTraceWitness p where
 @[simp] theorem canonicalClosure_publicValues :
     trace.canonicalClosure.publicValues = trace.publicValues := rfl
 
-@[simp] theorem canonicalClosure_memoryInit :
+theorem canonicalClosure_memoryInit :
     trace.canonicalClosure.providerOccurrences .memoryInit =
       trace.providerOccurrences .memoryInit := rfl
 
-@[simp] theorem canonicalClosure_memoryFinalize :
+theorem canonicalClosure_memoryFinalize :
     trace.canonicalClosure.providerOccurrences .memoryFinalize =
       trace.providerOccurrences .memoryFinalize := rfl
 
-@[simp] theorem canonicalClosure_memoryBump :
+theorem canonicalClosure_memoryBump :
     trace.canonicalClosure.providerOccurrences .memoryBump =
       trace.providerOccurrences .memoryBump := rfl
 
-@[simp] theorem canonicalClosure_stateBump :
+theorem canonicalClosure_stateBump :
     trace.canonicalClosure.providerOccurrences .stateBump =
       trace.providerOccurrences .stateBump := rfl
 
