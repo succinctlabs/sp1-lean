@@ -21,6 +21,8 @@ Completed:
   transition;
 - neutral `InstructionChipId`/`InstructionRouting`/`ProviderTableId` registries shared by native
   ensemble construction, completeness assembly, decoding, and transport;
+- one Model-layer `SP1TransitionView` shared literally by the ordinary semantic relation,
+  soundness construction, chronological compiler, and Program agreement proof;
 - exact list-level 34-table execution and 6-table memory-boundary relations;
 - constructive exact-row assembly of all 53 native tables plus the verifier row, with local
   constraints proved from valid clusters, a caller-supplied `CanonicalPreprocessedInventory`, and
@@ -38,8 +40,8 @@ Not completed:
 - cross-shard boot-to-halt soundness;
 - concrete syscall-handler refinements beyond the abstract relation;
 - ArkLib verifier knowledge soundness; and
-- a shared capacity-bounded semantic relation for soundness and completeness, plus the residual
-  implications from that relation to `NativeTraceReady` and `NativeTraceFootprint.Fits`; and
+- `NativeTraceTotalOnSupportedCore`, the residual implications from the shared bounded semantic
+  relation to `NativeTraceReady` and `NativeTraceFootprint.Fits`; and
 - the exact-upstream reconfiguration theorem relating this native compiler output to Rust's full
   Core trace.
 
@@ -150,6 +152,20 @@ balance, and `SemanticBoundaryBinding`. From the two, the library derives
 provider family is six Byte-op tables, all 17 Range widths `0..16`, Program, MemoryInit,
 MemoryFinalize, MemoryBump, and StateBump. The complete Range family closes honest shift-row balance;
 the former four-width subset omitted live shift lookup keys.
+
+**Local system-table semantics update (2026-08-25).**
+`Composition/CoreSystemSemantics.lean` now exposes the exact native inputs of MemoryBump and
+StateBump and audited views for SyscallCore, SyscallInstrs, and MemoryLocal. `Channels.SyscallMsg` is
+the one nine-field carrier used by the exact SyscallCore receive and SyscallInstrs send; their
+generated table byte remains the send multiplicity. MemoryLocal names typed initial/final Memory
+messages. The exact-list membership theorems expose those three endpoints without copying either
+generated interaction list into a second hand-written ledger. SyscallCore and MemoryLocal retain iff
+theorems for their complete local assertions, and exact-relation corollaries fan those facts out to
+every physical row through the generic `CoreAIR.System.localValid_of_relationFor` eliminator.
+
+This is local progress on five of the six Core system tables, not closure of their trace semantics.
+Syscall transcript consistency, Memory range/order consequences, both bump ordering arguments, and
+Global's public-boundary/cumulative meaning remain explicit obligations.
 
 Byte/Range/Program multiplicities are now recounted from the actual Clean interaction ledger of the
 verifier, 25 transported instruction tables, MemoryInit/MemoryFinalize, and both bumps instead of
@@ -285,15 +301,21 @@ The source relation must express supported, trace-generatable executions and con
 behavior. The conformance pipeline remains the empirical regression layer during this work but is not
 a substitute for the theorem.
 
-**Status (2026-08-24): deterministic all-table native completeness is closed on the explicit
-admissible compiler image; aligning both directions on one capacity-bounded semantic language
-remains open.**
+**Status (2026-08-25): deterministic all-table native completeness is closed on the explicit
+admissible compiler image, and both directions now use one capacity-bounded semantic language.
+Closing the transparent compiler-admissibility totality theorem remains open.**
 
 W4 built `ToClean/Air/TableBuild.lean` and local completeness tables for all 25 instruction chips,
 the 28 provider/boundary tables, and the verifier row.  W5 now adds the semantic construction:
 
 - `InstructionEvent.lean` implements all 25 instruction-family projections;
+- `TransitionView.lean` hoists fetch/decode/route and the attempted access plan into the one
+  proof-free view consumed by both directions; access failure stays explicit instead of narrowing
+  the semantic relation;
 - `ExecutionCompiler.lean` folds the one `Machine.EventExecutionTrace` chronologically;
+- its structural totality theorem proves the fold adds no failure after one-row readiness, and the
+  semantic specialization discharges outer fetch/decode/image/route projection directly from
+  `SupportedOrdinaryShardExecutionValid`;
 - the shared field-free scheduler inserts register `MemoryBump` rows at timestamp-window crossings,
   while `stateBumpEvents` derives State refreshes;
 - `MemoryHistory.lean` constructs the canonical initial/final record per touched location;
@@ -305,9 +327,10 @@ the 28 provider/boundary tables, and the verifier row.  W5 now adds the semantic
 `supported_core_native_functionalCompleteness`
 (`SP1Clean/Soundness/NativeCompleteness.lean`) maps that trace into the unchanged
 `SupportedCoreNativeRelation`.  Its source,
-`SupportedCoreNativeAdmissibleExecutionRelation`, is the exact ordinary Sail relation plus the
-pinned Core row budget, the named compiler/readiness facts for this same execution, and the actual
-four-channel interaction footprint `< p`.  Constraints, channel balance, public equality, and the
+`SupportedCoreNativeAdmissibleExecutionRelation`, is the shared bounded ordinary Sail relation plus
+the named compiler/readiness facts for this same execution and the actual four-channel interaction
+footprint `< p`.  The semantic and native row counts both feed the one
+`CoreProfile.WithinOrdinaryRowLimit` policy. Constraints, channel balance, public equality, and the
 semantic boundary are conclusions.  `supported_core_native_complete` is its existential form and
 `sp1Ensemble_statement_of_supported_execution` is the direct Clean statement theorem.
 
@@ -317,23 +340,24 @@ retains each `LocatedTransition` beside its generated routed event and access sc
 
 What P3 still means:
 
-- prove `Execution.NativeCompilerReady`—especially every generated event's rich per-chip `Valid`
+- prove access-plan success (especially complete source/target eight-byte RAM cells), then
+  `Execution.NativeCompilerReady`—including every generated event's rich per-chip `Valid`
   contract—from every supported official Sail transition, rather than restricting the source;
 - discharge the remaining State/Memory chronology and physical-row agreement fields from the
   deterministic compiler, including canonical addresses and initial Memory content;
 - derive literal-ledger Byte polarity and Byte/Program demand servability instead of carrying them
   as broad closure assumptions;
-- close Program row agreement and the configured-state decode-stability gap (the semantic relation
-  records successful decode in the actual source state, while `ProgTruth` quantifies over all
-  configured states); and
+- close the remaining Program-row physical projection (configured-state decode is already the
+  shared `ConfiguredDecode` fact carried by each supported semantic transition); and
 - derive the emitted interaction footprint from the Core row budget and table arities.
 
-Closing these implications is necessary but not sufficient for `WitnessRelation.Correct`: the
-current exact soundness target is unbounded and therefore cannot return `WithinCoreShardLimit` or
-the physical `< p` capacity fact.  The capstone first needs a shared capacity-bounded semantic
-relation on both directions (or an equivalent strengthening/weakening proved on both sides).
-Until then no public-language equality is claimed. Reconfiguration to the exact upstream trace and
-cryptographic proof-system completeness remain separate workstreams.
+These implications are collected exactly by `NativeTraceTotalOnSupportedCore`. Capacity alignment
+is closed: `supported_core_native_shard_sound` and
+`supported_core_native_shard_functionalCompleteness` use the same bounded native/semantic relation
+pair, and `supported_core_native_shard_correct_of_totality` plus its language-equality corollary need
+only that one theorem. Until it is proved no unconditional public-language equality is claimed.
+Reconfiguration to the exact upstream trace and cryptographic proof-system completeness remain
+separate workstreams.
 
 ## Maintenance gates
 

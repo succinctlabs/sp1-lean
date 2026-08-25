@@ -28,16 +28,25 @@ kernel, each with the question it decides. Reading these, plus `FormalModel/Cont
 | Declaration | File | Question it decides |
 |---|---|---|
 | `WitnessRelation.Relation` | `SP1Clean/FormalModel/Relations.lean` | What a statement/witness relation is |
+| `Relation.restrict` | `SP1Clean/FormalModel/Relations.lean` | How capacity/profile domains refine one relation without changing its witness representation |
+| `SP1Prime` | `SP1Clean/Model/SP1Field.lean` | The one concrete KoalaBear characteristic used by exact/test instantiations |
 | `WitnessRelation.Sound` | `SP1Clean/FormalModel/Relations.lean` | Direction and shape of the soundness claim |
 | `WitnessRelation.Complete` | `SP1Clean/FormalModel/Relations.lean` | Direction and shape of the completeness claim |
 | `WitnessRelation.FunctionalCompleteness` | `SP1Clean/FormalModel/Relations.lean` | The proof-independent reverse witness map; no witness-preservation law is implicit |
 | `WitnessRelation.Correct` | `SP1Clean/FormalModel/Relations.lean` | Both existential directions, hence public-language equality rather than witness inversion |
+| `SupportedCoreStatement` | `SP1Clean/FormalModel/Execution.lean` | The one program/public-boundary statement shared by both proof directions |
+| `CoreProfile.WithinOrdinaryRowLimit` | `SP1Clean/FormalModel/CoreProfile.lean` | The one numeric Core row-budget policy used by both witness representations |
 | `SupportedCoreNativeRelation` | `SP1Clean/Soundness/AIR.lean` | The hypothesis side: exactly two conjuncts |
+| `SupportedCoreNativeShardRelation` | `SP1Clean/Soundness/AIR.lean` | The same native relation restricted to the pinned active-row budget |
 | `supported_core_native_sound` | `SP1Clean/Soundness/AIR.lean` | The headline theorem |
 | `supported_core_native_ordinary_sound` | `SP1Clean/Soundness/AIR.lean` | The native witness projected to the exact ordinary supported target |
+| `supported_core_native_shard_sound` | `SP1Clean/Soundness/AIR.lean` | Capacity-aligned soundness into the shared bounded semantic relation |
 | `SupportedCoreLocalExecutionRelation` | `SP1Clean/FormalModel/Execution.lean` | What the conclusion actually says |
 | `SupportedOrdinaryShardExecutionRelation` | `SP1Clean/FormalModel/SupportedShard.lean` | The shared normal-retirement, 25-route semantic target |
-| `SupportedDecodedTransition` | `SP1Clean/FormalModel/SupportedShard.lean` | What “supported” requires of each transition |
+| `SupportedCoreOrdinaryShardExecutionRelation` | `SP1Clean/FormalModel/SupportedShard.lean` | The one pinned capacity-bounded semantic language shared by both directions |
+| `SP1TransitionView` | `SP1Clean/Model/Semantics/TransitionView.lean` | The one proof-free fetch/decode/route/access projection shared by both directions |
+| `projectSP1Transition?` | `SP1Clean/Model/Semantics/TransitionView.lean` | How an operational transition is projected, including the explicit optional access-plan result |
+| `SupportedSP1Transition` | `SP1Clean/FormalModel/SupportedShard.lean` | What “supported” requires of each transition, expressed through that shared view |
 | `LocalSegmentMatchesBoundary` | `SP1Clean/FormalModel/Execution.lean` | How the conclusion is pinned to the public endpoints |
 
 ## Which machine is being verified
@@ -84,6 +93,7 @@ granularity gap is recorded on the definitions themselves.
 | `SailRetiresNormally` | `SP1Clean/Model/Semantics/GuestProgram.lean` | Excludes trap/illegal/wait exits by recording the official `Retire_Success` branch |
 | `SailChain` | `SP1Clean/Model/Semantics/GuestProgram.lean` | A multi-step run |
 | `SailConfigured` | `SP1Clean/Model/Semantics/GuestProgram.lean` | Which platform state is assumed (incl. the single RWX PMA region) |
+| `ConfiguredDecode` | `SP1Clean/Model/Semantics/GuestProgram.lean` | The one word/instruction decode fact shared by Program truth and shard semantics |
 | `SailCodeMemoryCompatible` | `SP1Clean/Model/Semantics/GuestProgram.lean` | The code/data separation contract — self-modifying code excluded by assumption |
 | `SP1MachineModel` | `SP1Clean/Model/Machine/Execution.lean` | The clock model |
 | `SP1MachineModel.UsesOrdinarySchedule` | `SP1Clean/Model/Machine/Execution.lean` | Which schedule the conclusion is quantified over |
@@ -105,6 +115,38 @@ granularity gap is recorded on the definitions themselves.
 | `PreprocessedProviderRecountContract` | `SP1Clean/Composition/PreprocessedProviders.lean` | Coverage, nonpositivity, canonical capacity |
 | `ExactNativeGlobalContract` | `SP1Clean/Composition/CoreArtifact.lean` | What the artifact still assumes globally |
 | `CoreAIRRefinementObligations` | `SP1Clean/Soundness/CoreAIR.lean` | The 14-field exact-refinement bundle (`executionCase` open) |
+| `System.localValid_of_relationFor` | `SP1Clean/FormalModel/CoreAIRRelation.lean` | The stable eliminator from an exact cluster relation to one row's complete local validity |
+
+## Exact Core system-table semantics
+
+The generated `Extracted/SystemOracle` lists are the sole complete interaction ledgers. The
+hand-written semantic layer names typed messages and proves that selected generated endpoints use
+them; it does not maintain a second list that could drift from extraction.
+
+| Declaration | File | Question it decides |
+|---|---|---|
+| `Channels.SyscallMsg` | `SP1Clean/Model/BusMessages.lean` | The one nine-field v6.4.0 Syscall tuple shared by producer and consumer |
+| `transportMemoryBumpRow_input` | `SP1Clean/Composition/CoreSystemSemantics.lean` | Which native MemoryBump input the exact row reconstructs |
+| `transportStateBumpRow_input` | `SP1Clean/Composition/CoreSystemSemantics.lean` | Which native StateBump input the exact row reconstructs |
+| `SyscallCoreView` | `SP1Clean/Composition/CoreSystemSemantics.lean` | All ten SyscallCore columns grouped around the shared message |
+| `syscallCore_assertions_iff` | `SP1Clean/Composition/CoreSystemSemantics.lean` | Complete local SyscallCore assertion semantics: exactly selector binarity |
+| `syscallCore_syscall_receive_mem` | `SP1Clean/Composition/CoreSystemSemantics.lean` | The typed message is the exact generated Syscall receive |
+| `syscallCore_rowFacts_of_relation` | `SP1Clean/Composition/CoreSystemSemantics.lean` | Exact execution validity fans the local contract out to every SyscallCore row |
+| `SyscallInstrsSyscallView` | `SP1Clean/Composition/CoreSystemSemantics.lean` | The Syscall message and `send_to_table` byte projected from a 65-column instruction row |
+| `syscallInstrs_syscall_send_mem` | `SP1Clean/Composition/CoreSystemSemantics.lean` | The same typed message is the exact generated Syscall send |
+| `MemoryLocalView` | `SP1Clean/Composition/CoreSystemSemantics.lean` | All twenty MemoryLocal columns and their typed Memory endpoints |
+| `memoryLocal_assertions_iff` | `SP1Clean/Composition/CoreSystemSemantics.lean` | Complete local MemoryLocal assertions: selector binarity plus both byte recombinations |
+| `memoryLocal_memory_endpoints_mem` | `SP1Clean/Composition/CoreSystemSemantics.lean` | The typed initial/final messages are the exact generated Memory receive/send |
+| `memoryLocal_rowFacts_of_relation` | `SP1Clean/Composition/CoreSystemSemantics.lean` | Exact execution validity fans the complete local contract out to every MemoryLocal row |
+
+| Core table | Landed semantic projection | Still required for full refinement |
+|---|---|---|
+| MemoryBump | Exact native row transport and decoded input | Per-location order/timestamp consequences after provider balance |
+| StateBump | Exact native row transport and decoded input | Sparse-clock State ordering after balance |
+| SyscallCore | Complete local assertions and typed Syscall receive | Cross-table transcript consistency and handler meaning |
+| SyscallInstrs | Typed Syscall send with its generated table byte | Full instruction-row law and transcript consistency |
+| MemoryLocal | Complete local assertions and typed Memory endpoints | Range, per-location order, and Global-record meaning |
+| Global | No semantic reinterpretation in this unit | Public boundary and cumulative interaction facts |
 
 ## The completeness direction
 
@@ -112,8 +154,12 @@ granularity gap is recorded on the definitions themselves.
 |---|---|---|
 | `SupportedCoreTraceWitness` | `SP1Clean/Proofs/Completeness/Assembly.lean` | What a supplied trace is |
 | `compileExecution` | `SP1Clean/Proofs/Completeness/ExecutionCompiler.lean` | The proof-independent chronological all-25 compiler |
+| `compileLocatedTransitions?_exists_of_views` | `SP1Clean/Proofs/Completeness/ExecutionCompiler.lean` | Why the chronological fold itself is total once each retained shared view compiles |
+| `SupportedOrdinaryShardExecutionValid.compileExecution?_exists_of_instructionEventsReady` | `SP1Clean/Proofs/Completeness/ExecutionCompiler.lean` | Why semantic validity already discharges fetch/decode/image/route projection, leaving only one-row event readiness |
 | `nativeTrace` | `SP1Clean/Proofs/Completeness/NativeTraceCompiler.lean` | The unique 53-table trace produced from a statement and execution |
 | `NativeTraceReady` | `SP1Clean/Proofs/Completeness/NativeTraceCompiler.lean` | The remaining named semantic/representation facts about that exact compiler output |
+| `NativeTraceAdmissible` | `SP1Clean/Proofs/Completeness/NativeTraceCompiler.lean` | The residual compiler/output predicate, without copied semantic validity or row budget |
+| `NativeTraceTotalOnSupportedCore` | `SP1Clean/Proofs/Completeness/NativeTraceCompiler.lean` | The one domain-closure theorem still separating bounded completeness from full correctness |
 | `NativeStateRowProjection` | `SP1Clean/Proofs/Completeness/NativeTraceCompiler.lean` | The sole physical-row projection seam for State instruction accesses |
 | `NativeMemoryRowProjection` | `SP1Clean/Proofs/Completeness/NativeTraceCompiler.lean` | The two physical-row projection seams for instruction and MemoryBump accesses |
 | `NativeMemoryGenesis` | `SP1Clean/Proofs/Completeness/NativeTraceCompiler.lean` | The field-free initial-memory fact, before any Clean provider representation |
@@ -125,6 +171,7 @@ granularity gap is recorded on the definitions themselves.
 | `NativeTraceReady.semanticBoundary` | `SP1Clean/Proofs/Completeness/NativeBoundaryAgreement.lean` | The derived Program/Memory provider facts joined with the exact semantic boundary |
 | `SupportedCoreNativeAdmissibleExecutionRelation` | `SP1Clean/Proofs/Completeness/NativeTraceCompiler.lean` | The honest semantic source on which the deterministic compiler is presently proved complete |
 | `supported_core_native_functionalCompleteness` | `SP1Clean/Soundness/NativeCompleteness.lean` | The proof-independent semantic-execution-to-AIR witness map |
+| `supported_core_native_shard_functionalCompleteness` | `SP1Clean/Soundness/NativeCompleteness.lean` | The same map into the capacity-aligned native relation |
 | `supported_core_native_complete` | `SP1Clean/Soundness/NativeCompleteness.lean` | Existential whole-ensemble completeness on the admissible image |
 | `sp1Ensemble_statement_of_supported_execution` | `SP1Clean/Soundness/NativeCompleteness.lean` | The direct Clean `Ensemble.Statement` consequence |
 | `anchorExecution_admissible` | `SP1CleanTest/Audit/NativeCompletenessNonVacuity.lean` | A concrete boundary-only execution jointly inhabits every admissibility premise |
@@ -134,11 +181,15 @@ granularity gap is recorded on the definitions themselves.
 Completeness now covers the deterministic compiler's full 53-table admissible image: all 25 instruction
 families, refresh-aware StateBump/MemoryBump placement, canonical Byte/Range/Program closure, both
 Memory boundary tables, the State verifier row, constraints, and all four channel balances.  It is
-still narrower than the entire unbounded exact ordinary semantic relation. Its compiler domain needs
-registry-wide event-validity, Memory-genesis, configured-state decode-stability, and interaction-
-footprint theorems on the intended bounded source. A language-equality theorem additionally needs
-soundness to target that same capacity-bounded relation. No abstract certificate or existential AIR
-witness hides those facts, and no public-language equality is claimed.
+still narrower than the shared bounded ordinary semantic relation. Its compiler domain needs
+access-plan success (notably complete source/target RAM cells), registry-wide event-validity,
+Memory-genesis, representation-agreement, and interaction-footprint theorems. Configured-state
+decode stability is no longer on that list: it is attached to the shared `SP1TransitionView` by
+`SupportedSP1Transition` and is derived registry-wide. Soundness and completeness now use the
+same bounded native/semantic relation pair; `NativeTraceTotalOnSupportedCore` is the single remaining
+condition for the proved `supported_core_native_shard_correct_of_totality` and its language-equality
+corollary. No abstract certificate or existential AIR witness hides those facts, and unconditional
+public-language equality remains reserved until that transparent condition is closed.
 
 ## Outside this list
 

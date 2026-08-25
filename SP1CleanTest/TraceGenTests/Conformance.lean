@@ -1,5 +1,5 @@
 import SP1Clean.Math.Word
-import Mathlib.Tactic.NormNum.Prime
+import SP1Clean.Model.SP1Field
 
 /-! # Shared scaffolding for the circuit-as-trace-generator layer (`TraceGenTests/`).
 
@@ -22,25 +22,8 @@ namespace SP1Clean.TraceGenTests
 
 open SP1Clean
 
-/-- SP1's field is KoalaBear, the prime `2^31 - 2^24 + 1`. SP1's prover runs here, so trace
-conformance is checked at this concrete field. -/
-abbrev SP1Prime : ℕ := 2130706433
-
-instance instFactSP1Prime : Fact (Nat.Prime SP1Prime) := ⟨by native_decide⟩
-
-/-- The chips' standard field-size assumption, discharged at the concrete prime (the trace anchors
-instantiate whole chip `main`s, which carry `Fact (2 ^ 17 < p)`). -/
-instance instFact2pow17SP1Prime : Fact (2 ^ 17 < SP1Prime) := ⟨by norm_num [SP1Prime]⟩
-
-/-- `MulOperation.populate` / `MulChip.main` need `2 ^ 24 < p`; discharged at KoalaBear
-(`2^24 = 16777216 < SP1Prime`). -/
-instance instFact2pow24SP1Prime : Fact (2 ^ 24 < SP1Prime) := ⟨by norm_num [SP1Prime]⟩
-
-/-- The AIR-relation layer (`Soundness/AIR.lean`) states `SupportedCoreNativeRelation` and the
-capstone under `Fact (2 ^ 25 < p)`; discharged at KoalaBear (`2^25 = 33554432 < SP1Prime`) so the
-capstone's hypothesis bundle is instantiable at the real prime (exercised by
-`SP1CleanTest/Audit/JointNonVacuity.lean`). -/
-instance instFact2pow25SP1Prime : Fact (2 ^ 25 < SP1Prime) := ⟨by norm_num [SP1Prime]⟩
+/-! The prime and its `Fact` instances are shared with the production library through
+`Model.SP1Field`. -/
 
 /-- Cast a single ℕ (a dumped canonical field value) into SP1's field. -/
 def toField (n : ℕ) : ZMod SP1Prime := (n : ZMod SP1Prime)

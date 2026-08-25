@@ -49,7 +49,7 @@ local instance coreArtifactFieldBound : Fact (2 ^ 24 < p) :=
 /-- Pair the caller-supplied program (whose authentication remains an explicit global obligation)
 with the fourteen native boundary cells projected from the exact shard public values. -/
 def exactNativeStatement {Digest : Type} (program : GuestProgram)
-    (statement : SP1ShardStatement (ZMod p) Digest) : Soundness.SupportedCoreStatement p :=
+    (statement : SP1ShardStatement (ZMod p) Digest) : SupportedCoreStatement p :=
   ⟨program, exactNativeBoundary statement.publicValues⟩
 
 /-- **The remaining integration-to-native global translation endpoint.**

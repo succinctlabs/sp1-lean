@@ -150,7 +150,7 @@ theorem memoryBoundaryProviderContract_of_relation {Digest : Type}
     MemoryBoundaryProviderContract witness := by
   have rowValid : ∀ table row, row ∈ witness.trace.rows table →
       List.Forall (· = 0) (CoreAIR.Current.assertions statement.publicValues table row) :=
-    valid.2.2.1
+    fun _ _ rowMem => (CoreAIR.Current.system binds).localValid_of_relationFor valid rowMem
   exact {
     init := fun row hrow => ⟨semantic.initWord row hrow,
       memoryGlobalInitMultiplicity_bool statement.publicValues row

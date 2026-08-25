@@ -118,12 +118,12 @@ restriction is gone; only the actual interaction-list footprint `< p` remains.
 
 `supported_core_native_functionalCompleteness` proves the resulting 53-table witness satisfies the
 same native relation consumed by soundness on `SupportedCoreNativeAdmissibleExecutionRelation`.
-That source includes the exact ordinary execution, Core row budget, and named residual semantic
-readiness facts for the deterministic compiler output. The remaining scope gap is proving those
-facts on an appropriate capacity-bounded semantic source and using the same source for soundness;
-the present unbounded exact relation cannot itself imply the Core row limit or physical `< p`
-footprint. This is not missing tables, bump placement, provider closure, or an existential trace
-generator.
+That source restricts the shared bounded ordinary execution relation by named residual semantic
+readiness facts and the physical `< p` footprint for the deterministic compiler output. Both
+directions use the same `CoreProfile.WithinOrdinaryRowLimit` policy, and
+`supported_core_native_shard_sound` targets that same bounded semantic relation. The remaining
+scope gap is exactly `NativeTraceTotalOnSupportedCore`, not missing tables, bump placement, provider
+closure, a second execution carrier, or an existential trace generator.
 
 `ChipFaithful` is a whole-row statement. For every adversarial Rust row it proves equivalence between:
 

@@ -75,10 +75,10 @@ The deliverables:
   It compiles all 25 instruction families, schedules State/Memory refreshes, constructs Memory
   boundaries, recounts Byte/Range/Program demand from the literal Clean ledger, and builds all 53
   tables plus the verifier row with the circuits' own generators.  Constraints and all four Clean
-  channel balances are conclusions.  Its explicit admissible source is still narrower than D5's
-  exact ordinary target: registry-wide event validity, initial-Memory content, configured-state
-  Program decode stability, and actual interaction footprint remain named source facts (§7.4).
-  D5 is also unbounded, so language equality requires a common capacity-bounded target.
+  channel balances are conclusions. Its explicit admissible source is still narrower than the
+  shared bounded ordinary target: registry-wide event validity, initial-Memory content, physical
+  Program-row projection, and actual interaction footprint remain named source facts (§7.4).
+  Capacity alignment itself is closed by the paired bounded soundness/completeness API.
 - **D9 — Extracted-to-native local ensemble artifact.** `SP1Clean/Composition/`
   composes D3 with the native side, which Alex Hicks's 2026-08 PR #110 review found were never
   joined inside Lean. From valid witnesses of the pinned execution and memory-boundary clusters,
@@ -589,7 +589,8 @@ authentication fields — but its soundness theorem is intentionally not declare
 host-behavior semantics beyond the `SyscallHandler` interface. No boot/ELF-loading claim.
 
 A deterministic native ensemble-completeness theorem is now declared (§7.4). It covers the entire
-admissible native compiler image, not the unbounded exact ordinary semantic language.
+admissible native compiler image, not yet every witness of the shared bounded ordinary semantic
+language.
 
 ### 7.4 Deterministic native ensemble completeness
 
@@ -613,11 +614,11 @@ real no-wrap condition, the length of each actual channel interaction list being
 `supported_core_native_functionalCompleteness` proves this map satisfies the unchanged
 `SupportedCoreNativeRelation` on `SupportedCoreNativeAdmissibleExecutionRelation`.  The source is:
 
-1. `SupportedOrdinaryShardExecutionRelation`, the exact official-Sail ordinary segment;
-2. `WithinCoreShardLimit`, the pinned v6.4.0 Core ordinary-row budget;
-3. `NativeTraceReady`, named facts about this exact compiler result rather than an existential AIR
+1. `SupportedCoreOrdinaryShardExecutionRelation`, the exact official-Sail ordinary segment whose
+   step count satisfies the shared `CoreProfile.WithinOrdinaryRowLimit` policy;
+2. `NativeTraceReady`, named facts about this exact compiler result rather than an existential AIR
    trace; and
-4. the footprint bound above.
+3. the footprint bound above.
 
 From those hypotheses the theorem derives every constraint, all four channel balances, public-input
 equality, and `SemanticBoundaryBinding`.  The State and Memory channels use temporal hand-off
@@ -628,13 +629,14 @@ which do not suggest semantic completeness.
 The remaining widening gap is explicit in `NativeTraceReady`: compiler/event validity; State
 chronology, bump readiness, and instruction-row agreement; Memory address/record chronology,
 physical-ledger agreement, and initial content; literal-ledger consumer polarity and demand
-servability; and Program row projection plus configured-state decode stability.  The exact semantic
-relation records a successful decoder only at the transition's actual source state, whereas
-`ProgTruth` asks for every `SailConfigured` state. The actual emitted interaction footprint is a
-separate capacity premise. Even after those implications are proved on a bounded domain, a
-`WitnessRelation.Correct` theorem needs soundness to target that same domain: the current exact
-soundness conclusion is unbounded and contains neither `WithinCoreShardLimit` nor the physical
-footprint. The report therefore makes no public-language-equality claim.
+servability; and Program-row physical projection. Configured-state decoder stability is no longer a
+residual premise: committed Program rows and supported transitions share the one
+`ConfiguredDecode` definition. The actual emitted interaction footprint is a separate capacity
+premise. These remaining implications are exactly `NativeTraceTotalOnSupportedCore`. The paired
+`supported_core_native_shard_sound` and
+`supported_core_native_shard_functionalCompleteness` already use the same bounded relation pair;
+`supported_core_native_shard_correct_of_totality` and its language-equality corollary require only
+that totality theorem. The report therefore makes no unconditional public-language-equality claim.
 
 The full completeness source itself is jointly satisfiable:
 `SP1CleanTest/Audit/NativeCompletenessNonVacuity.lean` constructs a boundary-only exact execution,
@@ -1100,11 +1102,11 @@ Stated plainly:
    proof-independent all-25 compiler constructs an AIR witness satisfying
    `SupportedCoreNativeRelation`; constraints, canonical provider closure, refresh placement, and
    all four channel balances are proved.  Admissibility still records the per-chip event-validity,
-   initial-Memory, configured-state Program-decode, and actual-footprint facts not yet derived for
+   initial-Memory, Program-row projection, and actual-footprint facts not yet derived for
    a general bounded ordinary Sail execution. `NativeCompletenessNonVacuity.lean` jointly inhabits
    every premise in the boundary-only case; the active JAL-x0 anchor separately inhabits the older
-   generated-trace assembly path. Public-language equality additionally requires aligning the
-   current unbounded soundness target with the capacity-bounded completeness source.
+   generated-trace assembly path. Capacity alignment is closed; unconditional public-language
+   equality now depends exactly on `NativeTraceTotalOnSupportedCore`.
 7. **The extracted-to-native local ensemble transport is complete under named contracts; its global
    semantic refinement is not.** `SP1Clean/Composition/` composes every chip anchor with valid
    exact execution and separately authenticated memory-boundary witnesses, a caller-supplied

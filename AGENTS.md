@@ -183,7 +183,7 @@ Mirror-rust layout under `SP1Clean/`:
   `scripts/check_no_native_decide.sh`; `native_decide` trusts the whole compiler — at v4.32.2 the census
   shows this as generated `._native.native_decide.ax_*` constants, the successors of the named
   `Lean.ofReduceBool`/`Lean.trustCompiler` axioms). Contents: `Exportable.lean` (the
-  `#assert_exportable` battery + the canonical test-scope `SP1Prime`), `NonVacuity.lean` /
+  `#assert_exportable` battery using the canonical `Model/SP1Field.lean` `SP1Prime`), `NonVacuity.lean` /
   `NonVacuityReal.lean` (satisfiability anchors for the chip `Assumptions` — the real-row battery
   builds rows through `TraceGenTests/EventPopulate.lean`), `Audit/` (the joint-premise regression),
   and `TraceGenTests/{TraceGenerator,EventPopulate,Conformance}.lean` — the
@@ -241,9 +241,11 @@ Mirror-rust layout under `SP1Clean/`:
   `Proofs/Completeness/{InstructionEvent,ExecutionCompiler,NativeTraceCompiler}.lean` plus the
   stratum-10 `Soundness/NativeCompleteness.lean` capstone: it constructs all 53 tables and proves
   constraints/four-channel balance on `SupportedCoreNativeAdmissibleExecutionRelation`. Widening that
-  compiler domain remains named semantic-readiness/footprint work. Public-language equality also
-  requires aligning soundness and completeness on one capacity-bounded semantic relation: the
-  current exact soundness target is unbounded. No such equality is claimed yet. The bespoke
+  compiler domain remains named semantic-readiness/footprint work. Soundness and completeness now
+  share `SupportedCoreOrdinaryShardExecutionRelation` and the single
+  `CoreProfile.WithinOrdinaryRowLimit` policy; `NativeTraceTotalOnSupportedCore` is the exact remaining
+  condition for unconditional correctness and public-language equality. No unconditional equality
+  is claimed yet. The bespoke
   `MachineSoundness`/`MachineConsistency` `TraceValid` capstone was retired 2026-06-05.
   `Soundness/CoreAIR.lean` is the exact v6.4.0 deterministic boundary: its `_of_obligations`
   combinators consume the `.execution` cluster only and expose the unclosed field-by-field proof bundle.

@@ -101,7 +101,8 @@ theorem extractedInstructionRows_valid
   have rowAsserts : ∀ (table : CoreProfile.Table) (row : SP1Clean.CoreAIR.Current.Row p table),
       row ∈ witness.trace.rows table →
         List.Forall (· = 0) (SP1Clean.CoreAIR.Current.assertions statement.publicValues table row) :=
-    valid.2.2.1
+    fun _ _ rowMem =>
+      (SP1Clean.CoreAIR.Current.system binds).localValid_of_relationFor valid rowMem
   refine ⟨?_⟩
   intro id rustCols hmem
   cases id with

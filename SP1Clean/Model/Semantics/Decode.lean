@@ -666,6 +666,16 @@ def loadWidthOK (width : word_width) (isU : Bool) : Bool :=
 def storeWidthOK (width : word_width) : Bool :=
   width == 1 || width == 2 || width == 4 || width == 8
 
+/-- The guarded image of the pinned decoder. Most Sail instruction constructors are already
+exactly the image accepted by SP1. Multiply descriptors and load/store widths have a slightly
+wider generated carrier, so these three families retain their explicit fail-closed guards here,
+beside the canonical decode and routing projections that consume them. -/
+def instructionImageOK : instruction → Bool
+  | .MUL (_, _, _, operation) => mulOpCanonical operation
+  | .LOAD (_, _, _, isUnsigned, width) => loadWidthOK width isUnsigned
+  | .STORE (_, _, _, width) => storeWidthOK width
+  | _ => true
+
 /-- `instrToProgramRow` with the MUL/LOAD/STORE arms image-guarded (a guard wrapper, definitionally
 equal to inlining the guards into the three arms). -/
 def instrToProgramRow' (pc : Vector (ZMod p) 3) : instruction → Option (ProgramRow (ZMod p))
@@ -752,7 +762,7 @@ real decodes). -/
 def decodedInROM (prog : GuestProgram) (row : ProgramRow (ZMod p)) : Prop :=
   ∃ (w : BitVec 32) (I : instruction),
     prog.fetchWord (pcBitsOfRow row) = some w ∧
-    (∀ s, SailConfigured s → (ext_decode w).run s = .ok I s) ∧
+    ConfiguredDecode w I ∧
     instrToProgramRow' (rowPcVec row) I = some row
 
 set_option linter.unusedSectionVars false in
@@ -2305,6 +2315,26 @@ theorem instrToProgramRow'_store_valid {pc : Vector (ZMod p) 3}
   | false =>
     rw [instrToProgramRow', hcm] at h
     simp at h
+
+omit [Fact (2 ^ 17 < p)] in
+/-- Any successful guarded Program projection lies in the single decoder image accepted by the
+shared transition view. This packages the three exceptional guards without exposing them to
+soundness or completeness consumers. -/
+theorem instructionImageOK_of_instrToProgramRow'_some
+    {pc : Vector (ZMod p) 3} {i : instruction} {row : ProgramRow (ZMod p)}
+    (projected : instrToProgramRow' pc i = some row) :
+    instructionImageOK i = true := by
+  cases i with
+  | MUL tuple =>
+      rcases tuple with ⟨rs2, rs1, rd, operation⟩
+      exact instrToProgramRow'_mul_canonical projected
+  | LOAD tuple =>
+      rcases tuple with ⟨immediate, rs1, rd, isUnsigned, width⟩
+      exact instrToProgramRow'_load_valid projected
+  | STORE tuple =>
+      rcases tuple with ⟨immediate, rs2, rs1, width⟩
+      exact instrToProgramRow'_store_valid projected
+  | _ => rfl
 
 /-- **The STORE inversion WITHOUT `hpin`** (the `instrToProgramRow_inv_load'` twin for STORE).
 From the *guarded* projection, the opcode column pins the width for the decoder's canonical image —

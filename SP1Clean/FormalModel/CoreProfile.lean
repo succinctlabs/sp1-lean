@@ -34,6 +34,12 @@ def maxOrdinaryTransitions : ℕ := maxShardCycles / 8
 
 @[simp] theorem maxOrdinaryTransitions_eq : maxOrdinaryTransitions = 2 ^ 21 := by decide
 
+/-- The single pinned Core capacity predicate.  Semantic executions project `steps` into it and
+native AIR witnesses project their active instruction-row count into it; neither direction owns a
+separate spelling of the row budget. -/
+def WithinOrdinaryRowLimit (rows : ℕ) : Prop :=
+  rows ≤ maxOrdinaryTransitions
+
 /-- Generated AIR artifacts and the hand-audited profile name the same unmodified Rust source. -/
 theorem checkedIn_semanticRevision :
     SP1Clean.Extracted.checkedInProvenance.semanticRevision = sp1SemanticRevision := rfl

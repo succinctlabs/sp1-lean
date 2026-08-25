@@ -33,10 +33,15 @@ while IFS=$'\t' read -r decl file; do
 
   # A declaration may be written bare or namespace-qualified at its definition site, and the doc
   # may cite it either way (`Commit.progOf` is defined as `def progOf` inside `namespace Commit`;
-  # `SP1MachineModel.UsesOrdinarySchedule` is defined dotted). Accept both spellings.
+  # `SP1MachineModel.UsesOrdinarySchedule` is defined dotted). Accept both spellings. Escape the
+  # `?` accepted in Lean identifiers as well as namespace dots before using either spelling as an
+  # extended regular expression.
   bare="${decl##*.}"
+  decl_re="${decl//./\\.}"
+  decl_re="${decl_re//\?/\\?}"
+  bare_re="${bare//\?/\\?}"
   kw='(def|abbrev|structure|inductive|theorem|class|instance)'
-  if grep -qE "^[[:space:]]*(private |protected |noncomputable )*${kw} (${decl//./\\.}|${bare})\b" "$file"; then
+  if grep -qE "^[[:space:]]*(private |protected |noncomputable )*${kw} (${decl_re}|${bare_re})\b" "$file"; then
     continue
   fi
 

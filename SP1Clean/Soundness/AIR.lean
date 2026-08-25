@@ -32,10 +32,6 @@ open SP1Clean.Execution
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 25 < p)]
 
-/-- The public statement type of the currently supported core slice. -/
-abbrev SupportedCoreStatement (p : ℕ) :=
-  ProgramStatement (SupportedCorePrefixPublicValues (ZMod p))
-
 /-- The private native-Clean witness currently implemented by this repository. -/
 abbrev SupportedCoreNativeWitness (p : ℕ) [Fact p.Prime] [Fact (2 ^ 25 < p)] :=
   EnsembleWitness (sp1Ensemble (p := p))
@@ -126,6 +122,17 @@ def SupportedCoreNativeRelation :
   fun statement witness =>
     SupportedCoreEnsembleRelation statement witness ∧
       SP1SemanticBoundaryRelation statement witness
+
+/-- The capacity-bounded native shard relation.
+
+This is the ordinary native relation restricted in place; it does not introduce another native
+witness or copy any constraint/boundary field.  It projects the physical active-row count into the
+same `CoreProfile.WithinOrdinaryRowLimit` predicate used by the semantic relation. -/
+def SupportedCoreNativeShardRelation :
+    WitnessRelation.Relation (SupportedCoreStatement p) (SupportedCoreNativeWitness p) :=
+  SupportedCoreNativeRelation.restrict fun _ witness =>
+    CoreProfile.WithinOrdinaryRowLimit
+      (realDecodedInstructionRows witness.data witness.tables).length
 
 /-! ## Native grounding and the local-execution capstone -/
 
@@ -983,17 +990,17 @@ theorem supported_core_native_sound (model : Machine.SP1MachineModel)
   rw [Machine.localExecutionClock_eq_ordinary ordinary]
   exact grounding.clockCount
 
-/-- **Exact supported ordinary-shard soundness.** The same native relation constructs the one
-proof-free `EventExecutionTrace` consumed by completeness: every transition is an official ordinary
-event, carries a successful canonical instruction route, and matches the public pc/clock endpoints.
+/-- Construct the shared ordinary semantic witness while retaining its exact active-row count.
 
-No representation premise is added to `SupportedCoreNativeRelation`.  Canonical program commitment
-implies the semantic program's image addresses are encodable, while the public verifier row supplies
-the boundary limb bounds. -/
-theorem supported_core_native_ordinary_sound (handler : Machine.SyscallHandler) :
-    WitnessRelation.Sound (SupportedCoreNativeRelation (p := p))
-      (SupportedOrdinaryShardExecutionRelation handler) := by
-  intro statement witness valid
+This is the common implementation behind the broad and capacity-bounded soundness views.  Keeping
+the count here avoids reconstructing a second execution merely to align the completeness domain. -/
+theorem supported_core_native_ordinary_execution (handler : Machine.SyscallHandler)
+    (statement : SupportedCoreStatement p) (witness : SupportedCoreNativeWitness p)
+    (valid : SupportedCoreNativeRelation statement witness) :
+    ∃ execution : Machine.EventExecutionTrace,
+      SupportedOrdinaryShardExecutionRelation handler statement execution ∧
+        execution.steps =
+          (realDecodedInstructionRows witness.data witness.tables).length := by
   obtain ⟨⟨publicInputEq, constraints, balanced⟩, ⟨initial, boundary⟩⟩ := valid
   obtain ⟨rows, grounding⟩ :=
     supported_core_witness_grounding statement witness initial publicInputEq constraints balanced
@@ -1020,7 +1027,7 @@ theorem supported_core_native_ordinary_sound (handler : Machine.SyscallHandler) 
     codeMemoryCompatible := ?_
     segment := ?_
     allOrdinary := ordinary
-    supported := supported }⟩
+    supported := supported }, ?_⟩
   · rw [← publicInputEq]
     exact witness_publicInput_limbBounds witness constraints balanced
   · simpa only [initialEq] using boundary.romLoaded
@@ -1030,6 +1037,35 @@ theorem supported_core_native_ordinary_sound (handler : Machine.SyscallHandler) 
   · refine ⟨executionValid, clocked, ?_, finalPc, ?_⟩
     · simpa only [initialEq] using boundary.initialPc
     · exact finalClock.trans grounding.clockCount
+  · exact stepsEq.trans grounding.exhaustive.length_eq
+
+/-- **Exact supported ordinary-shard soundness.** The native relation constructs the one proof-free
+`EventExecutionTrace` consumed by completeness: every transition is an official ordinary event,
+carries a successful canonical instruction route, and matches the public pc/clock endpoints.
+
+This broad projection intentionally forgets the active-row count retained by
+`supported_core_native_ordinary_execution`. -/
+theorem supported_core_native_ordinary_sound (handler : Machine.SyscallHandler) :
+    WitnessRelation.Sound (SupportedCoreNativeRelation (p := p))
+      (SupportedOrdinaryShardExecutionRelation handler) := by
+  intro statement witness valid
+  obtain ⟨execution, semantic, -⟩ :=
+    supported_core_native_ordinary_execution handler statement witness valid
+  exact ⟨execution, semantic⟩
+
+/-- **Capacity-aligned native soundness.** Restricting the physical relation to SP1's pinned active
+row budget produces exactly the shared bounded semantic relation; no alternate witness or copied
+semantic definition is involved. -/
+theorem supported_core_native_shard_sound (handler : Machine.SyscallHandler) :
+    WitnessRelation.Sound (SupportedCoreNativeShardRelation (p := p))
+      (SupportedCoreOrdinaryShardExecutionRelation handler) := by
+  intro statement witness valid
+  obtain ⟨execution, semantic, steps⟩ :=
+    supported_core_native_ordinary_execution handler statement witness valid.1
+  refine ⟨execution, semantic, ?_⟩
+  change CoreProfile.WithinOrdinaryRowLimit execution.steps
+  rw [steps]
+  exact valid.2
 
 /-! ## Completeness boundary
 

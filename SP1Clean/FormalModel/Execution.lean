@@ -32,6 +32,12 @@ structure ProgramStatement (PublicValues : Type) where
   program : GuestProgram
   publicValues : PublicValues
 
+/-- The one public statement shared by the native Core AIR relation and its ordinary-shard
+semantic relation.  This belongs at the relation-model layer: soundness and completeness must not
+introduce direction-specific aliases for the same program and boundary pair. -/
+abbrev SupportedCoreStatement (p : ℕ) :=
+  ProgramStatement (SupportedCorePrefixPublicValues (ZMod p))
+
 /-- Recombine the current supported-core pc limbs. -/
 def supportedPcBits {p : ℕ} (pc0 pc1 pc2 : ZMod p) : BitVec 64 :=
   SP1Clean.Semantics.pcBits pc0 pc1 pc2

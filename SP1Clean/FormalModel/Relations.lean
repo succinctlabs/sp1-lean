@@ -22,6 +22,21 @@ universe u v w x
 /-- A relation between public values and a private witness. -/
 abbrev Relation (Public : Type u) (Witness : Type v) := Public → Witness → Prop
 
+/-- Restrict a witness relation without changing either of its representations.
+
+This is the canonical way to state a capacity, profile, or application domain: clients continue to
+share the same public and witness types and the same base validity predicate.  A restriction must
+not be replaced by a parallel witness carrier containing copied semantic data. -/
+def Relation.restrict {Public : Type u} {Witness : Type v}
+    (relation condition : Relation Public Witness) : Relation Public Witness :=
+  fun statement witness => relation statement witness ∧ condition statement witness
+
+@[simp] theorem Relation.restrict_apply {Public : Type u} {Witness : Type v}
+    (relation condition : Relation Public Witness) (statement : Public) (witness : Witness) :
+    relation.restrict condition statement witness ↔
+      relation statement witness ∧ condition statement witness :=
+  Iff.rfl
+
 /-- The product-set presentation used by ArkLib's oracle-reduction API.  This is only a change of
 representation: SP1's deterministic semantic layer does not import or depend on ArkLib. -/
 def asSet {Public : Type u} {Witness : Type v} (relation : Relation Public Witness) :
@@ -113,6 +128,27 @@ def FunctionalRefinement.trans {Public : Type u} {Witness₁ : Type v} {Witness�
       (refinement₁₂.map statement witness₁)
       (refinement₁₂.map_valid statement witness₁ valid₁)
 
+/-- Restrict both sides of a constructive refinement while retaining its witness map.
+
+The additional proof says that the source restriction is preserved by the existing decoder.  This
+keeps bounded/profiled correctness statements as views of one underlying refinement rather than
+introducing a second decoder or semantic witness. -/
+def FunctionalRefinement.restrict {Public : Type u} {AIRWitness : Type v}
+    {ExecutionWitness : Type w} {air : Relation Public AIRWitness}
+    {execution : Relation Public ExecutionWitness}
+    (refinement : FunctionalRefinement air execution)
+    (airCondition : Relation Public AIRWitness)
+    (executionCondition : Relation Public ExecutionWitness)
+    (mapCondition : ∀ statement airWitness,
+      air statement airWitness → airCondition statement airWitness →
+        executionCondition statement (refinement.map statement airWitness)) :
+    FunctionalRefinement (air.restrict airCondition)
+      (execution.restrict executionCondition) where
+  map := refinement.map
+  map_valid statement airWitness valid :=
+    ⟨refinement.map_valid statement airWitness valid.1,
+      mapCondition statement airWitness valid.1 valid.2⟩
+
 /-- Witness-producing completeness is the converse refinement.  It is deliberately independent of
 Clean's per-circuit `GeneralFormalCircuit.Completeness`: a whole-machine proof must construct one
 globally balanced AIR witness, not merely one satisfiable row at a time. -/
@@ -156,6 +192,42 @@ def FunctionalCompleteness.trans {Public : Type u} {Witness₁ : Type v} {Witnes
     completeness₁₂.map_valid statement
       (completeness₂₃.map statement witness₃)
       (completeness₂₃.map_valid statement witness₃ valid₃)
+
+/-- Restrict both sides of constructive completeness while retaining its trace compiler.
+
+This is the reverse-direction companion of `FunctionalRefinement.restrict`; the proof establishes
+that the semantic source condition is preserved by the existing AIR-witness constructor. -/
+def FunctionalCompleteness.restrict {Public : Type u} {AIRWitness : Type v}
+    {ExecutionWitness : Type w} {air : Relation Public AIRWitness}
+    {execution : Relation Public ExecutionWitness}
+    (completeness : FunctionalCompleteness air execution)
+    (airCondition : Relation Public AIRWitness)
+    (executionCondition : Relation Public ExecutionWitness)
+    (mapCondition : ∀ statement executionWitness,
+      execution statement executionWitness → executionCondition statement executionWitness →
+        airCondition statement (completeness.map statement executionWitness)) :
+    FunctionalCompleteness (air.restrict airCondition)
+      (execution.restrict executionCondition) where
+  map := completeness.map
+  map_valid statement executionWitness valid :=
+    ⟨completeness.map_valid statement executionWitness valid.1,
+      mapCondition statement executionWitness valid.1 valid.2⟩
+
+/-- Restrict only the AIR side of constructive completeness, preserving the semantic source
+relation and the existing trace compiler verbatim. -/
+def FunctionalCompleteness.restrictAir {Public : Type u} {AIRWitness : Type v}
+    {ExecutionWitness : Type w} {air : Relation Public AIRWitness}
+    {execution : Relation Public ExecutionWitness}
+    (completeness : FunctionalCompleteness air execution)
+    (airCondition : Relation Public AIRWitness)
+    (mapCondition : ∀ statement executionWitness,
+      execution statement executionWitness →
+        airCondition statement (completeness.map statement executionWitness)) :
+    FunctionalCompleteness (air.restrict airCondition) execution where
+  map := completeness.map
+  map_valid statement executionWitness valid :=
+    ⟨completeness.map_valid statement executionWitness valid,
+      mapCondition statement executionWitness valid⟩
 
 /-- Bidirectional correctness of two witness relations.  Soundness is the release-critical
 direction; whole-machine completeness may remain an explicitly disclosed admission while trace

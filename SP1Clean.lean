@@ -278,6 +278,7 @@ import SP1Clean.Composition.Extracted
 import SP1Clean.Composition.PreprocessedProviders
 import SP1Clean.Composition.MemoryBoundary
 import SP1Clean.Composition.SystemTables
+import SP1Clean.Composition.CoreSystemSemantics
 import SP1Clean.Composition.ProviderSegment
 import SP1Clean.Composition.CoreEnsemble
 import SP1Clean.Composition.CoreArtifact
@@ -333,6 +334,7 @@ import SP1Clean.Math.MulCarryChain
 import SP1Clean.Math.ShiftBounds
 import SP1Clean.Model.Register
 import SP1Clean.Model.SP1Constraint
+import SP1Clean.Model.SP1Field
 import SP1Clean.Model.SailDecode
 import SP1Clean.Model.SailMemory
 import SP1Clean.Model.SailWrap
@@ -350,6 +352,7 @@ import SP1Clean.Model.Semantics.AccessPlan
 import SP1Clean.Model.Semantics.AccessSchedule
 import SP1Clean.Model.Semantics.InstructionPlan
 import SP1Clean.Model.Semantics.TransitionDecode
+import SP1Clean.Model.Semantics.TransitionView
 import SP1Clean.Model.Semantics.Truth
 import SP1Clean.Model.Semantics.Decode
 import SP1Clean.Math.Word

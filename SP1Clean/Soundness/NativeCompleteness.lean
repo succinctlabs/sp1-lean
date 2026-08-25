@@ -16,6 +16,7 @@ namespace SP1Clean.Soundness
 
 open SP1Clean.LookupAccessList
 open SP1Clean.TraceGen
+open SP1Clean.Execution
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 25 < p)]
 
@@ -51,17 +52,67 @@ noncomputable def supported_core_native_functionalCompleteness
       (SupportedCoreNativeAdmissibleExecutionRelation (p := p) handler) where
   map statement execution := (nativeTrace statement execution).witness
   map_valid statement execution valid := by
-    obtain ⟨semantic, -, ready, fits⟩ := valid
+    obtain ⟨⟨semantic, -⟩, ready, fits⟩ := valid
     have constraints := ready.constraints semantic.publicValuesWellFormed
     have balanced := ready.balancedChannels semantic.publicValuesWellFormed fits
     exact ⟨⟨nativeTrace_witness_publicInput statement execution, constraints, balanced⟩,
       ready.semanticBoundary semantic⟩
+
+/-- Capacity-aligned functional completeness.
+
+The witness constructor is the same `nativeTrace`; the additional target fact follows from the
+shared semantic row budget and the proved one-active-row-per-transition equation.  Thus the paired
+soundness/completeness API uses `SupportedCoreNativeShardRelation` on the AIR side without defining
+a second compiler or trace. -/
+noncomputable def supported_core_native_shard_functionalCompleteness
+    (handler : Machine.SyscallHandler) :
+    WitnessRelation.FunctionalCompleteness (SupportedCoreNativeShardRelation (p := p))
+      (SupportedCoreNativeAdmissibleExecutionRelation (p := p) handler) :=
+  (supported_core_native_functionalCompleteness (p := p) handler).restrictAir
+    (fun _ witness => CoreProfile.WithinOrdinaryRowLimit
+      (realDecodedInstructionRows witness.data witness.tables).length) (by
+    intro statement execution valid
+    obtain ⟨⟨semantic, limit⟩, ready, -⟩ := valid
+    change
+      CoreProfile.WithinOrdinaryRowLimit
+        (realDecodedInstructionRows (nativeTrace statement execution).witness.data
+          (nativeTrace statement execution).witness.tables).length
+    rw [ready.activeInstructionRows_length semantic.publicValuesWellFormed]
+    exact limit)
 
 /-- Existential form of deterministic whole-ensemble completeness. -/
 theorem supported_core_native_complete (handler : Machine.SyscallHandler) :
     WitnessRelation.Complete (SupportedCoreNativeRelation (p := p))
       (SupportedCoreNativeAdmissibleExecutionRelation (p := p) handler) :=
   (supported_core_native_functionalCompleteness (p := p) handler).complete
+
+/-- Existential projection of capacity-aligned native completeness. -/
+theorem supported_core_native_shard_complete (handler : Machine.SyscallHandler) :
+    WitnessRelation.Complete (SupportedCoreNativeShardRelation (p := p))
+      (SupportedCoreNativeAdmissibleExecutionRelation (p := p) handler) :=
+  (supported_core_native_shard_functionalCompleteness (p := p) handler).complete
+
+/-- Bidirectional correctness on the one shared bounded shard relation, conditional only on the
+transparent compiler-domain closure theorem.  The unqualified correctness name remains reserved
+until `NativeTraceTotalOnSupportedCore` is proved. -/
+theorem supported_core_native_shard_correct_of_totality
+    (handler : Machine.SyscallHandler)
+    (total : NativeTraceTotalOnSupportedCore (p := p) handler) :
+    WitnessRelation.Correct (SupportedCoreNativeShardRelation (p := p))
+      (Execution.SupportedCoreOrdinaryShardExecutionRelation handler) where
+  sound := supported_core_native_shard_sound handler
+  complete := by
+    intro statement execution semantic
+    exact supported_core_native_shard_complete handler statement execution
+      ⟨semantic, total statement execution semantic⟩
+
+/-- Public-language equality is now a direct consequence of the same single totality theorem. -/
+theorem supported_core_native_shard_language_eq_of_totality
+    (handler : Machine.SyscallHandler)
+    (total : NativeTraceTotalOnSupportedCore (p := p) handler) :
+    WitnessRelation.language (SupportedCoreNativeShardRelation (p := p)) =
+      WitnessRelation.language (Execution.SupportedCoreOrdinaryShardExecutionRelation handler) :=
+  (supported_core_native_shard_correct_of_totality handler total).language_eq
 
 /-- A supported admissible execution proves the literal Clean `Ensemble.Statement` at the
 statement's public boundary. -/
@@ -70,7 +121,7 @@ theorem sp1Ensemble_statement_of_supported_execution
     (execution : Machine.EventExecutionTrace)
     (valid : SupportedCoreNativeAdmissibleExecutionRelation handler statement execution) :
     (sp1Ensemble (p := p)).Statement statement.publicValues := by
-  obtain ⟨semantic, -, ready, fits⟩ := valid
+  obtain ⟨⟨semantic, -⟩, ready, fits⟩ := valid
   exact ⟨(nativeTrace statement execution).witness,
     nativeTrace_witness_publicInput statement execution,
     ready.constraints semantic.publicValuesWellFormed,

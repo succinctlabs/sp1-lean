@@ -121,6 +121,22 @@ else
 fi
 
 echo
+echo "== A1 SP1 field singleton (gate) =="
+if scripts/check_sp1_field_singleton.sh; then
+  :
+else
+  echo "FAIL: SP1's concrete field has more than one Lean owner"; fail=1
+fi
+
+echo
+echo "== A1 shared relation vocabulary (gate) =="
+if scripts/check_shared_vocabulary.sh; then
+  :
+else
+  echo "FAIL: soundness/completeness vocabulary has duplicate owners"; fail=1
+fi
+
+echo
 echo "== A1 audit-surface index (gate) =="
 if scripts/check_audit_surface.sh; then
   :

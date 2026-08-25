@@ -106,6 +106,15 @@ structure SailConfigured (s : SailState) : Prop where
   /-- The single fixed SP1 PMA region (bare translation) — the fetch/load address decode. -/
   pma_regions : s.regs.get Register.pma_regions (init _) = [SailMem.SP1_PMA_Region]
 
+/-- One decoded instruction, stable across the entire SP1 platform-configuration class.
+
+This is the shared decode currency for committed Program rows and semantic shard transitions.  It
+is intentionally about one word/instruction pair; execution-wide quantification belongs to the
+relation that owns the transition list, not to a second aggregate decode predicate. -/
+def ConfiguredDecode (word : BitVec 32) (decoded : instruction) : Prop :=
+  ∀ state, SailConfigured state →
+    (ext_decode word).run state = .ok decoded state
+
 /-- The SP1 memory configuration (`isValidMemConfig`) the low-level fetch/load/store lemmas consume,
 reconstructed from the flattened `SailConfigured` fields (`h_cur_privilege` derives from `priv`; the
 other five are the inlined memory-config fields — the flatten deduped the `cur_privilege` fact). -/

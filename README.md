@@ -49,12 +49,13 @@ Its map is proof-independent; `supported_core_native_complete` is the existentia
 `sp1Ensemble_statement_of_supported_execution` is the direct Clean statement.
 
 The source is explicitly `SupportedCoreNativeAdmissibleExecutionRelation`: the exact supported
-ordinary Sail relation, Core row budget, named compiler/semantic readiness facts, and the actual
-interaction footprint `< p`. Constraints and all four channel balances are conclusions. This is
-full completeness for the deterministic native compiler image, but not yet public-language equality
-with the broader exact ordinary relation. Such an equality needs one shared capacity-bounded
-semantic relation on both the soundness and completeness sides; the current exact soundness target
-does not record the Core row cap or the native footprint.
+ordinary Sail relation restricted by the shared `CoreProfile.WithinOrdinaryRowLimit`, plus named
+compiler/semantic readiness facts and the actual interaction footprint `< p`. Constraints and all
+four channel balances are conclusions. `supported_core_native_shard_sound` and
+`supported_core_native_shard_functionalCompleteness` now use the same bounded native/semantic
+relation pair. The sole remaining condition for unconditional correctness and public-language
+equality is `NativeTraceTotalOnSupportedCore`: every execution in that bounded semantic relation
+must satisfy the transparent `NativeTraceAdmissible` compiler/output predicate.
 
 `SP1CleanTest/Audit/NativeCompletenessNonVacuity.lean` jointly witnesses the entire admissible source
 with a boundary-only exact execution and invokes both completeness capstones, so the theorem is not
