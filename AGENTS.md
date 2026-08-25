@@ -63,7 +63,7 @@ to a canonical Rust exporter so it does not obscure the verifier/refinement boun
 
 **This workstream's current priority:** instantiate the exact v6.4.0 Core AIR refinement bundle. Native
 timed grounding, every one of the 25 chip contracts, and `supported_core_native_sound` are closed. The
-34-table execution and 6-table memory-boundary relations exist, but full upstream soundness remains open
+paired 34-table execution and 6-table memory-boundary shard relation exists, but full upstream soundness remains open
 until the six Core system tables derive the native boundary facts and
 `CoreAIRRefinementObligations` has a closed construction. Until then only
 `sp1_air_refinement_of_obligations`/`sp1_air_sound_of_obligations` are declared; the unqualified names
@@ -240,15 +240,16 @@ Mirror-rust layout under `SP1Clean/`:
   and timed grounding. The converse is now the proof-independent all-25 compiler under
   `Proofs/Completeness/{InstructionEvent,ExecutionCompiler,NativeTraceCompiler}.lean` plus the
   stratum-10 `Soundness/NativeCompleteness.lean` capstone: it constructs all 53 tables and proves
-  constraints/four-channel balance on `SupportedCoreNativeAdmissibleExecutionRelation`. Widening that
+  constraints/four-channel balance on `SupportedCoreNativeAdmissibleShardRelation`. Widening that
   compiler domain remains named semantic-readiness/footprint work. Soundness and completeness now
-  share `SupportedCoreOrdinaryShardExecutionRelation` and the single
-  `CoreProfile.WithinOrdinaryRowLimit` policy; `NativeTraceTotalOnSupportedCore` is the exact remaining
+  share `SupportedCoreShardExecutionRelation` and the single
+  `CoreProfile.WithinOrdinaryRowLimit` policy; `NativeShardTraceTotal` is the exact remaining
   condition for unconditional correctness and public-language equality. No unconditional equality
   is claimed yet. The bespoke
   `MachineSoundness`/`MachineConsistency` `TraceValid` capstone was retired 2026-06-05.
   `Soundness/CoreAIR.lean` is the exact v6.4.0 deterministic boundary: its `_of_obligations`
-  combinators consume the `.execution` cluster only and expose the unclosed field-by-field proof bundle.
+  combinators consume the paired 34+6-table `CoreAIR.Current.ShardRelation` and expose the unclosed
+  field-by-field proof bundle plus an explicit external loader/platform context.
   The frozen Eulerian-path interface (`GatedVm/`, `TargetVm.lean`, `AdvanceDispatch.lean`, the
   `Soundness/Decode.lean` walk half) was deleted 2026-08 — its scheduled post-seam retirement; the
   live-path survivors are `Walk.lean`'s graph core, `RowEffectDefs.lean`'s `RefinesAt`/`RowEffect`

@@ -37,6 +37,7 @@ import SP1Clean.Extracted.SystemOracle.SyscallInstrs
 import SP1Clean.Extracted.ChipOracle.UType
 import SP1Clean.FormalModel.Contracts.PublicValues
 import SP1Clean.FormalModel.CoreAIRRelation
+import SP1Clean.Model.InteractionBus
 
 /-! # Exact extracted Core AIR
 
@@ -221,21 +222,30 @@ def directionScope : Dir → Scope
   | .send | .receive => .local
   | .sendGlobal | .receiveGlobal => .global
 
-/-- Canonical natural multiplicity sent for one payload in one interaction scope. -/
+/-- Forget local/global scope while retaining the send/receive polarity. -/
+def naturalDirection : Dir → NaturalDirection
+  | .send | .sendGlobal => .send
+  | .receive | .receiveGlobal => .receive
+
+/-- The exact extracted interaction list in the one shared natural-ledger representation.  Scope
+is part of the key, so a local contribution can never cancel a global one. -/
+def naturalLedger (all : List (Extracted.Interaction (ZMod p))) :
+    NaturalBusLedger (Scope × AirInteraction (ZMod p)) :=
+  all.map fun interaction =>
+    { key := (directionScope interaction.dir, interaction.payload)
+      direction := naturalDirection interaction.dir
+      multiplicity := interaction.mult.val }
+
+/-- Send-count projection of the canonical ledger.  This compatibility spelling does not define a
+second balance representation. -/
 def sentCount (scope : Scope) (all : List (Extracted.Interaction (ZMod p)))
     (payload : AirInteraction (ZMod p)) : ℕ :=
-  (all.filter fun interaction =>
-      directionScope interaction.dir = scope ∧ interaction.payload = payload ∧
-        (interaction.dir = .send ∨ interaction.dir = .sendGlobal)).map
-    (fun interaction => interaction.mult.val) |>.sum
+  NaturalBusLedger.sentCount (naturalLedger all) (scope, payload)
 
-/-- Canonical natural multiplicity received for one payload in one interaction scope. -/
+/-- Receive-count projection of the canonical ledger. -/
 def receivedCount (scope : Scope) (all : List (Extracted.Interaction (ZMod p)))
     (payload : AirInteraction (ZMod p)) : ℕ :=
-  (all.filter fun interaction =>
-      directionScope interaction.dir = scope ∧ interaction.payload = payload ∧
-        (interaction.dir = .receive ∨ interaction.dir = .receiveGlobal)).map
-    (fun interaction => interaction.mult.val) |>.sum
+  NaturalBusLedger.receivedCount (naturalLedger all) (scope, payload)
 
 /-- Exact local interaction relation supplied by the LogUp/GKR knowledge extractor.
 
@@ -247,7 +257,22 @@ the pinned baseline emits none; a future pin that introduces them must add the c
 cross-shard accumulator relation explicitly. -/
 def Valid (all : List (Extracted.Interaction (ZMod p))) : Prop :=
   (∀ interaction ∈ all, directionScope interaction.dir = Scope.local) ∧
-    ∀ payload, sentCount Scope.local all payload = receivedCount Scope.local all payload
+    (naturalLedger all).Balanced
+
+omit [Fact p.Prime] [Fact (2 ^ 17 < p)] in
+/-- The exact balance relation at a local payload, exposed without reintroducing a second pair of
+counting functions. -/
+theorem Valid.local_balance {all : List (Extracted.Interaction (ZMod p))}
+    (valid : Valid all) (payload : AirInteraction (ZMod p)) :
+    NaturalBusLedger.sentCount (naturalLedger all) (.local, payload) =
+      NaturalBusLedger.receivedCount (naturalLedger all) (.local, payload) :=
+  valid.2 (.local, payload)
+
+omit [Fact p.Prime] [Fact (2 ^ 17 < p)] in
+theorem Valid.local_counts {all : List (Extracted.Interaction (ZMod p))}
+    (valid : Valid all) (payload : AirInteraction (ZMod p)) :
+    sentCount .local all payload = receivedCount .local all payload :=
+  valid.local_balance payload
 
 end Balance
 
@@ -285,6 +310,11 @@ cluster cannot be passed to the execution-shard soundness theorem merely because
 heterogeneous row universe. -/
 abbrev Relation {Digest : Type} (binds : PreprocessedBinding p Digest) (cluster : Cluster) :=
   (system binds).relationFor cluster
+
+/-- Public exact Core-shard relation: the execution and memory-boundary clusters are authenticated
+together and cannot be separated by a downstream refinement signature. -/
+abbrev ShardRelation {Digest : Type} (binds : PreprocessedBinding p Digest) :=
+  (system binds).shardRelation
 
 /-! ## Audited syscall-row view -/
 

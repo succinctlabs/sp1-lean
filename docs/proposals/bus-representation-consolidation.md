@@ -31,7 +31,7 @@ different stories about the same buses.
 
 The consolidation adopts three rules.
 
-### 1. Keep two bus primaries, not one and not many
+### 1. Share one counting algebra across two row-facing bus views
 
 The two proof directions require inequivalent information.
 
@@ -39,13 +39,19 @@ The two proof directions require inequivalent information.
 messages. `producedMessages`/`consumedMessages` and the typed State, Program, and Memory modules use
 this form to relate a circuit pull to the exact row state consumed by a Sail bridge.
 
-**Computable primary, for completeness.** `LookupAccess`, `tableCleanAccesses`, and the generated
+**Computable native view, for completeness.** `LookupAccess`, `tableCleanAccesses`, and the generated
 trace's full ledger retain natural payload arrays and centered signed-integer multiplicities. This
 form supports provider recounting, per-key integer sums, and executable concrete-shard checks.
 
-**One bridge.** `Interaction.toAccess` is the element-level projection. It is lifted table- and
-ensemble-wide, then connected to Clean's field balance by `Model/BalanceBridge.lean`. A new third
-native ledger is not allowed merely to make one proof convenient.
+**Shared counting core.** `NaturalBusLedger Key` retains direction and natural multiplicity over an
+arbitrary key type. The exact AIR instantiates it with `(Scope × AirInteraction)`; its `Balance.Valid`
+is literally `NaturalBusLedger.Balanced`. Native Clean may project the same algebra to
+`LookupAccessList` with `NaturalBusLedger.toSigned`; `balanced_toSigned` proves that exact natural
+balance gives the signed per-key equation. This is one representation-polymorphic definition, not a
+third table ledger.
+
+`Interaction.toAccess` remains the element-level projection from evaluated Clean rows. It is lifted
+table- and ensemble-wide, then connected to Clean's field balance by `Model/BalanceBridge.lean`.
 
 Clean orientation is canonical in both native views. The Rust oracle's opposite Memory/Program
 polarity is a real extraction-boundary fact, so it has one named Rust-facing projection rather than
@@ -63,18 +69,22 @@ Dependent Rust row types are indexed by `InstructionChipId` through `ExtractedCo
 witness exposes one total `forId` function. Constraint transport and ledger transport are pointwise
 over that index and flattened in the canonical order.
 
-### 3. Use one proof-free semantic execution carrier
+### 3. Use one proof-free semantic shard carrier
 
-`Machine.EventExecutionTrace` is the operational witness shared by both directions. Validity is
-separate evidence, which keeps a future trace compiler executable. The ordinary fragment converts
-directly to `SailChain`; the PolyFun prefix is a theorem view rather than a second stored model.
+`Machine.CoreShardSemanticWitness` is the public operational witness shared by native soundness,
+native completeness, and exact Core refinement. It stores the program, finite Memory boundary,
+private initial state, and event transcript, but not a redundant target-state list. A
+`CoreShardModel` supplies executable syscall behavior, and `evaluatedTrace` deterministically
+reconstructs the `EventExecutionTrace` used by the low-level compiler. Validity is separate evidence;
+the ordinary evaluated fragment converts directly to `SailChain`, while the PolyFun prefix is a
+theorem view rather than a second stored model.
 
-`Execution.SupportedOrdinaryShardExecutionRelation` is the exact semantic image of the 25 native
-instruction chips: each transition carries official-Sail `Retire_Success` evidence as well as its
-canonical route. Physical `DecodedInstructionRow` and `ChipRow` types remain codecs at the AIR
-boundary. The compiler's field-free access schedules and State/Memory histories are deterministic
-views of that same trace, not independently supplied timelines. Their physical agreement is proved
-or retained as an explicit readiness seam rather than assumed through a parallel execution model.
+`Execution.CoreShardExecutionRelation` fixes the common semantics. The native
+`SupportedCoreShardExecutionRelation` specializes it to ordinary, normally retiring, routed
+transitions and the pinned row budget; `SP1CoreShardSemanticRelation` specializes it to the full
+eventful exact-Core statement. Physical `DecodedInstructionRow` and `ChipRow` types remain codecs at
+the AIR boundary. The compiler's field-free access schedules and State/Memory histories are
+deterministic views of the evaluated trace, not independently supplied timelines.
 
 ## Implemented changes
 
@@ -142,21 +152,23 @@ transport to agree on identity before a physical table can be assembled.
 
 ### Shared exact shard relation
 
-`FormalModel/SupportedShard.lean` states the exact ordinary supported relation over
-`EventExecutionTrace`. Every transition is an official normally retiring Sail step, follows the
-eight-tick schedule, fetches from the committed program, and has a successful canonical route.
+`Model/Machine/Shard.lean` and `FormalModel/CoreShard.lean` own the shared witness, evaluator, and
+relation skeleton. `FormalModel/SupportedShard.lean` adds the native ordinary/routing policy, while
+`FormalModel/Execution.lean` adds the exact Core public-value, syscall, and commit policy.
 
-`supported_core_native_ordinary_sound` constructs that exact trace from an accepted native witness.
-On the reverse path, `nativeTrace` is a total proof-independent compiler over the same
-`EventExecutionTrace`, and `supported_core_native_functionalCompleteness` proves its full native
-ensemble result on `SupportedCoreNativeAdmissibleExecutionRelation`.  The compiler retains each
-source transition beside its generated event, so this boundary really is coupled to the supplied
-execution.  The former abstract language certificate was removed because its map could ignore that
-execution. Both directions now use `SupportedCoreOrdinaryShardExecutionRelation`, whose row count is
-checked by the single `CoreProfile.WithinOrdinaryRowLimit` policy; the native side projects its
-active-row count into that same policy. Public-language equality remains intentionally
-conditional on `NativeTraceTotalOnSupportedCore`, the residual readiness/footprint theorem for the
-deterministic compiler image.
+`supported_core_native_shard_sound` constructs the common witness directly from an accepted bounded
+native witness. On the reverse path, `nativeTrace` is a total proof-independent function of its
+evaluated trace, and `supported_core_native_functionalCompleteness` proves the full native ensemble
+result on `SupportedCoreNativeAdmissibleShardRelation`. The former abstract language certificate and
+the intermediate ordinary-trace relation were removed: neither direction now publishes a second
+semantic carrier. Both directions use the single `CoreProfile.WithinOrdinaryRowLimit` policy.
+Public-language equality remains intentionally conditional on `NativeShardTraceTotal`, the residual
+readiness/footprint theorem for the deterministic compiler image.
+
+The exact source is likewise one object: `CoreAIR.ShardWitness` pairs the 34-table execution cluster
+with the six-table Memory-boundary cluster, and `CoreAIR.Current.ShardRelation` authenticates both.
+`sp1_air_refinement_of_obligations` maps that pair deterministically into the same common shard
+carrier at the one production `SP1Prime`, which is the map an ArkLib extractor can post-compose.
 
 ## Boundaries intentionally not collapsed
 
@@ -198,7 +210,7 @@ readiness groups: rich per-chip event contracts; State/Memory chronology and phy
 literal-ledger polarity/servability; initial-Memory truth; Program row/configured-decode agreement;
 and the actual interaction footprint on the intended bounded semantic domain. The capacity-aligned
 soundness target and conditional correctness/language-equality API are now present; closing
-`NativeTraceTotalOnSupportedCore` removes the last native-domain restriction.
+`NativeShardTraceTotal` removes the last native-domain restriction.
 
 All-25 exportable witness programs, SP1 trace dumps, and interpreter differentials remain valuable
 conformance evidence, but they are separate from those semantic inverse lemmas and from exact-Rust
@@ -215,9 +227,9 @@ Future work should preserve these checkable invariants:
 1. No new global `*Lookups`/`*Consistency` shadow may duplicate the actual Clean interaction ledger.
 2. A new instruction or provider identity is added at its neutral registry first; table builders and
    proof-bearing realizations map that identity.
-3. `EventExecutionTrace` remains the only proof-free operational trace carrier. New data needed for
-   compilation should be a proved view, not a parallel chain; a normalized middle carrier must land
-   together with executable projections from both sides.
+3. `CoreShardSemanticWitness` remains the only public proof-free shard carrier;
+   `EventExecutionTrace` is its deterministic evaluated view. New compilation data should be a
+   proved view, not a parallel chain.
 4. Native statements use Clean interaction orientation. Rust dualization is explicit at the
    faithfulness boundary.
 5. Unknown channel names cannot enter Byte or Program provider closure by default.

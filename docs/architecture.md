@@ -252,9 +252,10 @@ The whole-machine proof derives meaning in this order:
 
 The generic timed engine and every one of the 25 registry contracts are proved. The result is packaged
 by `supported_core_witness_grounding` and consumed in two forms: `supported_core_native_sound`
-targets the broad shard-local Sail relation, while `supported_core_native_ordinary_sound` constructs
-the exact `EventExecutionTrace` target shared with completeness and proves that every transition has
-normal `Retire_Success` evidence and a canonical `InstructionChipId` route. This excludes routed
+targets the broad shard-local Sail relation, while `supported_core_native_shard_sound` constructs
+the common `CoreShardSemanticWitness` target shared with completeness. Its event transcript
+deterministically evaluates to an `EventExecutionTrace` in which every transition has normal
+`Retire_Success` evidence and a canonical `InstructionChipId` route. This excludes routed
 instructions that enter Sail's trap path but cannot produce a valid native instruction row.
 
 The source relation keeps non-algebraic facts visible. The exact AIR/PCS integration must derive the
@@ -327,7 +328,7 @@ exact system rows
 
 both
   ── supported_core_native_sound + event assembly
-  ──→ SP1CoreShardExecutionRelation
+  ──→ SP1CoreShardSemanticRelation
 ```
 
 This structure reuses the closed native proof and avoids a second whole-machine execution engine.
@@ -358,7 +359,10 @@ and final HALT conditions. It is deliberately downstream of shard AIR soundness.
 `FormalModel/Verifier.lean` provides relation-level composition machinery for the later ArkLib layer.
 ArkLib must supply probabilistic knowledge soundness for transcript processing, LogUp/GKR, zero-check,
 PCS openings, commitments, and Fiat--Shamir. The error term must survive post-composition with the
-deterministic AIR refinement.
+deterministic AIR refinement. Its extracted input relation is the paired
+`CoreAIR.Current.ShardRelation`: one witness contains both the 34-table execution cluster and the
+six-table Memory-boundary cluster. The postprocessor is a total decoder into
+`Machine.CoreShardSemanticWitness`, and the exact theorem is pinned to the production `SP1Prime`.
 
 ## Completeness
 
@@ -372,29 +376,29 @@ supported semantic execution
   → accepting cryptographic proof
 ```
 
-The source is `SupportedOrdinaryShardExecutionRelation`, the exact supported ordinary image also
-produced by `supported_core_native_ordinary_sound`.  The forward implementation is now the total,
-proof-independent `nativeTrace statement execution` function.  It decodes and compiles all 25
+The source is `SupportedCoreShardExecutionRelation`, the canonical witness relation also produced by
+`supported_core_native_shard_sound`. The forward implementation is the total, proof-independent
+`nativeTrace` function applied to `CoreShardSemanticWitness.evaluatedTrace`. It decodes and compiles all 25
 instruction families, schedules Memory refreshes, derives State refreshes, creates canonical
 Memory boundaries, recounts Byte/Range/Program providers from the literal Clean consumer ledger,
 and stores the public boundary once.
 
 `supported_core_native_functionalCompleteness` proves that map satisfies
-`SupportedCoreNativeRelation` on `SupportedCoreNativeAdmissibleExecutionRelation`; its existential
+`SupportedCoreNativeRelation` on `SupportedCoreNativeAdmissibleShardRelation`; its existential
 projection is `supported_core_native_complete`, and
 `sp1Ensemble_statement_of_supported_execution` exposes the direct Clean statement.  Admissibility
-is a restriction of `SupportedCoreOrdinaryShardExecutionRelation` by named readiness facts for this
-exact compiler output and `NativeTraceFootprint.Fits`. The semantic and native active-row counts are
+is a restriction of `SupportedCoreShardExecutionRelation` by named readiness facts for this exact
+compiler output and `NativeTraceFootprint.Fits`. The semantic and native active-row counts are
 both checked by `CoreProfile.WithinOrdinaryRowLimit`. It does not assume table constraints, channel
 balance, or an existential generated trace.
 
-The source is deliberately narrower than the shared capacity-bounded ordinary relation.
+The source is deliberately narrower than the shared capacity-bounded canonical shard relation.
 The remaining compiler-domain work includes registry-wide event validity; State and Memory chronology/row-agreement
 lemmas; literal-ledger Byte polarity and demand servability; initial-Memory content; Program-row
 physical projection; and the actual interaction-count bound.  Deterministic representation
 facts should migrate out of readiness as their agreement theorems close. Configured decode itself
 has already moved to the shared `ConfiguredDecode` predicate below both directions. The remaining
-implications are named exactly by `NativeTraceTotalOnSupportedCore`;
+implications are named exactly by `NativeShardTraceTotal`;
 `supported_core_native_shard_correct_of_totality` and its public-language-equality corollary consume
 only that theorem. The library does not claim unconditional public-language equality until it is
 closed. The older abstract language-certificate API was removed because its map could ignore the

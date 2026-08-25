@@ -1,5 +1,6 @@
 import SP1Clean.FormalModel.Contracts.CoreAIR
 import SP1Clean.FormalModel.Contracts.PublicValues
+import SP1Clean.FormalModel.CoreShard
 import SP1Clean.FormalModel.Relations
 import SP1Clean.Model.Machine.EventExecution
 import SP1Clean.Model.Machine.Execution
@@ -140,17 +141,6 @@ abbrev ProgramBinding (p : ℕ) (Digest : Type) :=
 
 /-! ## Eventful Core shard target -/
 
-/-- Private, proof-free semantic witness for one Core shard.  An execution shard carries raw event
-trace data checked by the relation below; a non-execution shard carries `none`. -/
-structure SP1EventfulShardExecutionWitness where
-  program : GuestProgram
-  execution : Option Machine.EventExecutionTrace
-
-/-- Syscall transcript exposed by a shard witness; boundary-only shards expose the empty list. -/
-def SP1EventfulShardExecutionWitness.syscallEvents
-    (witness : SP1EventfulShardExecutionWitness) : List Machine.CoreSyscallEvent :=
-  witness.execution.map Machine.EventExecutionTrace.syscallEvents |>.getD []
-
 /-- An eventful execution segment agrees with the public pc and timestamp endpoints. -/
 def EventSegmentMatches {handler : Machine.SyscallHandler} (initialClock : ℕ)
     (initialPc : BitVec 64) (finalClock : ℕ) (finalPc : BitVec 64)
@@ -161,69 +151,62 @@ def EventSegmentMatches {handler : Machine.SyscallHandler} (initialClock : ℕ)
     execution.finalState.regs.get? Register.PC = some finalPc ∧
     execution.finalClock initialClock = finalClock
 
-/-- The two honest semantic cases of a baseline Core shard.
+/-! ### Canonical specialization -/
 
-Making the branch a named inductive keeps the top-level audit surface readable and prevents a proof
-from satisfying an opaque disjunction with an unrelated existential.  A boundary shard consumes no
-machine step; an execution shard exposes the exact trace that was decoded from the AIR witness. -/
-inductive SP1CoreShardCase {p : ℕ} {Digest : Type} (handler : Machine.SyscallHandler)
-    (statement : SP1ShardStatement (ZMod p) Digest)
-    (witness : SP1EventfulShardExecutionWitness) : Prop
-  | boundary :
-      statement.publicValues.is_execution_shard = 0 →
-      witness.execution = none →
-      statement.publicValues.pc_start = statement.publicValues.next_pc →
-      statement.publicValues.initial_timestamp = statement.publicValues.last_timestamp →
-      SP1CoreShardCase handler statement witness
-  | execution (trace : Machine.EventExecutionTrace) :
-      statement.publicValues.is_execution_shard = 1 →
-      witness.execution = some trace →
-      RomLoaded witness.program trace.initialState →
-      SailConfigured trace.initialState →
-      EventSegmentMatches (handler := handler)
-        statement.publicValues.initial_timestamp.toNat
-        statement.publicValues.pcStartBits statement.publicValues.last_timestamp.toNat
-        statement.publicValues.nextPcBits witness.program trace →
-      SP1CoreShardCase handler statement witness
+/-- Project full SP1 shard public values into the shared execution coordinates. -/
+def sp1CoreShardBoundary {p : ℕ} {Digest : Type}
+    (statement : SP1ShardStatement (ZMod p) Digest) : Machine.CoreShardBoundary where
+  isExecution := decide (statement.publicValues.is_execution_shard = 1)
+  initialClock := statement.publicValues.initial_timestamp.toNat
+  initialPc := statement.publicValues.pcStartBits
+  finalClock := statement.publicValues.last_timestamp.toNat
+  finalPc := statement.publicValues.nextPcBits
 
-/-- Named validity record for the semantic result of one baseline Core shard.
+/-- Exact Core operational model.  The executable host handler supplies both evaluation and the
+relational graph checked by the shared semantics. -/
+def sp1CoreShardModel {p : ℕ} {Digest : Type}
+    (handler : Machine.ExecutableSyscallHandler)
+    (programBinding : ProgramBinding p Digest) :
+    Machine.CoreShardModel (SP1ShardStatement (ZMod p) Digest) where
+  boundary := sp1CoreShardBoundary
+  programBound := fun statement program => programBinding statement.verifyingKey program
+  syscalls := handler
 
-The fields are intentionally the complete public audit surface.  Table-specific proofs may be split
-however is convenient internally, but the AIR refinement must fill these fields explicitly. -/
-structure SP1CoreShardExecutionValid {p : ℕ} {Digest : Type}
-    (layout : SP1PublicValuesLayout) (handler : Machine.SyscallHandler)
-    (programBinding : ProgramBinding p Digest)
-    (statement : SP1ShardStatement (ZMod p) Digest)
-    (witness : SP1EventfulShardExecutionWitness) : Prop where
-  verifyingKeyWellFormed : statement.verifyingKey.WellFormed layout
-  publicValuesWellFormed : statement.publicValues.WellFormed layout
-  configurationMatches : statement.ConfigurationMatches
-  programWellFormed : witness.program.WellFormed
-  programBound : programBinding statement.verifyingKey witness.program
-  entryPoint :
-    BitVec.ofNat 64 statement.verifyingKey.pc_start.toNat = witness.program.pc_start
-  firstExecutionShard : statement.publicValues.is_first_execution_shard = 1 →
-    statement.publicValues.pcStartBits = witness.program.pc_start ∧
-      statement.publicValues.initial_timestamp.toNat = 1 ∧
-      statement.publicValues.is_execution_shard = 1
-  commitRows : CoreAIR.CommitRowsMatch statement.publicValues witness.syscallEvents
-  commitRowsSetFlags : CoreAIR.CommitRowsSetFlags statement.publicValues witness.syscallEvents
-  commitTransition : statement.publicValues.CommitTransitionValid
-  shardCase : SP1CoreShardCase handler statement witness
+/-- Exact-profile laws around the fixed shared execution semantics.  COMMIT behavior is stated once
+on the common syscall transcript and therefore applies uniformly to both shard branches. -/
+def sp1CoreShardContract {p : ℕ} {Digest : Type}
+    (layout : SP1PublicValuesLayout) :
+    CoreShardContract (SP1ShardStatement (ZMod p) Digest) where
+  statementValid := fun statement =>
+    statement.verifyingKey.WellFormed layout ∧
+      statement.publicValues.WellFormed layout ∧
+      statement.ConfigurationMatches
+  programValid := fun statement program =>
+    BitVec.ofNat 64 statement.verifyingKey.pc_start.toNat = program.pc_start ∧
+      (statement.publicValues.is_first_execution_shard = 1 →
+        statement.publicValues.pcStartBits = program.pc_start ∧
+          statement.publicValues.initial_timestamp.toNat = 1 ∧
+          statement.publicValues.is_execution_shard = 1)
+  witnessValid := fun statement witness =>
+    CoreAIR.CommitRowsMatch statement.publicValues witness.syscallEvents ∧
+      CoreAIR.CommitRowsSetFlags statement.publicValues witness.syscallEvents ∧
+      statement.publicValues.CommitTransitionValid
 
-/-- Full semantic target for a baseline Core AIR shard.
+/-- Exact Core validity is a specialization of the one canonical shard validity record. -/
+abbrev SP1CoreShardSemanticValid {p : ℕ} {Digest : Type}
+    (layout : SP1PublicValuesLayout) (handler : Machine.ExecutableSyscallHandler)
+    (programBinding : ProgramBinding p Digest) :=
+  CoreShardExecutionValid (sp1CoreShardModel handler programBinding)
+    (sp1CoreShardContract layout)
 
-Ordinary rows are official Sail steps; syscall rows are raw, auditable events interpreted by the
-explicit `handler` relation.  This avoids both failure modes of the older projection: treating every
-row as an ordinary Sail step, or hiding syscall behavior in an existential machine model.  The
-relation remains shard-local; boot reachability and cross-shard state continuity belong to the
-authenticated ledger theorem. -/
-def SP1CoreShardExecutionRelation {p : ℕ} {Digest : Type}
-    (layout : SP1PublicValuesLayout) (handler : Machine.SyscallHandler)
+/-- Exact Core semantic target used by the paired AIR refinement and ArkLib composition seam. -/
+def SP1CoreShardSemanticRelation {p : ℕ} {Digest : Type}
+    (layout : SP1PublicValuesLayout) (handler : Machine.ExecutableSyscallHandler)
     (programBinding : ProgramBinding p Digest) :
     WitnessRelation.Relation (SP1ShardStatement (ZMod p) Digest)
-      SP1EventfulShardExecutionWitness :=
-  SP1CoreShardExecutionValid layout handler programBinding
+      Machine.CoreShardSemanticWitness :=
+  CoreShardExecutionRelation (sp1CoreShardModel handler programBinding)
+    (sp1CoreShardContract layout)
 
 /-! ## Authenticated shard composition and the halted execution relation -/
 

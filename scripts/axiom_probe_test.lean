@@ -12,9 +12,11 @@ test-library oleans — run `lake test` first).
 Run via `lake env lean scripts/axiom_probe_test.lean` (see `scripts/run_audit.sh`). -/
 
 #print axioms SP1Clean.Audit.NativeCompletenessNonVacuity.anchorExecution_nativeTraceReady
+#print axioms SP1Clean.Audit.NativeCompletenessNonVacuity.anchorSemanticWitness_trace
 #print axioms SP1Clean.Audit.NativeCompletenessNonVacuity.anchorExecution_admissible
 #print axioms SP1Clean.Audit.NativeCompletenessNonVacuity.anchorExecution_yields_airWitness
 #print axioms SP1Clean.Audit.NativeCompletenessNonVacuity.anchorExecution_yields_ensembleStatement
+#print axioms SP1Clean.Audit.NativeCompletenessNonVacuity.anchorExecution_bounded_roundTrip
 #print axioms SP1Clean.NonVacuityRealTests.constraintsHold_of_check
 #print axioms SP1Clean.NonVacuityRealTests.rTypeEventInputs_is_real
 #print axioms SP1Clean.NonVacuityRealTests.aluTypeEventInputs_is_real

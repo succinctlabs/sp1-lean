@@ -110,9 +110,11 @@ private theorem compiledRow_located_mem
 semantic statement's ROM.  This is the only place the exact relation's fetch/decode evidence and
 the configured-state decoder hoist meet. -/
 theorem nativeProgramKey_decodedInROM
-    {handler : Machine.SyscallHandler} {statement : SupportedCoreStatement p}
+    {statement : SupportedCoreStatement p} {semanticWitness : Machine.CoreShardSemanticWitness}
     {execution : Machine.EventExecutionTrace}
-    (semantic : SupportedOrdinaryShardExecutionRelation handler statement execution)
+    (semantic : SupportedCoreShardExecutionRelation statement semanticWitness)
+    (executionEq : execution =
+      semanticWitness.evaluatedTrace (supportedCoreShardModel (p := p)))
     (compiler : NativeCompilerReady statement.program execution (nativeInitialClock statement))
     (projection : NativeProgramRowProjection statement execution)
     {key : LookupKey}
@@ -120,12 +122,20 @@ theorem nativeProgramKey_decodedInROM
     (keyKind : key.1 = InteractionKind.Program) :
     ∃ row : ProgramChip.ProgramRow (ZMod p),
       key = ProgramChip.programRowKey row ∧ decodedInROM statement.program row := by
+  subst execution
+  obtain ⟨-, -, -, -, -, -, supported, -⟩ :=
+    Execution.SupportedCoreShardExecutionValid.evaluatedTrace_facts semantic
+  have semanticSupported : AllTransitionsSupported statement.program
+      (semanticWitness.evaluatedTrace (supportedCoreShardModel (p := p))) := by
+    simpa only [Execution.SupportedCoreShardExecutionValid.program_eq semantic] using supported
   obtain ⟨compiledRow, compiledRowMem, row, generatedView, sourcePc, projected, keyEq⟩ :=
     projection key keyMem keyKind
-  have locatedMem : compiledRow.located ∈ execution.locatedTransitions :=
+  have locatedMem : compiledRow.located ∈
+      (semanticWitness.evaluatedTrace
+        (supportedCoreShardModel (p := p))).locatedTransitions :=
     compiledRow_located_mem compiler compiledRowMem
   obtain ⟨semanticView, semanticViewEq, stableDecode⟩ :=
-    (semantic.supported compiledRow.located locatedMem).view
+    (semanticSupported compiledRow.located locatedMem).view
   have viewEq : semanticView = compiledRow.view :=
     Option.some.inj (semanticViewEq.symm.trans generatedView)
   subst semanticView
@@ -170,13 +180,17 @@ private theorem rowSpec_of_programServable
 semantic statement.  The only non-derived source facts are the two named seams above; in
 particular this theorem assumes neither `ProgramProviderBound` nor an AIR-witness existential. -/
 theorem nativeTrace_programProviderBound
-    {handler : Machine.SyscallHandler} {statement : SupportedCoreStatement p}
+    {statement : SupportedCoreStatement p} {semanticWitness : Machine.CoreShardSemanticWitness}
     {execution : Machine.EventExecutionTrace}
-    (semantic : SupportedOrdinaryShardExecutionRelation handler statement execution)
+    (semantic : SupportedCoreShardExecutionRelation statement semanticWitness)
+    (executionEq : execution =
+      semanticWitness.evaluatedTrace (supportedCoreShardModel (p := p)))
     (compiler : NativeCompilerReady statement.program execution (nativeInitialClock statement))
     (servable : (nativeBaseTrace statement execution).DemandServable)
     (projection : NativeProgramRowProjection statement execution) :
     ProgramProviderBound (nativeTrace statement execution).witness := by
+  subst execution
+  let execution := semanticWitness.evaluatedTrace (supportedCoreShardModel (p := p))
   intro raw member _
   let typed : TypedInteraction (programChannel (p := p)) :=
     { raw := raw
@@ -214,16 +228,20 @@ theorem nativeTrace_programProviderBound
     rw [program_round key _ selected keyServable]
     rfl
   obtain ⟨semanticRow, semanticKey, decoded⟩ :=
-    nativeProgramKey_decodedInROM semantic compiler projection keyMem keyKind
+    nativeProgramKey_decodedInROM semantic rfl compiler projection keyMem keyKind
   have typedKey :
       ProgramChip.programRowKey (rowOfMsg typed.message) = key :=
     (keyOf_toAccess_typedProgram typed).symm.trans rawKeyEq
   have rowEq : rowOfMsg typed.message = semanticRow :=
     ProgramChip.programRow_eq_of_key (typedKey.trans semanticKey)
   have clockEncodable := nativeInitialClock_encodable statement
-    semantic.publicValuesWellFormed
+    (Execution.SupportedCoreShardExecutionValid.publicValuesWellFormed semantic)
   have committed := Commit.dataOfAt_statementFor (p := p) statement.program
-    (nativeInitialClock statement) semantic.programWellFormed semantic.programEncodable
+    (nativeInitialClock statement)
+    (by simpa only [Execution.SupportedCoreShardExecutionValid.program_eq semantic] using
+      semantic.programWellFormed)
+    (by simpa only [Execution.SupportedCoreShardExecutionValid.program_eq semantic] using
+      Execution.SupportedCoreShardExecutionValid.programEncodable semantic)
     clockEncodable
   change ProgTruth typed.message (nativeTrace statement execution).witness.data
   refine ⟨rowSpec_of_programServable keyServable typed rawKeyEq, ?_⟩

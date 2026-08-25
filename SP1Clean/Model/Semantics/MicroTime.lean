@@ -70,6 +70,65 @@ inductive MemLoc
   | ram (cell : RamCell)
 deriving DecidableEq
 
+namespace MemLoc
+
+/-- The canonical byte address carried by the three Memory-bus address limbs.  Register records
+use their index; RAM records use the aligned eight-byte cell base.  This belongs to the semantic
+location type rather than to either trace compiler so soundness and completeness cannot disagree
+about the address represented by a `MemLoc`. -/
+def busAddress : MemLoc → ℕ
+  | .reg index => index.toNat
+  | .ram cell => cell.toNat * 8
+
+/-- The Memory bus carries only 48 address bits and reserves `0..31` for register records.  A RAM
+location is canonically representable exactly when its aligned base lies in the remaining 48-bit
+address space. -/
+def CanonicalAddress : MemLoc → Prop
+  | .reg _ => True
+  | .ram cell => 32 ≤ cell.toNat * 8 ∧ cell.toNat * 8 < 2 ^ 48
+
+theorem busAddress_lt_two_pow_48 {loc : MemLoc}
+    (canonical : loc.CanonicalAddress) : loc.busAddress < 2 ^ 48 := by
+  cases loc with
+  | reg index => exact lt_trans index.isLt (by norm_num)
+  | ram cell =>
+      simp only [CanonicalAddress] at canonical
+      exact canonical.2
+
+/-- Canonical register/RAM address encoding is injective.  The lower-bound clause is load-bearing:
+without it, aligned RAM addresses `0,8,16,24` collide with the reserved register shapes. -/
+theorem busAddress_injective_of_canonical {left right : MemLoc}
+    (leftCanonical : left.CanonicalAddress) (rightCanonical : right.CanonicalAddress)
+    (addressEq : left.busAddress = right.busAddress) : left = right := by
+  cases left with
+  | reg leftIndex =>
+      cases right with
+      | reg rightIndex =>
+          simp only [busAddress] at addressEq
+          congr 1
+          exact BitVec.eq_of_toNat_eq addressEq
+      | ram rightCell =>
+          exfalso
+          have leftLt : leftIndex.toNat < 32 := leftIndex.isLt
+          simp only [CanonicalAddress] at rightCanonical
+          simp only [busAddress] at addressEq
+          omega
+  | ram leftCell =>
+      cases right with
+      | reg rightIndex =>
+          exfalso
+          have rightLt : rightIndex.toNat < 32 := rightIndex.isLt
+          simp only [CanonicalAddress] at leftCanonical
+          simp only [busAddress] at addressEq
+          omega
+      | ram rightCell =>
+          simp only [busAddress] at addressEq
+          congr 1
+          apply BitVec.eq_of_toNat_eq
+          omega
+
+end MemLoc
+
 /-- Decode a Memory message's 3-limb address into its location (register ⟺ the register shape).
 RAM messages are interpreted at SP1's canonical 8-byte-cell granularity.  Faithful load/store rows
 already carry the aligned address; division by eight additionally makes the semantic boundary total

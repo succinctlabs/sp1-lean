@@ -4,7 +4,7 @@ set_option autoImplicit false
 
 /-! # The syscall-free restriction, and the obligations it discharges
 
-`CoreAIRRefinementObligations` (`Soundness/CoreAIR.lean`) is the fourteen-field proof bundle the
+`CoreAIRRefinementObligations` (`Soundness/CoreAIR.lean`) is the twelve-field AIR proof bundle the
 conditional `sp1_air_refinement_of_obligations` / `sp1_air_sound_of_obligations` combinators
 consume. Five fields mention SP1's syscall table: four quantify over decoded syscall events, while
 `syscallTranscript` compares the supplied decoder's transcript with the extracted one. On a shard
@@ -45,8 +45,8 @@ def SyscallFree (witness : CoreAIR.Witness (CoreAIR.Current.Row p)) : Prop :=
 Core AIR accepts for this statement is syscall-free. -/
 def RelationSyscallFree {Digest : Type} (binds : CoreAIR.Current.PreprocessedBinding p Digest) :
     Prop :=
-  ∀ statement witness, CoreAIR.Current.Relation binds .execution statement witness →
-    SyscallFree witness
+  ∀ statement witness, CoreAIR.Current.ShardRelation binds statement witness →
+    SyscallFree witness.execution
 
 namespace RelationSyscallFree
 
@@ -57,10 +57,10 @@ omit [Fact (2 ^ 17 < p)] in
 event-quantified obligation fields reduce to. -/
 theorem elim (free : RelationSyscallFree binds)
     {statement : SP1ShardStatement (ZMod p) Digest}
-    {witness : CoreAIR.Witness (CoreAIR.Current.Row p)}
-    (valid : CoreAIR.Current.Relation binds .execution statement witness)
+    {witness : CoreAIR.ShardWitness (CoreAIR.Current.system binds)}
+    (valid : CoreAIR.Current.ShardRelation binds statement witness)
     {event : Machine.CoreSyscallEvent}
-    (mem : event ∈ CoreAIR.Current.syscallEvents witness) : False := by
+    (mem : event ∈ CoreAIR.Current.syscallEvents witness.execution) : False := by
   rw [free statement witness valid] at mem
   exact absurd mem List.not_mem_nil
 
@@ -68,8 +68,8 @@ omit [Fact (2 ^ 17 < p)] in
 /-- `publicCommitOperand`, discharged. -/
 theorem publicCommitOperand (free : RelationSyscallFree binds) :
     ∀ statement witness,
-      CoreAIR.Current.Relation binds .execution statement witness →
-      ∀ event ∈ CoreAIR.Current.syscallEvents witness, ∀ index : Fin 8,
+      CoreAIR.Current.ShardRelation binds statement witness →
+      ∀ event ∈ CoreAIR.Current.syscallEvents witness.execution, ∀ index : Fin 8,
         event.IsCanonicalCode Machine.commitSyscallId →
         event.arg1.toNat = index →
         event.arg2 =
@@ -80,8 +80,8 @@ omit [Fact (2 ^ 17 < p)] in
 /-- `deferredCommitOperand`, discharged. -/
 theorem deferredCommitOperand (free : RelationSyscallFree binds) :
     ∀ statement witness,
-      CoreAIR.Current.Relation binds .execution statement witness →
-      ∀ event ∈ CoreAIR.Current.syscallEvents witness, ∀ index : Fin 8,
+      CoreAIR.Current.ShardRelation binds statement witness →
+      ∀ event ∈ CoreAIR.Current.syscallEvents witness.execution, ∀ index : Fin 8,
         event.IsCanonicalCode Machine.commitDeferredSyscallId →
         event.arg1.toNat = index →
         (event.arg2.toNat : ZMod p) = statement.publicValues.deferred_proofs_digest[index] :=
@@ -91,8 +91,8 @@ omit [Fact (2 ^ 17 < p)] in
 /-- `publicCommitSetsFlag`, discharged. -/
 theorem publicCommitSetsFlag (free : RelationSyscallFree binds) :
     ∀ statement witness,
-      CoreAIR.Current.Relation binds .execution statement witness →
-      ∀ event ∈ CoreAIR.Current.syscallEvents witness,
+      CoreAIR.Current.ShardRelation binds statement witness →
+      ∀ event ∈ CoreAIR.Current.syscallEvents witness.execution,
         event.IsCanonicalCode Machine.commitSyscallId →
           statement.publicValues.commit_syscall = 1 :=
   fun _ _ valid _ mem _ => absurd (free.elim valid mem) not_false
@@ -101,8 +101,8 @@ omit [Fact (2 ^ 17 < p)] in
 /-- `deferredCommitSetsFlag`, discharged. -/
 theorem deferredCommitSetsFlag (free : RelationSyscallFree binds) :
     ∀ statement witness,
-      CoreAIR.Current.Relation binds .execution statement witness →
-      ∀ event ∈ CoreAIR.Current.syscallEvents witness,
+      CoreAIR.Current.ShardRelation binds statement witness →
+      ∀ event ∈ CoreAIR.Current.syscallEvents witness.execution,
         event.IsCanonicalCode Machine.commitDeferredSyscallId →
           statement.publicValues.commit_deferred_syscall = 1 :=
   fun _ _ valid _ mem _ => absurd (free.elim valid mem) not_false
@@ -113,12 +113,13 @@ shard. The premise is a property of the *decoder* the eventual bundle supplies, 
 it is kept explicit rather than assumed away. -/
 theorem syscallTranscript (free : RelationSyscallFree binds)
     (decode : SP1ShardStatement (ZMod p) Digest →
-      CoreAIR.Witness (CoreAIR.Current.Row p) → SP1EventfulShardExecutionWitness)
-    (decodeFree : ∀ statement witness, SyscallFree witness →
+      CoreAIR.ShardWitness (CoreAIR.Current.system binds) → Machine.CoreShardSemanticWitness)
+    (decodeFree : ∀ statement witness, SyscallFree witness.execution →
       (decode statement witness).syscallEvents = []) :
     ∀ statement witness,
-      CoreAIR.Current.Relation binds .execution statement witness →
-        (decode statement witness).syscallEvents = CoreAIR.Current.syscallEvents witness :=
+      CoreAIR.Current.ShardRelation binds statement witness →
+        (decode statement witness).syscallEvents =
+          CoreAIR.Current.syscallEvents witness.execution :=
   fun statement witness valid =>
     (decodeFree statement witness (free statement witness valid)).trans
       (free statement witness valid).symm

@@ -42,6 +42,88 @@ abbrev LookupAccess := InteractionKind × String × List ℕ × ℤ
 more entries. -/
 abbrev LookupAccessList := List LookupAccess
 
+/-! ## Direction-preserving natural ledger
+
+The signed list above is the physical Clean projection.  Semantic arguments use the following
+direction-preserving representation instead: sends and receives carry natural multiplicities, so a
+negative field representative is never mistaken for a negative count. -/
+
+/-- Direction of one natural interaction contribution. -/
+inductive NaturalDirection
+  | send
+  | receive
+deriving DecidableEq, Repr
+
+/-- One interaction contribution before encoding direction as an integer sign.  The key type is
+parametric: native Clean uses `LookupKey`, while the exact AIR retains its full payload and scope. -/
+structure NaturalAccess (Key : Type) where
+  key : Key
+  direction : NaturalDirection
+  multiplicity : ℕ
+deriving DecidableEq, Repr
+
+/-- Canonical direction-preserving interaction ledger shared by both proof directions. -/
+abbrev NaturalBusLedger (Key : Type) := List (NaturalAccess Key)
+
+namespace NaturalBusLedger
+
+/-- Natural send multiplicity at one key. -/
+def sentCount {Key : Type} [DecidableEq Key] (ledger : NaturalBusLedger Key) (key : Key) : ℕ :=
+  ((ledger.filter fun access => access.key = key ∧ access.direction = .send).map
+    NaturalAccess.multiplicity).sum
+
+/-- Natural receive multiplicity at one key. -/
+def receivedCount {Key : Type} [DecidableEq Key] (ledger : NaturalBusLedger Key) (key : Key) : ℕ :=
+  ((ledger.filter fun access => access.key = key ∧ access.direction = .receive).map
+    NaturalAccess.multiplicity).sum
+
+/-- Exact balance without field reduction or signed representatives. -/
+def Balanced {Key : Type} [DecidableEq Key] (ledger : NaturalBusLedger Key) : Prop :=
+  ∀ key, sentCount ledger key = receivedCount ledger key
+
+/-- Physical signed projection used by the existing Clean ledger API. -/
+def toSigned (ledger : NaturalBusLedger (InteractionKind × String × List ℕ)) :
+    LookupAccessList :=
+  ledger.map fun access =>
+    (access.key.1, access.key.2.1, access.key.2.2,
+      match access.direction with
+      | .send => access.multiplicity
+      | .receive => -(access.multiplicity : ℤ))
+
+@[simp] theorem sentCount_nil {Key : Type} [DecidableEq Key] (key : Key) :
+    sentCount [] key = 0 := rfl
+
+@[simp] theorem receivedCount_nil {Key : Type} [DecidableEq Key] (key : Key) :
+    receivedCount [] key = 0 := rfl
+
+theorem sentCount_cons {Key : Type} [DecidableEq Key]
+    (access : NaturalAccess Key) (ledger : NaturalBusLedger Key) (key : Key) :
+    sentCount (access :: ledger) key =
+      (if access.key = key ∧ access.direction = .send then access.multiplicity else 0) +
+        sentCount ledger key := by
+  simp only [sentCount, List.filter_cons]
+  by_cases h : access.key = key ∧ access.direction = .send <;> simp [h]
+
+theorem receivedCount_cons {Key : Type} [DecidableEq Key]
+    (access : NaturalAccess Key) (ledger : NaturalBusLedger Key) (key : Key) :
+    receivedCount (access :: ledger) key =
+      (if access.key = key ∧ access.direction = .receive then access.multiplicity else 0) +
+        receivedCount ledger key := by
+  simp only [receivedCount, List.filter_cons]
+  by_cases h : access.key = key ∧ access.direction = .receive <;> simp [h]
+
+theorem sentCount_append {Key : Type} [DecidableEq Key]
+    (left right : NaturalBusLedger Key) (key : Key) :
+    sentCount (left ++ right) key = sentCount left key + sentCount right key := by
+  simp [sentCount, List.filter_append, List.map_append, List.sum_append]
+
+theorem receivedCount_append {Key : Type} [DecidableEq Key]
+    (left right : NaturalBusLedger Key) (key : Key) :
+    receivedCount (left ++ right) key = receivedCount left key + receivedCount right key := by
+  simp [receivedCount, List.filter_append, List.map_append, List.sum_append]
+
+end NaturalBusLedger
+
 namespace LookupAccessList
 
 /-- The grouping key: which bus, which table, which entry — multiplicity excluded. -/
@@ -798,5 +880,38 @@ theorem multiplicitySum_append_closing (skeleton : LookupAccessList) (select : L
 
 
 end LookupAccessList
+
+namespace NaturalBusLedger
+
+/-- Encoding direction as an integer sign turns the natural ledger into sent minus received at
+every key.  This is the only sign bridge needed by native Clean consumers. -/
+theorem multiplicitySum_toSigned
+    (ledger : NaturalBusLedger LookupAccessList.LookupKey)
+    (key : LookupAccessList.LookupKey) :
+    LookupAccessList.multiplicitySum ledger.toSigned key =
+      (sentCount ledger key : ℤ) - (receivedCount ledger key : ℤ) := by
+  induction ledger with
+  | nil => rfl
+  | cons access rest ih =>
+      rw [show NaturalBusLedger.toSigned (access :: rest) =
+        (access.key.1, access.key.2.1, access.key.2.2,
+          match access.direction with
+          | .send => (access.multiplicity : ℤ)
+          | .receive => -(access.multiplicity : ℤ)) ::
+            NaturalBusLedger.toSigned rest from rfl]
+      rw [LookupAccessList.multiplicitySum_cons, sentCount_cons, receivedCount_cons, ih]
+      cases access.direction <;> by_cases keyEq : access.key = key <;>
+        simp [keyEq, LookupAccessList.keyOf, LookupAccessList.multOf] <;> ring
+
+/-- Natural balance implies the legacy signed-integer balance used by Clean.  No characteristic
+or small-multiplicity hypothesis appears because direction is encoded only after counting. -/
+theorem balanced_toSigned
+    {ledger : NaturalBusLedger LookupAccessList.LookupKey}
+    (balanced : ledger.Balanced) :
+    LookupAccessList.isConsistentBalanced ledger.toSigned := by
+  intro key
+  rw [multiplicitySum_toSigned, balanced key, sub_self]
+
+end NaturalBusLedger
 
 end SP1Clean

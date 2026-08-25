@@ -571,7 +571,7 @@ in-repo, so the theorem is a parametric conditional — the configured-state cor
 have explicit joint witnesses. `JointNonVacuity.lean` proves `SupportedCoreNativeRelation` outright
 for a boundary-only witness over a real one-instruction program.
 `NativeCompletenessNonVacuity.lean` proves the complete admissible compiler source for a
-boundary-only exact execution and invokes both native completeness capstones. Separately,
+zero-event canonical execution shard and invokes both native completeness capstones. Separately,
 `ActiveTraceNonVacuity.lean` hand-assembles a genuinely active semantic trace record for
 `JAL x0, 0`; its instruction-event count and decoded physical instruction-row count are both one,
 and matching native provider occurrences balance all four buses. Completeness circuit-generates the
@@ -595,7 +595,7 @@ language.
 ### 7.4 Deterministic native ensemble completeness
 
 `nativeTrace statement execution` (`Proofs/Completeness/NativeTraceCompiler.lean`) is the one total,
-proof-independent map from the operational witness to a physical native trace.  Its chronological
+proof-independent low-level map from the common witness's evaluated trace to a physical native trace. Its chronological
 compiler retains each `LocatedTransition`, decoded instruction, routed dependent event, access
 schedule, and outgoing frontier in one record.  The construction then:
 
@@ -612,12 +612,13 @@ Canonical provider balance is proved directly in the field.  There is no native
 real no-wrap condition, the length of each actual channel interaction list being below `p`.
 
 `supported_core_native_functionalCompleteness` proves this map satisfies the unchanged
-`SupportedCoreNativeRelation` on `SupportedCoreNativeAdmissibleExecutionRelation`.  The source is:
+`SupportedCoreNativeRelation` on `SupportedCoreNativeAdmissibleShardRelation`. The source is:
 
-1. `SupportedCoreOrdinaryShardExecutionRelation`, the exact official-Sail ordinary segment whose
-   step count satisfies the shared `CoreProfile.WithinOrdinaryRowLimit` policy;
-2. `NativeTraceReady`, named facts about this exact compiler result rather than an existential AIR
-   trace; and
+1. `SupportedCoreShardExecutionRelation`, the common event-transcript witness whose deterministic
+   evaluation is an exact official-Sail ordinary segment satisfying the shared
+   `CoreProfile.WithinOrdinaryRowLimit` policy;
+2. `NativeTraceReady`, named facts about that exact evaluated compiler result rather than an
+   existential AIR trace; and
 3. the footprint bound above.
 
 From those hypotheses the theorem derives every constraint, all four channel balances, public-input
@@ -632,14 +633,14 @@ physical-ledger agreement, and initial content; literal-ledger consumer polarity
 servability; and Program-row physical projection. Configured-state decoder stability is no longer a
 residual premise: committed Program rows and supported transitions share the one
 `ConfiguredDecode` definition. The actual emitted interaction footprint is a separate capacity
-premise. These remaining implications are exactly `NativeTraceTotalOnSupportedCore`. The paired
+premise. These remaining implications are exactly `NativeShardTraceTotal`. The paired
 `supported_core_native_shard_sound` and
 `supported_core_native_shard_functionalCompleteness` already use the same bounded relation pair;
 `supported_core_native_shard_correct_of_totality` and its language-equality corollary require only
 that totality theorem. The report therefore makes no unconditional public-language-equality claim.
 
 The full completeness source itself is jointly satisfiable:
-`SP1CleanTest/Audit/NativeCompletenessNonVacuity.lean` constructs a boundary-only exact execution,
+`SP1CleanTest/Audit/NativeCompletenessNonVacuity.lean` constructs a zero-event common shard witness,
 proves `anchorExecution_admissible`, and invokes the functional/existential capstone and the direct
 Clean-statement theorem on its literal `nativeTrace`.
 
@@ -647,11 +648,11 @@ The lower generated-trace assembly bundle is satisfiable in the active case:
 `SP1CleanTest/Audit/ActiveTraceNonVacuity.lean` hand-assembles one semantic trace record for
 `JAL x0, 0` with the matching native Byte/Range/Program/Memory provider occurrences. Its event count
 and decoded physical instruction-row count are both one, preventing regression to the boundary-only
-case, and its four explicit ledgers have lengths 4/46/2/4 and satisfy exact integer balance plus the
+or zero-event cases, and its four explicit ledgers have lengths 4/46/2/4 and satisfy exact integer balance plus the
 count bounds. `activeTrace_yields_airWitness` invokes generated-trace assembly, which circuit-generates the
 physical rows; `activeTrace_yields_localExecution` immediately invokes native soundness on the
 result. The anchor demonstrates one real row through the complete assembly path; it is not yet an
-inhabitant of every residual premise of `SupportedCoreNativeAdmissibleExecutionRelation`.
+inhabitant of every residual premise of `SupportedCoreNativeAdmissibleShardRelation`.
 
 ## 8. The headline theorem and the conditional exact-AIR layer
 
@@ -717,11 +718,13 @@ result, with the shard-local restriction being ours alone.
 
 ### 8.3 The exact-upstream layer is honestly conditional
 
-The relation over SP1's *exact* extracted tables (the 34-table execution cluster, with
-`GlobalValid` demanding well-formed public values and an exact natural-number send/receive
-balance) is defined in `Faithful/CoreAIR.lean` + `FormalModel/CoreAIRRelation.lean`. Its
-refinement into the eventful SP1/Sail shard relation exists only through the conditional
-declaration below.
+The relation over SP1's *exact* extracted tables is
+`CoreAIR.Current.ShardRelation`, whose one witness pairs the 34-table execution cluster with the
+six-table Memory-boundary cluster. `GlobalValid` demands well-formed public values and exact
+natural-number send/receive balance in the shared `NaturalBusLedger` representation. The relation
+and its row universe are defined in `Faithful/CoreAIR.lean` +
+`FormalModel/CoreAIRRelation.lean`; refinement into the common SP1/Sail shard relation exists only
+through the conditional declaration below.
 
 The native chip/grounding theorems are field-generic under their stated prime bounds. The full exact
 system/public-value artifacts are not automatically so: `Global` and `SyscallInstrs`, and the
@@ -733,19 +736,19 @@ exact-system soundness claim is made here.
 ```lean
 -- SP1Clean/Soundness/CoreAIR.lean
 theorem sp1_air_sound_of_obligations ...
-    (proofs : CoreAIRRefinementObligations binds handler programBinding) :
-    WitnessRelation.Sound (CoreAIR.Current.Relation binds .execution)
-      (SP1CoreShardExecutionRelation .base handler programBinding)
+    (external : CoreAIRExternalContext binds handler programBinding)
+    (proofs : CoreAIRRefinementObligations binds handler programBinding external) :
+    WitnessRelation.Sound (CoreAIR.Current.ShardRelation binds)
+      (SP1CoreShardSemanticRelation .base handler programBinding)
 ```
 
-conditional on `CoreAIRRefinementObligations` — a named structure whose fields are the open
-proofs (decode totality, public-value/program well-formedness, first-shard discipline, syscall
-transcript and commit-operand equalities, the boundary-shard case, and the substantive
-`executionCase`: exact system-table rows ground an eventful Sail segment). The bundle was audited
-for coherence (fields well-typed, mutually consistent, none dead — every field is consumed by the
-combinator). Until a closed construction exists, the unqualified names stay reserved. This is the
-repository's core honesty discipline: conditional results are *named* as conditional, and
-headline names are not spent early.
+The total proof-free decoder and six program/loader/platform facts that are not AIR consequences live
+in `CoreAIRExternalContext`. Conditional `CoreAIRRefinementObligations` has twelve AIR-facing fields:
+public-value and first-shard laws; syscall transcript, operand, flag, and commit-transition laws;
+Memory-boundary well-formedness and endpoint agreement; and the boundary/execution shard cases. The
+substantive `executionCase` must ground the exact system-table rows as an eventful Sail segment. Every
+field is consumed by the combinator. Until a closed construction exists, the unqualified names stay
+reserved; conditional results remain visibly named as conditional.
 
 The exact/native construction beneath that still-open semantic refinement is now explicit at its
 local boundary. `Composition/CoreEnsemble.lean` consumes valid exact execution and
@@ -1104,9 +1107,9 @@ Stated plainly:
    all four channel balances are proved.  Admissibility still records the per-chip event-validity,
    initial-Memory, Program-row projection, and actual-footprint facts not yet derived for
    a general bounded ordinary Sail execution. `NativeCompletenessNonVacuity.lean` jointly inhabits
-   every premise in the boundary-only case; the active JAL-x0 anchor separately inhabits the older
+   every premise in the zero-event canonical execution case; the active JAL-x0 anchor separately inhabits the older
    generated-trace assembly path. Capacity alignment is closed; unconditional public-language
-   equality now depends exactly on `NativeTraceTotalOnSupportedCore`.
+   equality now depends exactly on `NativeShardTraceTotal`.
 7. **The extracted-to-native local ensemble transport is complete under named contracts; its global
    semantic refinement is not.** `SP1Clean/Composition/` composes every chip anchor with valid
    exact execution and separately authenticated memory-boundary witnesses, a caller-supplied
@@ -1143,7 +1146,7 @@ Stated plainly:
    cancellation, preprocessing/program authentication, memory-boundary meaning, and syscall facts.
    Consequently `CoreAIRRefinementObligations.executionCase` remains open, and the unqualified
    `sp1_air_refinement` / `sp1_air_sound` names stay reserved. Under an explicit syscall-free
-   restriction (`Soundness/CoreAIRSyscallFree.lean`) four of the bundle's fourteen fields are
+   restriction (`Soundness/CoreAIRSyscallFree.lean`) four of the bundle's twelve fields are
    discharged and a fifth is reduced to an explicit decoder property.
 8. **Trusted surfaces T1–T5** (§10), including the pinned git dependency graph — in which the
    Clean DSL is currently a fork (T5) — and the trace-battery provenance caveat (§4.3).

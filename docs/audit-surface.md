@@ -39,11 +39,12 @@ kernel, each with the question it decides. Reading these, plus `FormalModel/Cont
 | `SupportedCoreNativeRelation` | `SP1Clean/Soundness/AIR.lean` | The hypothesis side: exactly two conjuncts |
 | `SupportedCoreNativeShardRelation` | `SP1Clean/Soundness/AIR.lean` | The same native relation restricted to the pinned active-row budget |
 | `supported_core_native_sound` | `SP1Clean/Soundness/AIR.lean` | The headline theorem |
-| `supported_core_native_ordinary_sound` | `SP1Clean/Soundness/AIR.lean` | The native witness projected to the exact ordinary supported target |
-| `supported_core_native_shard_sound` | `SP1Clean/Soundness/AIR.lean` | Capacity-aligned soundness into the shared bounded semantic relation |
+| `supported_core_native_shard_sound` | `SP1Clean/Soundness/AIR.lean` | Capacity-aligned soundness into the one canonical semantic relation |
 | `SupportedCoreLocalExecutionRelation` | `SP1Clean/FormalModel/Execution.lean` | What the conclusion actually says |
-| `SupportedOrdinaryShardExecutionRelation` | `SP1Clean/FormalModel/SupportedShard.lean` | The shared normal-retirement, 25-route semantic target |
-| `SupportedCoreOrdinaryShardExecutionRelation` | `SP1Clean/FormalModel/SupportedShard.lean` | The one pinned capacity-bounded semantic language shared by both directions |
+| `Machine.CoreShardSemanticWitness` | `SP1Clean/Model/Machine/Shard.lean` | The one proof-free program/Memory-boundary/initial-state/event carrier shared by native and exact Core |
+| `CoreShardSemanticWitness.evaluatedTrace` | `SP1Clean/Model/Machine/Shard.lean` | The total proof-independent evaluator consumed by the trace compiler |
+| `CoreShardExecutionRelation` | `SP1Clean/FormalModel/CoreShard.lean` | The one semantic relation skeleton specialized by native and exact Core |
+| `SupportedCoreShardExecutionRelation` | `SP1Clean/FormalModel/SupportedShard.lean` | The normal-retirement, 25-route, capacity-bounded specialization shared by both native directions |
 | `SP1TransitionView` | `SP1Clean/Model/Semantics/TransitionView.lean` | The one proof-free fetch/decode/route/access projection shared by both directions |
 | `projectSP1Transition?` | `SP1Clean/Model/Semantics/TransitionView.lean` | How an operational transition is projected, including the explicit optional access-plan result |
 | `SupportedSP1Transition` | `SP1Clean/FormalModel/SupportedShard.lean` | What “supported” requires of each transition, expressed through that shared view |
@@ -114,7 +115,11 @@ granularity gap is recorded on the definitions themselves.
 | `PreprocessedProviderContract` | `SP1Clean/Composition/PreprocessedProviders.lean` | Caller-supplied row-local provider semantics |
 | `PreprocessedProviderRecountContract` | `SP1Clean/Composition/PreprocessedProviders.lean` | Coverage, nonpositivity, canonical capacity |
 | `ExactNativeGlobalContract` | `SP1Clean/Composition/CoreArtifact.lean` | What the artifact still assumes globally |
-| `CoreAIRRefinementObligations` | `SP1Clean/Soundness/CoreAIR.lean` | The 14-field exact-refinement bundle (`executionCase` open) |
+| `CoreAIR.ShardWitness` | `SP1Clean/FormalModel/CoreAIRRelation.lean` | The paired execution and Memory-boundary exact witness; neither cluster can be omitted from the capstone source |
+| `CoreAIR.Current.ShardRelation` | `SP1Clean/Faithful/CoreAIR.lean` | Exact 34+6-table validity on that paired witness |
+| `CoreAIRExternalContext` | `SP1Clean/Soundness/CoreAIR.lean` | The total decoder and six loader/platform/program facts that are not AIR consequences |
+| `CoreAIRRefinementObligations` | `SP1Clean/Soundness/CoreAIR.lean` | The 12-field exact AIR-to-common-shard proof bundle (`executionCase` open) |
+| `sp1_air_refinement_of_obligations` | `SP1Clean/Soundness/CoreAIR.lean` | The pinned-SP1Prime deterministic map from the paired exact source to the common shard relation |
 | `System.localValid_of_relationFor` | `SP1Clean/FormalModel/CoreAIRRelation.lean` | The stable eliminator from an exact cluster relation to one row's complete local validity |
 
 ## Exact Core system-table semantics
@@ -155,11 +160,11 @@ them; it does not maintain a second list that could drift from extraction.
 | `SupportedCoreTraceWitness` | `SP1Clean/Proofs/Completeness/Assembly.lean` | What a supplied trace is |
 | `compileExecution` | `SP1Clean/Proofs/Completeness/ExecutionCompiler.lean` | The proof-independent chronological all-25 compiler |
 | `compileLocatedTransitions?_exists_of_views` | `SP1Clean/Proofs/Completeness/ExecutionCompiler.lean` | Why the chronological fold itself is total once each retained shared view compiles |
-| `SupportedOrdinaryShardExecutionValid.compileExecution?_exists_of_instructionEventsReady` | `SP1Clean/Proofs/Completeness/ExecutionCompiler.lean` | Why semantic validity already discharges fetch/decode/image/route projection, leaving only one-row event readiness |
+| `SupportedCoreShardExecutionValid.compileExecution?_exists_of_instructionEventsReady` | `SP1Clean/Proofs/Completeness/ExecutionCompiler.lean` | Why common semantic validity already discharges fetch/decode/image/route projection, leaving only one-row event readiness |
 | `nativeTrace` | `SP1Clean/Proofs/Completeness/NativeTraceCompiler.lean` | The unique 53-table trace produced from a statement and execution |
 | `NativeTraceReady` | `SP1Clean/Proofs/Completeness/NativeTraceCompiler.lean` | The remaining named semantic/representation facts about that exact compiler output |
 | `NativeTraceAdmissible` | `SP1Clean/Proofs/Completeness/NativeTraceCompiler.lean` | The residual compiler/output predicate, without copied semantic validity or row budget |
-| `NativeTraceTotalOnSupportedCore` | `SP1Clean/Proofs/Completeness/NativeTraceCompiler.lean` | The one domain-closure theorem still separating bounded completeness from full correctness |
+| `NativeShardTraceTotal` | `SP1Clean/Proofs/Completeness/NativeTraceCompiler.lean` | The one domain-closure theorem still separating bounded completeness from full correctness |
 | `NativeStateRowProjection` | `SP1Clean/Proofs/Completeness/NativeTraceCompiler.lean` | The sole physical-row projection seam for State instruction accesses |
 | `NativeMemoryRowProjection` | `SP1Clean/Proofs/Completeness/NativeTraceCompiler.lean` | The two physical-row projection seams for instruction and MemoryBump accesses |
 | `NativeMemoryGenesis` | `SP1Clean/Proofs/Completeness/NativeTraceCompiler.lean` | The field-free initial-memory fact, before any Clean provider representation |
@@ -169,24 +174,24 @@ them; it does not maintain a second list that could drift from extraction.
 | `nativeTrace_memoryInitProviderBound` | `SP1Clean/Proofs/Completeness/NativeMemoryAgreement.lean` | Field-free Memory genesis grounds the generated init-provider rows |
 | `nativeTrace_programProviderBound` | `SP1Clean/Proofs/Completeness/NativeProgramAgreement.lean` | Retained decode agreement grounds the generated Program-provider rows |
 | `NativeTraceReady.semanticBoundary` | `SP1Clean/Proofs/Completeness/NativeBoundaryAgreement.lean` | The derived Program/Memory provider facts joined with the exact semantic boundary |
-| `SupportedCoreNativeAdmissibleExecutionRelation` | `SP1Clean/Proofs/Completeness/NativeTraceCompiler.lean` | The honest semantic source on which the deterministic compiler is presently proved complete |
+| `SupportedCoreNativeAdmissibleShardRelation` | `SP1Clean/Proofs/Completeness/NativeTraceCompiler.lean` | The canonical semantic source restricted only by facts about its deterministic compiled trace |
 | `supported_core_native_functionalCompleteness` | `SP1Clean/Soundness/NativeCompleteness.lean` | The proof-independent semantic-execution-to-AIR witness map |
 | `supported_core_native_shard_functionalCompleteness` | `SP1Clean/Soundness/NativeCompleteness.lean` | The same map into the capacity-aligned native relation |
 | `supported_core_native_complete` | `SP1Clean/Soundness/NativeCompleteness.lean` | Existential whole-ensemble completeness on the admissible image |
 | `sp1Ensemble_statement_of_supported_execution` | `SP1Clean/Soundness/NativeCompleteness.lean` | The direct Clean `Ensemble.Statement` consequence |
-| `anchorExecution_admissible` | `SP1CleanTest/Audit/NativeCompletenessNonVacuity.lean` | A concrete boundary-only execution jointly inhabits every admissibility premise |
+| `anchorExecution_admissible` | `SP1CleanTest/Audit/NativeCompletenessNonVacuity.lean` | A concrete zero-event common shard witness jointly inhabits every admissibility premise |
 | `anchorExecution_yields_airWitness` | `SP1CleanTest/Audit/NativeCompletenessNonVacuity.lean` | The functional capstone returns its literal compiled 53-table witness |
 | `SupportedCoreGeneratedTraceRelation` | `SP1Clean/Soundness/AIRCompleteness.lean` | The lower generated-trace assembly boundary, kept distinct from semantic completeness |
 
 Completeness now covers the deterministic compiler's full 53-table admissible image: all 25 instruction
 families, refresh-aware StateBump/MemoryBump placement, canonical Byte/Range/Program closure, both
 Memory boundary tables, the State verifier row, constraints, and all four channel balances.  It is
-still narrower than the shared bounded ordinary semantic relation. Its compiler domain needs
+still narrower than the common bounded semantic relation. Its compiler domain needs
 access-plan success (notably complete source/target RAM cells), registry-wide event-validity,
 Memory-genesis, representation-agreement, and interaction-footprint theorems. Configured-state
 decode stability is no longer on that list: it is attached to the shared `SP1TransitionView` by
 `SupportedSP1Transition` and is derived registry-wide. Soundness and completeness now use the
-same bounded native/semantic relation pair; `NativeTraceTotalOnSupportedCore` is the single remaining
+same bounded native/semantic relation pair; `NativeShardTraceTotal` is the single remaining
 condition for the proved `supported_core_native_shard_correct_of_totality` and its language-equality
 corollary. No abstract certificate or existential AIR witness hides those facts, and unconditional
 public-language equality remains reserved until that transparent condition is closed.

@@ -94,12 +94,11 @@ the proved register/RAM interpretation the ordinary-row grounding engine consume
 | Sail instruction bridges | 25 / 25 supported tables | proved |
 | Whole-chip Rust AIR faithfulness | 25 / 25 supported instruction tables | proved |
 | Grounding contracts used by the native capstone | 25 / 25 descriptors | proved |
-| Exact upstream execution cluster | 34 tables | complete list-level relation present |
-| Exact upstream memory-boundary cluster | 6 tables | complete list-level relation present |
+| Exact upstream Core shard | paired 34-table execution + 6-table Memory-boundary clusters | complete list-level source relation present |
 | Exact clusters + named transport contracts → local native ensemble artifact | 53 tables + verifier | constructed; all local constraints proved |
 | Active hand-assembled semantic trace → circuit-generated native AIR → Sail anchor | 1 JAL-x0 row | one event and one decoded physical instruction row; four-bus balance, native relation, and local execution proved for any supplied ordinary-schedule model |
 | Whole-chip Rust trace conformance (dump-anchored gate) | 25 chips | executable test evidence, not a theorem premise |
-| Exact upstream AIR to Sail | 34-table execution cluster | open bundle; conditional combinator only |
+| Exact upstream AIR to Sail | paired 34+6-table shard witness | open 12-field AIR bundle plus explicit external context; conditional combinator only |
 | Cross-shard boot-to-halt execution | full shard ledger | relation specified; theorem not yet declared |
 | Cross-shard ledger predicate layer | `Contracts/PublicValues.lean` | reserved API, declared ahead of its consumer |
 | ArkLib verifier knowledge soundness | Core verifier | out of this workstream's current proof |
@@ -111,18 +110,19 @@ of the exact `CoreProfile.instructionTables` list. It also tracks the physical o
 `supportedChips` registry.
 
 The native completeness layer now has a proof-independent compiler for all 25 instruction tables.
-It folds the one operational `EventExecutionTrace`, inserts the required State/Memory refreshes,
+It folds the `EventExecutionTrace` deterministically evaluated from the common
+`CoreShardSemanticWitness`, inserts the required State/Memory refreshes,
 constructs both Memory boundaries, and closes Byte/Range/Program demand from the trace's own Clean
 ledger. Provider balance is proved directly in the field, so the old `2 * multiplicity ≤ p`
 restriction is gone; only the actual interaction-list footprint `< p` remains.
 
 `supported_core_native_functionalCompleteness` proves the resulting 53-table witness satisfies the
-same native relation consumed by soundness on `SupportedCoreNativeAdmissibleExecutionRelation`.
-That source restricts the shared bounded ordinary execution relation by named residual semantic
-readiness facts and the physical `< p` footprint for the deterministic compiler output. Both
+same native relation consumed by soundness on `SupportedCoreNativeAdmissibleShardRelation`.
+That source restricts the common bounded shard relation by named residual semantic readiness facts
+and the physical `< p` footprint for the deterministic compiler output. Both
 directions use the same `CoreProfile.WithinOrdinaryRowLimit` policy, and
 `supported_core_native_shard_sound` targets that same bounded semantic relation. The remaining
-scope gap is exactly `NativeTraceTotalOnSupportedCore`, not missing tables, bump placement, provider
+scope gap is exactly `NativeShardTraceTotal`, not missing tables, bump placement, provider
 closure, a second execution carrier, or an existential trace generator.
 
 `ChipFaithful` is a whole-row statement. For every adversarial Rust row it proves equivalence between:

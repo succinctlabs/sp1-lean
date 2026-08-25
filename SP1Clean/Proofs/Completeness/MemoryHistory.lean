@@ -101,57 +101,25 @@ def Continues (earlier later : MemoryHistoryAccess) : Prop :=
     later.pulled = earlier.pushed
 
 /-- The canonical byte address used in the three address limbs of the Memory channel.  Register
-records use their index; RAM records use the aligned eight-byte cell base. -/
-def busAddress : MemLoc → ℕ
-  | .reg index => index.toNat
-  | .ram cell => cell.toNat * 8
+records use their index; RAM records use the aligned eight-byte cell base.  The definition itself
+is shared at `Semantics.MemLoc.busAddress`; this spelling is retained for compiler clients. -/
+abbrev busAddress : MemLoc → ℕ := MemLoc.busAddress
 
 /-- The Memory bus carries only 48 address bits and reserves `0..31` for register records.  A RAM
 location is canonically representable exactly when its aligned base lies in the remaining 48-bit
-address space. -/
-def CanonicalAddress : MemLoc → Prop
-  | .reg _ => True
-  | .ram cell => 32 ≤ cell.toNat * 8 ∧ cell.toNat * 8 < 2 ^ 48
+address space.  This compiler spelling is an alias of the Model-layer predicate. -/
+abbrev CanonicalAddress : MemLoc → Prop := MemLoc.CanonicalAddress
 
 theorem busAddress_lt_two_pow_48 {loc : MemLoc}
     (canonical : CanonicalAddress loc) : busAddress loc < 2 ^ 48 := by
-  cases loc with
-  | reg index => exact lt_trans index.isLt (by norm_num)
-  | ram cell =>
-      simp only [CanonicalAddress] at canonical
-      exact canonical.2
+  exact MemLoc.busAddress_lt_two_pow_48 canonical
 
 /-- Canonical register/RAM address encoding is injective.  The lower-bound clause is load-bearing:
 without it, aligned RAM addresses `0,8,16,24` collide with the reserved register shapes. -/
 theorem busAddress_injective_of_canonical {left right : MemLoc}
     (leftCanonical : CanonicalAddress left) (rightCanonical : CanonicalAddress right)
     (addressEq : busAddress left = busAddress right) : left = right := by
-  cases left with
-  | reg leftIndex =>
-      cases right with
-      | reg rightIndex =>
-          simp only [busAddress] at addressEq
-          congr 1
-          exact BitVec.eq_of_toNat_eq addressEq
-      | ram rightCell =>
-          exfalso
-          have leftLt : leftIndex.toNat < 32 := leftIndex.isLt
-          simp only [CanonicalAddress] at rightCanonical
-          simp only [busAddress] at addressEq
-          omega
-  | ram leftCell =>
-      cases right with
-      | reg rightIndex =>
-          exfalso
-          have rightLt : rightIndex.toNat < 32 := rightIndex.isLt
-          simp only [CanonicalAddress] at leftCanonical
-          simp only [busAddress] at addressEq
-          omega
-      | ram rightCell =>
-          simp only [busAddress] at addressEq
-          congr 1
-          apply BitVec.eq_of_toNat_eq
-          omega
+  exact MemLoc.busAddress_injective_of_canonical leftCanonical rightCanonical addressEq
 
 /-- The record pulled by this access. -/
 def pulledEntry (access : MemoryHistoryAccess) : MemRecordEntry where

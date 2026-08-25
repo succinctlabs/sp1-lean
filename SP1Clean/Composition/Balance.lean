@@ -81,9 +81,13 @@ theorem sentCount_cons (i : Extracted.Interaction (ZMod p)) (rest : List (Extrac
       (if Balance.directionScope i.dir = Balance.Scope.local ∧ i.payload = payload ∧
           (i.dir = .send ∨ i.dir = .sendGlobal) then i.mult.val else 0) +
         Balance.sentCount Balance.Scope.local rest payload := by
-  simp only [Balance.sentCount, List.filter_cons]
-  by_cases h : Balance.directionScope i.dir = Balance.Scope.local ∧ i.payload = payload ∧
-      (i.dir = .send ∨ i.dir = .sendGlobal) <;> simp [h]
+  unfold Balance.sentCount
+  rw [show Balance.naturalLedger (i :: rest) =
+    { key := (Balance.directionScope i.dir, i.payload)
+      direction := Balance.naturalDirection i.dir
+      multiplicity := i.mult.val } :: Balance.naturalLedger rest from rfl]
+  rw [NaturalBusLedger.sentCount_cons]
+  cases i.dir <;> simp [Balance.directionScope, Balance.naturalDirection]
 
 omit [Fact p.Prime] in
 theorem receivedCount_cons (i : Extracted.Interaction (ZMod p)) (rest : List (Extracted.Interaction (ZMod p)))
@@ -92,9 +96,13 @@ theorem receivedCount_cons (i : Extracted.Interaction (ZMod p)) (rest : List (Ex
       (if Balance.directionScope i.dir = Balance.Scope.local ∧ i.payload = payload ∧
           (i.dir = .receive ∨ i.dir = .receiveGlobal) then i.mult.val else 0) +
         Balance.receivedCount Balance.Scope.local rest payload := by
-  simp only [Balance.receivedCount, List.filter_cons]
-  by_cases h : Balance.directionScope i.dir = Balance.Scope.local ∧ i.payload = payload ∧
-      (i.dir = .receive ∨ i.dir = .receiveGlobal) <;> simp [h]
+  unfold Balance.receivedCount
+  rw [show Balance.naturalLedger (i :: rest) =
+    { key := (Balance.directionScope i.dir, i.payload)
+      direction := Balance.naturalDirection i.dir
+      multiplicity := i.mult.val } :: Balance.naturalLedger rest from rfl]
+  rw [NaturalBusLedger.receivedCount_cons]
+  cases i.dir <;> simp [Balance.directionScope, Balance.naturalDirection]
 
 omit [Fact p.Prime] in
 /-- Below half the characteristic the centered representative *is* `ZMod.val`. -/
@@ -163,7 +171,8 @@ Clean bus balance is stated in.
 theorem signedSum_eq_zero (all : List (Extracted.Interaction (ZMod p))) (hp : 2 < p)
     (valid : Balance.Valid all) (small : SmallMultiplicities all)
     (payload : AirInteraction (ZMod p)) :
-    signedSum all payload = 0 := by
-  rw [signedSum_eq_sent_sub_received all hp valid.1 small payload, valid.2 payload, sub_self]
+  signedSum all payload = 0 := by
+  rw [signedSum_eq_sent_sub_received all hp valid.1 small payload,
+    valid.local_counts payload, sub_self]
 
 end SP1Clean.Composition

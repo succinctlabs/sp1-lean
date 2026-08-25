@@ -16,14 +16,15 @@ Completed:
   `supported_core_native_grounding` endpoint retaining final-State and memory-finalize truth;
 - Program and Memory timed grounding for the native 53-table ensemble;
 - `supported_core_native_sound`;
-- the exact `supported_core_native_ordinary_sound` theorem over the shared proof-free
-  `EventExecutionTrace`, with normal-retirement evidence and canonical 25-chip routing on every
-  transition;
+- `supported_core_native_shard_sound` into the shared proof-free
+  `CoreShardSemanticWitness`, with deterministic event evaluation, normal-retirement evidence, and
+  canonical 25-chip routing on every transition;
 - neutral `InstructionChipId`/`InstructionRouting`/`ProviderTableId` registries shared by native
   ensemble construction, completeness assembly, decoding, and transport;
 - one Model-layer `SP1TransitionView` shared literally by the ordinary semantic relation,
   soundness construction, chronological compiler, and Program agreement proof;
-- exact list-level 34-table execution and 6-table memory-boundary relations;
+- the paired exact `CoreAIR.Current.ShardRelation`, containing the list-level 34-table execution and
+  6-table Memory-boundary witnesses together;
 - constructive exact-row assembly of all 53 native tables plus the verifier row, with local
   constraints proved from valid clusters, a caller-supplied `CanonicalPreprocessedInventory`, and
   named preprocessing, memory-boundary, and public-limb transport contracts;
@@ -40,7 +41,7 @@ Not completed:
 - cross-shard boot-to-halt soundness;
 - concrete syscall-handler refinements beyond the abstract relation;
 - ArkLib verifier knowledge soundness; and
-- `NativeTraceTotalOnSupportedCore`, the residual implications from the shared bounded semantic
+- `NativeShardTraceTotal`, the residual implications from the shared bounded semantic
   relation to `NativeTraceReady` and `NativeTraceFootprint.Fits`; and
 - the exact-upstream reconfiguration theorem relating this native compiler output to Rust's full
   Core trace.
@@ -225,12 +226,12 @@ At that point the `_of_obligations` declarations may remain as internal composit
 
 Acceptance criteria:
 
-- source is exactly `CoreAIR.Current.Relation binds .execution`;
-- target is `SP1CoreShardExecutionRelation`;
+- source is exactly the paired `CoreAIR.Current.ShardRelation binds`;
+- target is `SP1CoreShardSemanticRelation`;
 - the map is a total deterministic function of statement and AIR witness;
 - no field simply restates the final target as an assumption;
-- the proof consumes all 34 execution-cluster tables;
-- the memory-boundary cluster is used only where its own relation is authenticated; and
+- the proof consumes the 34 execution-cluster and six Memory-boundary tables from the one paired
+  witness, using each cluster only under its own authenticated relation;
 - the audit remains `sorryAx`-free.
 
 ## P1: compose shards from boot to HALT
@@ -312,10 +313,11 @@ the 28 provider/boundary tables, and the verifier row.  W5 now adds the semantic
 - `TransitionView.lean` hoists fetch/decode/route and the attempted access plan into the one
   proof-free view consumed by both directions; access failure stays explicit instead of narrowing
   the semantic relation;
-- `ExecutionCompiler.lean` folds the one `Machine.EventExecutionTrace` chronologically;
+- `ExecutionCompiler.lean` folds the common witness's deterministically evaluated
+  `Machine.EventExecutionTrace` chronologically;
 - its structural totality theorem proves the fold adds no failure after one-row readiness, and the
   semantic specialization discharges outer fetch/decode/image/route projection directly from
-  `SupportedOrdinaryShardExecutionValid`;
+  `SupportedCoreShardExecutionValid`;
 - the shared field-free scheduler inserts register `MemoryBump` rows at timestamp-window crossings,
   while `stateBumpEvents` derives State refreshes;
 - `MemoryHistory.lean` constructs the canonical initial/final record per touched location;
@@ -327,9 +329,9 @@ the 28 provider/boundary tables, and the verifier row.  W5 now adds the semantic
 `supported_core_native_functionalCompleteness`
 (`SP1Clean/Soundness/NativeCompleteness.lean`) maps that trace into the unchanged
 `SupportedCoreNativeRelation`.  Its source,
-`SupportedCoreNativeAdmissibleExecutionRelation`, is the shared bounded ordinary Sail relation plus
-the named compiler/readiness facts for this same execution and the actual four-channel interaction
-footprint `< p`.  The semantic and native row counts both feed the one
+`SupportedCoreNativeAdmissibleShardRelation`, is the canonical bounded shard relation plus the named
+compiler/readiness facts for its evaluated trace and the actual four-channel interaction footprint
+`< p`. The semantic and native row counts both feed the one
 `CoreProfile.WithinOrdinaryRowLimit` policy. Constraints, channel balance, public equality, and the
 semantic boundary are conclusions.  `supported_core_native_complete` is its existential form and
 `sp1Ensemble_statement_of_supported_execution` is the direct Clean statement theorem.
@@ -351,7 +353,7 @@ What P3 still means:
   shared `ConfiguredDecode` fact carried by each supported semantic transition); and
 - derive the emitted interaction footprint from the Core row budget and table arities.
 
-These implications are collected exactly by `NativeTraceTotalOnSupportedCore`. Capacity alignment
+These implications are collected exactly by `NativeShardTraceTotal`. Capacity alignment
 is closed: `supported_core_native_shard_sound` and
 `supported_core_native_shard_functionalCompleteness` use the same bounded native/semantic relation
 pair, and `supported_core_native_shard_correct_of_totality` plus its language-equality corollary need

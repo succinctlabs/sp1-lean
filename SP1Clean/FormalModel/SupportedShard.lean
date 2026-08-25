@@ -1,3 +1,4 @@
+import SP1Clean.FormalModel.CoreShard
 import SP1Clean.FormalModel.Execution
 import SP1Clean.FormalModel.CoreProfile
 import SP1Clean.Model.Semantics.TransitionView
@@ -6,17 +7,11 @@ import SP1Clean.Model.Semantics.ProgramCommitment
 /-!
 # Exact semantic relation for the native ordinary-instruction shard
 
-This module is the semantic side shared by soundness and completeness. It deliberately contains no
-Clean table, physical row, provider inventory, or field-valued instruction event. A witness is the
-one proof-free `Machine.EventExecutionTrace`; validity says that it is an ordinary official-Sail
-segment, that every fetched instruction routes through the canonical 25-chip profile, and that its
-public endpoints and program boundary are honest.
-
-The existing `SupportedCoreLocalExecutionRelation` is a deliberately broad Sail target useful to
-soundness. `SupportedOrdinaryShardExecutionRelation` supplies the shared semantic validity, and
-`SupportedCoreOrdinaryShardExecutionRelation` restricts that same relation to the pinned Core shard
-budget. Keeping both views here prevents completeness from defining "supported execution" in terms
-of a generated AIR trace or introducing a second execution carrier.
+This module specializes the canonical Core-shard relation for the syscall-free 25-chip native
+profile.  It deliberately contains no Clean table, physical row, provider inventory, or
+field-valued instruction event.  Soundness and completeness consume the same proof-free
+`Machine.CoreShardSemanticWitness`; its event transcript evaluates to an ordinary official-Sail
+segment whose every fetched instruction routes through the supported profile.
 -/
 
 open LeanRV64D.Defs
@@ -98,75 +93,92 @@ theorem SupportedSP1Transition.notAboutToExecuteEcall
   rw [instructionEq] at routed
   simp [instructionRouteId, instructionRouteKey] at routed
 
-/-- Named audit surface of one native-supported semantic shard.
+/-! ## Canonical native specialization -/
 
-`segment` owns the official event-step relation, schedule, and public endpoints. The remaining
-fields are exactly the program/boundary facts needed in the opposite directions: the honest encoder
-can represent the program, Sail begins from loaded/configured code, code bytes remain compatible
-with SP1's immutable Program table, and every normally retiring ordinary decode belongs to the
-25-chip profile. -/
-structure SupportedOrdinaryShardExecutionValid {p : ℕ} [Fact p.Prime]
-    (handler : Machine.SyscallHandler)
-    (statement : SupportedCoreStatement p)
-    (execution : Machine.EventExecutionTrace) : Prop where
-  publicValuesWellFormed : statement.publicValues.LimbBounds
-  programWellFormed : statement.program.WellFormed
-  programEncodable : Commit.Encodable statement.program
-  romLoaded : RomLoaded statement.program execution.initialState
-  configured : SailConfigured execution.initialState
-  codeMemoryCompatible : SailCodeMemoryCompatible statement.program execution.initialState
-  segment : EventSegmentMatches (handler := handler)
-    (SP1Clean.Semantics.clkNat statement.publicValues.init_clk_high
-      statement.publicValues.init_clk_low)
-    (supportedPcBits statement.publicValues.init_pc0 statement.publicValues.init_pc1
-      statement.publicValues.init_pc2)
-    (SP1Clean.Semantics.clkNat statement.publicValues.final_clk_high
-      statement.publicValues.final_clk_low)
-    (supportedPcBits statement.publicValues.final_pc0 statement.publicValues.final_pc1
-      statement.publicValues.final_pc2)
-    statement.program execution
-  allOrdinary : execution.AllOrdinary
-  supported : AllTransitionsSupported statement.program execution
+/-- Decode the native prefix statement into the common public execution coordinates. -/
+def supportedCoreShardBoundary {p : ℕ} [Fact p.Prime]
+    (statement : SupportedCoreStatement p) : Machine.CoreShardBoundary where
+  isExecution := true
+  initialClock := SP1Clean.Semantics.clkNat statement.publicValues.init_clk_high
+    statement.publicValues.init_clk_low
+  initialPc := supportedPcBits statement.publicValues.init_pc0 statement.publicValues.init_pc1
+    statement.publicValues.init_pc2
+  finalClock := SP1Clean.Semantics.clkNat statement.publicValues.final_clk_high
+    statement.publicValues.final_clk_low
+  finalPc := supportedPcBits statement.publicValues.final_pc0 statement.publicValues.final_pc1
+    statement.publicValues.final_pc2
 
-/-- Exact semantic witness relation for the native 25-chip ordinary slice. -/
-def SupportedOrdinaryShardExecutionRelation {p : ℕ} [Fact p.Prime]
-    (handler : Machine.SyscallHandler) :
-    WitnessRelation.Relation (SupportedCoreStatement p)
-      Machine.EventExecutionTrace :=
-  SupportedOrdinaryShardExecutionValid handler
+/-- Operational model of the syscall-free native instruction profile.  Program identity is one
+field of the model, so neither proof direction can silently execute a different ROM. -/
+def supportedCoreShardModel {p : ℕ} [Fact p.Prime] :
+    Machine.CoreShardModel (SupportedCoreStatement p) where
+  boundary := supportedCoreShardBoundary
+  programBound := fun statement program => program = statement.program
+  syscalls := .none
 
-/-- The one capacity-bounded semantic language shared by native soundness and completeness.
+/-- Profile-specific additions around the one common shard semantics. -/
+def supportedCoreShardContract {p : ℕ} [Fact p.Prime] :
+    CoreShardContract (SupportedCoreStatement p) where
+  statementValid := fun statement => statement.publicValues.LimbBounds
+  programValid := fun _ program => Commit.Encodable program
+  executionValid := fun _ witness execution =>
+    execution.AllOrdinary ∧
+      AllTransitionsSupported witness.program execution ∧
+      _root_.SP1Clean.CoreProfile.WithinOrdinaryRowLimit execution.steps
 
-This is a restriction of `SupportedOrdinaryShardExecutionRelation`, not a second semantic model:
-the public statement, proof-free execution witness, and all semantic fields are literally shared.
-Only the pinned v6.4.0 ordinary-row budget is added. -/
-def SupportedCoreOrdinaryShardExecutionRelation {p : ℕ} [Fact p.Prime]
-    (handler : Machine.SyscallHandler) :
-    WitnessRelation.Relation (SupportedCoreStatement p)
-      Machine.EventExecutionTrace :=
-  (SupportedOrdinaryShardExecutionRelation handler).restrict fun _ execution =>
-    _root_.SP1Clean.CoreProfile.WithinOrdinaryRowLimit execution.steps
+/-- The single capacity-bounded semantic language for the supported native Core profile. -/
+abbrev SupportedCoreShardExecutionValid {p : ℕ} [Fact p.Prime] :=
+  CoreShardExecutionValid (supportedCoreShardModel (p := p))
+    (supportedCoreShardContract (p := p))
 
-/-- The exact relation exposes an official Sail chain without translating through another custom
-execution model. -/
-theorem SupportedOrdinaryShardExecutionValid.sailChain {p : ℕ} [Fact p.Prime]
-    {handler : Machine.SyscallHandler}
-    {statement : SupportedCoreStatement p}
-    {execution : Machine.EventExecutionTrace}
-    (valid : SupportedOrdinaryShardExecutionValid handler statement execution) :
-    SailChain execution.steps execution.initialState execution.finalState :=
-  execution.sailChain valid.segment.1 valid.allOrdinary
+/-- Public native specialization of `CoreShardExecutionRelation`. -/
+def SupportedCoreShardExecutionRelation {p : ℕ} [Fact p.Prime] :
+    WitnessRelation.Relation (SupportedCoreStatement p) Machine.CoreShardSemanticWitness :=
+  CoreShardExecutionRelation (supportedCoreShardModel (p := p))
+    (supportedCoreShardContract (p := p))
 
-/-- Every located transition in the exact relation is ordinary, independently of the projected
-view retained by `SupportedSP1Transition`. -/
-theorem SupportedOrdinaryShardExecutionValid.located_event_eq_ordinary {p : ℕ}
-    [Fact p.Prime]
-    {handler : Machine.SyscallHandler}
-    {statement : SupportedCoreStatement p}
-    {execution : Machine.EventExecutionTrace}
-    (valid : SupportedOrdinaryShardExecutionValid handler statement execution)
-    {located : Machine.LocatedTransition} (member : located ∈ execution.locatedTransitions) :
-    located.transition.event = .ordinary :=
-  (valid.supported located member).1
+namespace SupportedCoreShardExecutionValid
+
+theorem program_eq {p : ℕ} [Fact p.Prime]
+    {statement : SupportedCoreStatement p} {witness : Machine.CoreShardSemanticWitness}
+    (valid : SupportedCoreShardExecutionValid statement witness) :
+    witness.program = statement.program :=
+  valid.programBound
+
+theorem publicValuesWellFormed {p : ℕ} [Fact p.Prime]
+    {statement : SupportedCoreStatement p} {witness : Machine.CoreShardSemanticWitness}
+    (valid : SupportedCoreShardExecutionValid statement witness) :
+    statement.publicValues.LimbBounds :=
+  valid.statementValid
+
+theorem programEncodable {p : ℕ} [Fact p.Prime]
+    {statement : SupportedCoreStatement p} {witness : Machine.CoreShardSemanticWitness}
+    (valid : SupportedCoreShardExecutionValid statement witness) :
+    Commit.Encodable witness.program :=
+  valid.programValid
+
+/-- The deterministic trace selected by a valid common witness, together with every native profile
+fact.  This is the sole trace-elimination rule used by the compiler. -/
+theorem evaluatedTrace_facts {p : ℕ} [Fact p.Prime]
+    {statement : SupportedCoreStatement p} {witness : Machine.CoreShardSemanticWitness}
+    (valid : SupportedCoreShardExecutionValid statement witness) :
+    let execution := witness.evaluatedTrace (supportedCoreShardModel (p := p))
+    execution.Valid Machine.ExecutableSyscallHandler.none.relation witness.program ∧
+      execution.Clocked (supportedCoreShardBoundary statement).initialClock ∧
+      execution.finalClock (supportedCoreShardBoundary statement).initialClock =
+        (supportedCoreShardBoundary statement).finalClock ∧
+      execution.initialState.regs.get? Register.PC =
+        some (supportedCoreShardBoundary statement).initialPc ∧
+      execution.finalState.regs.get? Register.PC =
+        some (supportedCoreShardBoundary statement).finalPc ∧
+      execution.AllOrdinary ∧
+      AllTransitionsSupported witness.program execution ∧
+      _root_.SP1Clean.CoreProfile.WithinOrdinaryRowLimit execution.steps := by
+  obtain ⟨events, trace, -, evaluated, traceValid, clocked, finalClock, initialPc, finalPc,
+      ordinary, supported, limit⟩ := valid.executionTrace rfl
+  rw [witness.evaluatedTrace_eq_of_trace? evaluated]
+  exact ⟨traceValid, clocked, finalClock, initialPc, finalPc, ordinary, supported, limit⟩
+
+end SupportedCoreShardExecutionValid
 
 end SP1Clean.Execution

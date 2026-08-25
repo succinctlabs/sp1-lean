@@ -32,9 +32,9 @@ SupportedCoreNativeRelation
 Conditional only:
 
 ```text
-CoreAIR.Current.Relation
+CoreAIR.Current.ShardRelation
   + CoreAIRRefinementObligations
-  → SP1CoreShardExecutionRelation
+  → SP1CoreShardSemanticRelation
 ```
 
 The conditional declarations are named `sp1_air_refinement_of_obligations` and

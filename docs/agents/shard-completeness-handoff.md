@@ -16,60 +16,62 @@ existential or hand-assembled trace.
 
 ```text
                       supported_core_native_shard_sound
-bounded native AIR  ------------------------------------------->  bounded ordinary shard
+bounded native AIR  ------------------------------------------->  canonical Core shard
        ^                                                              |
        | supported_core_native_shard_functionalCompleteness           | nativeTrace
        |                                                              | (total, proof-independent)
        +------------ admissible restriction of that shard <-----------+
 ```
 
-The shared target is `Execution.SupportedCoreOrdinaryShardExecutionRelation`, a restriction of
-`Execution.SupportedOrdinaryShardExecutionRelation`. Its witness is the single
-proof-free `Machine.EventExecutionTrace`; validity supplies the official event-step semantics,
-normal retirement, the ordinary eight-tick schedule, public endpoints, committed-program boundary,
-and a successful route through the canonical 25-chip profile for every transition. Its only added
-policy is `CoreProfile.WithinOrdinaryRowLimit execution.steps`.
+The shared target is `Execution.SupportedCoreShardExecutionRelation`, a specialization of
+`Execution.CoreShardExecutionRelation`. Its witness is the single proof-free
+`Machine.CoreShardSemanticWitness`: committed program, finite Memory boundary, private initial
+state, and an event transcript. `CoreShardSemanticWitness.evaluatedTrace` deterministically
+reconstructs the official event trace; relation validity supplies official event-step semantics,
+normal retirement, the ordinary eight-tick schedule, public endpoints, a successful route through
+the canonical 25-chip profile for every transition, and
+`CoreProfile.WithinOrdinaryRowLimit execution.steps`.
 
 The released direction theorems are:
 
-- `supported_core_native_ordinary_sound` is closed. Every witness accepted by
-  `SupportedCoreNativeRelation` produces an exact supported ordinary event trace.
 - `supported_core_native_shard_sound` is the capacity-aligned projection from
-  `SupportedCoreNativeShardRelation` to the shared bounded semantic relation.
+  `SupportedCoreNativeShardRelation` to the canonical semantic relation.
 - `supported_core_native_functionalCompleteness` is closed from
-  `SupportedCoreNativeAdmissibleExecutionRelation`.  Its map is literally the deterministic
-  `nativeTrace statement execution`; it is independent of the proof of admissibility.
+  `SupportedCoreNativeAdmissibleShardRelation`. Its map is literally `nativeTrace` applied to the
+  common witness's evaluated trace; it is independent of the proof of admissibility.
 - `supported_core_native_shard_functionalCompleteness` maps the same source and same compiler into
   the capacity-aligned native relation.
 - `supported_core_native_complete` is the existential projection of that functional theorem.
 - `supported_core_native_shard_correct_of_totality` and its language-equality corollary show that
-  `NativeTraceTotalOnSupportedCore` is the sole remaining native-domain condition.
+  `NativeShardTraceTotal` is the sole remaining native-domain condition.
 - `sp1Ensemble_statement_of_supported_execution` exposes the underlying Clean
   `Ensemble.Statement` directly.
 
-`SupportedCoreNativeAdmissibleExecutionRelation` is not a renamed AIR witness condition. It is a
-`Relation.restrict` view of the shared bounded ordinary Sail relation, adding only the named
-field-free compiler/readiness facts for that same execution and `NativeTraceFootprint.Fits` on the
-actual emitted interactions. In particular it contains neither channel balance nor table
-constraints; both are conclusions.
+`SupportedCoreNativeAdmissibleShardRelation` is not a renamed AIR witness condition. It is a
+`Relation.restrict` view of the canonical shard relation, adding only the named field-free
+compiler/readiness facts for its evaluated trace and `NativeTraceFootprint.Fits` on the actual
+emitted interactions. In particular it contains neither channel balance nor table constraints;
+both are conclusions.
 
 This closes whole-ensemble completeness for the honest deterministic compiler image. It does not
-yet prove that every witness of the shared bounded ordinary relation lies in that image. Therefore
+yet prove that every witness of the shared bounded canonical shard relation lies in that image. Therefore
 there is deliberately no unconditional `WitnessRelation.Correct` or public-language-equality
-theorem: `NativeTraceTotalOnSupportedCore` must first derive readiness and the physical `< p`
-footprint for every bounded semantic execution. Capacity alignment itself is no longer open.
+theorem: `NativeShardTraceTotal` must first derive readiness and the physical `< p` footprint for
+every valid canonical witness. Capacity alignment itself is no longer open.
 
-The older `supported_core_native_sound` remains useful as the broader local-Sail target. The exact
-ordinary theorem is the one completeness should use: its source excludes unsupported instructions
-and host-handled syscalls by construction.
+The older `supported_core_native_sound` remains useful as the broader local-Sail target. The
+canonical shard theorem is the one completeness uses: its native specialization excludes
+unsupported instructions and host-handled syscalls by construction.
 
 ## 2. The shared formal model
 
 Two layers are now explicit.
 
-1. `Machine.EventExecutionTrace` is the only proof-free operational execution carrier. A valid
-   ordinary trace converts directly to `SailChain`, and a valid trace also has a direct PolyFun
-   prefix view. There is no second custom prefix or completeness-only instruction trace.
+1. `Machine.CoreShardSemanticWitness` is the only public proof-free shard carrier. It stores no
+   target-state list: the executable model reconstructs one `Machine.EventExecutionTrace` from its
+   initial state and event transcript. A valid ordinary evaluated trace converts directly to
+   `SailChain` and has a direct PolyFun prefix view. There is no completeness-only instruction
+   trace.
 2. `DecodedInstructionRow`, `ChipRow`, and `RowView` are physical codecs for a Clean witness. They
    remain dependent and field-valued because that information is real at the AIR boundary; they are
    not an alternative execution semantics.
@@ -202,8 +204,8 @@ boundary is the concrete `Execution.NativeCompilerReady` plus the small named in
 
 The all-25 compiler, bump placement, provider recount, public-boundary projection, capacity-aligned
 soundness/completeness API, and final AIR map are implemented. What remains on the compiler side is
-proving `NativeTraceTotalOnSupportedCore`: every residual `NativeTraceReady` group plus the emitted
-footprint on `SupportedCoreOrdinaryShardExecutionRelation`:
+proving `NativeShardTraceTotal`: every residual `NativeTraceReady` group plus the emitted footprint
+on `SupportedCoreShardExecutionRelation`:
 
 - access-plan success (including complete source and target RAM cells for memory instructions),
   row-shape compiler success, and registry-wide validity of each generated per-chip event;
@@ -235,9 +237,13 @@ all 53 native tables and the verifier row are covered by the current completenes
 ## 8. Separate upstream and cryptographic boundaries
 
 This handoff concerns the 53-table native proof architecture. It does not close the exact v6.4.0
-34-table/6-table Rust AIR refinement bundle. `CoreAIRRefinementObligations` still has to derive the
-native provider/boundary facts from the six Core system tables before unqualified `sp1_air_sound` is
-available.
+34-table/6-table Rust AIR refinement bundle. The public exact source is now the paired
+`CoreAIR.Current.ShardRelation`, so neither the deterministic decoder nor an ArkLib extractor can
+authenticate the execution cluster while omitting the six-table Memory-boundary cluster.
+`CoreAIRRefinementObligations` still has to derive its system-table chronology, Memory-boundary, and
+execution fields before unqualified `sp1_air_sound` is available; loader, platform, program-binding,
+and initial-state facts remain separately named in `CoreAIRExternalContext` because they are not AIR
+consequences.
 
 The first local semantic fan-out for that bundle now lives in
 `Composition/CoreSystemSemantics.lean`: both bump transports expose their exact native decoded

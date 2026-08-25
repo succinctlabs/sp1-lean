@@ -350,18 +350,21 @@ theorem MemoryHistoryAccess.locOf_toMemoryMsg_of_busAddress
   cases loc with
   | reg index =>
       apply MemoryMsg.locOf_register _ index
-      · simp only [MemRecordEntry.toMemoryMsg, address, MemoryHistoryAccess.busAddress]
+      · simp only [MemRecordEntry.toMemoryMsg, address, MemoryHistoryAccess.busAddress,
+          MemLoc.busAddress]
         rw [Nat.mod_eq_of_lt (lt_trans index.isLt (by norm_num))]
-      · simp only [MemRecordEntry.toMemoryMsg, address, MemoryHistoryAccess.busAddress]
+      · simp only [MemRecordEntry.toMemoryMsg, address, MemoryHistoryAccess.busAddress,
+          MemLoc.busAddress]
         have indexLt : index.toNat < 2 ^ 16 := lt_trans index.isLt (by norm_num)
         rw [Nat.div_eq_of_lt indexLt]
         norm_num
-      · simp only [MemRecordEntry.toMemoryMsg, address, MemoryHistoryAccess.busAddress]
+      · simp only [MemRecordEntry.toMemoryMsg, address, MemoryHistoryAccess.busAddress,
+          MemLoc.busAddress]
         have indexLt : index.toNat < 2 ^ 32 := lt_trans index.isLt (by norm_num)
         rw [Nat.div_eq_of_lt indexLt]
         norm_num
   | ram cell =>
-      simp only [MemoryHistoryAccess.CanonicalAddress] at canonical
+      simp only [MemoryHistoryAccess.CanonicalAddress, MemLoc.CanonicalAddress] at canonical
       let base := cell.toNat * 8
       have hp : 2 ^ 16 < p := by have := Fact.out (p := 2 ^ 25 < p); omega
       have lowLt : base % 2 ^ 16 < p :=
@@ -377,7 +380,7 @@ theorem MemoryHistoryAccess.locOf_toMemoryMsg_of_busAddress
         omega
       unfold MemoryMsg.locOf
       simp only [MemRecordEntry.toMemoryMsg, address, MemoryHistoryAccess.busAddress,
-        show cell.toNat * 8 = base from rfl]
+        MemLoc.busAddress]
       rw [ZMod.val_natCast_of_lt lowLt, ZMod.val_natCast_of_lt midLt,
         ZMod.val_natCast_of_lt highLt]
       rw [if_neg]

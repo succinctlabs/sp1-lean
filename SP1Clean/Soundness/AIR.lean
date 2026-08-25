@@ -990,24 +990,26 @@ theorem supported_core_native_sound (model : Machine.SP1MachineModel)
   rw [Machine.localExecutionClock_eq_ordinary ordinary]
   exact grounding.clockCount
 
-/-- Construct the shared ordinary semantic witness while retaining its exact active-row count.
+/-- Construct the common semantic witness while retaining its exact active-row count.
 
-This is the common implementation behind the broad and capacity-bounded soundness views.  Keeping
-the count here avoids reconstructing a second execution merely to align the completeness domain. -/
-theorem supported_core_native_ordinary_execution (handler : Machine.SyscallHandler)
+The witness stores only the grounded initial state and ordinary event transcript.  Its transition
+targets are recovered by the shared evaluator, so native soundness does not publish a second
+trace-shaped semantic relation. -/
+theorem supported_core_native_shard_execution
     (statement : SupportedCoreStatement p) (witness : SupportedCoreNativeWitness p)
-    (valid : SupportedCoreNativeRelation statement witness) :
-    ∃ execution : Machine.EventExecutionTrace,
-      SupportedOrdinaryShardExecutionRelation handler statement execution ∧
-        execution.steps =
+    (valid : SupportedCoreNativeShardRelation statement witness) :
+    ∃ semanticWitness : Machine.CoreShardSemanticWitness,
+      SupportedCoreShardExecutionRelation statement semanticWitness ∧
+        (semanticWitness.evaluatedTrace (supportedCoreShardModel (p := p))).steps =
           (realDecodedInstructionRows witness.data witness.tables).length := by
-  obtain ⟨⟨publicInputEq, constraints, balanced⟩, ⟨initial, boundary⟩⟩ := valid
+  obtain ⟨nativeValid, rowLimit⟩ := valid
+  obtain ⟨⟨publicInputEq, constraints, balanced⟩, ⟨initial, boundary⟩⟩ := nativeValid
   obtain ⟨rows, grounding⟩ :=
     supported_core_witness_grounding statement witness initial publicInputEq constraints balanced
       boundary
   obtain ⟨execution, initialEq, stepsEq, finalPc, executionValid, clocked, finalClock,
       ordinary, supported⟩ :=
-    eventExecution_of_groundedRows handler
+    eventExecution_of_groundedRows Machine.ExecutableSyscallHandler.none.relation
       (fun decoded : DecodedInstructionRow p => decoded.toChipRow witness.data)
       witness.data statement.program initial rows
       (supportedPcBits statement.publicValues.init_pc0 statement.publicValues.init_pc1
@@ -1018,54 +1020,60 @@ theorem supported_core_native_ordinary_execution (handler : Machine.SyscallHandl
       boundary.romLoaded boundary.configured
       (Semantics.clkNat statement.publicValues.init_clk_high
         statement.publicValues.init_clk_low)
-  refine ⟨execution, {
-    publicValuesWellFormed := ?_
+  let semanticWitness := Machine.CoreShardSemanticWitness.ofOrdinaryTrace
+    statement.program ⟨[]⟩ execution
+  have publicValuesWellFormed : statement.publicValues.LimbBounds := by
+    rw [← publicInputEq]
+    exact witness_publicInput_limbBounds witness constraints balanced
+  have evaluated := Machine.CoreShardSemanticWitness.trace?_ofOrdinaryTrace
+    (supportedCoreShardModel (p := p)) statement.program ⟨[]⟩ execution executionValid ordinary
+  refine ⟨semanticWitness, {
+    statementValid := publicValuesWellFormed
     programWellFormed := boundary.programWellFormed
-    programEncodable := boundary.programCommitted.encodable
+    programBound := rfl
+    programValid := boundary.programCommitted.encodable
+    contractValid := trivial
     romLoaded := ?_
     configured := ?_
     codeMemoryCompatible := ?_
-    segment := ?_
-    allOrdinary := ordinary
-    supported := supported }, ?_⟩
-  · rw [← publicInputEq]
-    exact witness_publicInput_limbBounds witness constraints balanced
-  · simpa only [initialEq] using boundary.romLoaded
-  · simpa only [initialEq] using boundary.configured
-  · rw [initialEq]
+    memoryWellFormed := ?_
+    memoryAgrees := ?_
+    shardCase := ?_ }, ?_⟩
+  · change Target.RomLoaded statement.program execution.initialState
+    rw [initialEq]
+    exact boundary.romLoaded
+  · change Target.SailConfigured execution.initialState
+    rw [initialEq]
+    exact boundary.configured
+  · change Target.SailCodeMemoryCompatible statement.program execution.initialState
+    rw [initialEq]
     exact boundary.codeMemoryCompatible
-  · refine ⟨executionValid, clocked, ?_, finalPc, ?_⟩
-    · simpa only [initialEq] using boundary.initialPc
-    · exact finalClock.trans grounding.clockCount
-  · exact stepsEq.trans grounding.exhaustive.length_eq
+  · exact ⟨List.nodup_nil, fun cell member => absurd member List.not_mem_nil⟩
+  · intro cell member
+    exact absurd member List.not_mem_nil
+  · refine .execution execution.events execution rfl rfl evaluated executionValid clocked
+      (finalClock.trans grounding.clockCount) ?_ finalPc ?_
+    · simpa only [initialEq, supportedCoreShardModel, supportedCoreShardBoundary] using
+        boundary.initialPc
+    · refine ⟨ordinary, supported, ?_⟩
+      rw [stepsEq, grounding.exhaustive.length_eq]
+      exact rowLimit
+  · rw [Machine.CoreShardSemanticWitness.evaluatedTrace_eq_of_trace? evaluated]
+    exact stepsEq.trans grounding.exhaustive.length_eq
 
-/-- **Exact supported ordinary-shard soundness.** The native relation constructs the one proof-free
-`EventExecutionTrace` consumed by completeness: every transition is an official ordinary event,
-carries a successful canonical instruction route, and matches the public pc/clock endpoints.
+/-- **Capacity-aligned native soundness into the one canonical shard relation.**
 
-This broad projection intentionally forgets the active-row count retained by
-`supported_core_native_ordinary_execution`. -/
-theorem supported_core_native_ordinary_sound (handler : Machine.SyscallHandler) :
-    WitnessRelation.Sound (SupportedCoreNativeRelation (p := p))
-      (SupportedOrdinaryShardExecutionRelation handler) := by
-  intro statement witness valid
-  obtain ⟨execution, semantic, -⟩ :=
-    supported_core_native_ordinary_execution handler statement witness valid
-  exact ⟨execution, semantic⟩
-
-/-- **Capacity-aligned native soundness.** Restricting the physical relation to SP1's pinned active
-row budget produces exactly the shared bounded semantic relation; no alternate witness or copied
-semantic definition is involved. -/
-theorem supported_core_native_shard_sound (handler : Machine.SyscallHandler) :
+The intermediate `EventExecutionTrace` is immediately embedded by its initial state and event
+transcript; its target states are then recovered by the shared evaluator.  The canonical witness's
+Memory boundary is empty on this projection because the native relation already carries its
+provider binding separately; exact Core fills the same field from the paired six-table cluster. -/
+theorem supported_core_native_shard_sound :
     WitnessRelation.Sound (SupportedCoreNativeShardRelation (p := p))
-      (SupportedCoreOrdinaryShardExecutionRelation handler) := by
+      (SupportedCoreShardExecutionRelation (p := p)) := by
   intro statement witness valid
-  obtain ⟨execution, semantic, steps⟩ :=
-    supported_core_native_ordinary_execution handler statement witness valid.1
-  refine ⟨execution, semantic, ?_⟩
-  change CoreProfile.WithinOrdinaryRowLimit execution.steps
-  rw [steps]
-  exact valid.2
+  obtain ⟨semanticWitness, semantic, -⟩ :=
+    supported_core_native_shard_execution statement witness valid
+  exact ⟨semanticWitness, semantic⟩
 
 /-! ## Completeness boundary
 
@@ -1084,7 +1092,7 @@ unsupported Sail executions. -/
 
 `Soundness/CoreAIR.lean` owns the conditional
 `sp1_air_refinement_of_obligations`/`sp1_air_sound_of_obligations` combinators.  Their source is the
-concrete 34-table/6-table Rust relation in `Faithful/CoreAIR.lean`, not this smaller native ensemble.
+concrete paired 34+6-table Rust relation in `Faithful/CoreAIR.lean`, not this smaller native ensemble.
 The required field-by-field proof bundle is not yet instantiated, so the unqualified
 `sp1_air_refinement`/`sp1_air_sound` names remain reserved for that closed result.  Its COMMIT
 conclusion is deliberately limited to correctness of rows that exist.  The base composed execution
