@@ -1,7 +1,7 @@
 # Axiom and trust ledger
 
-Snapshot date: 2026-08-25, updated for the shared transition/system-semantics hoist and awaiting the
-post-commit raw-census restamp.
+Snapshot date: 2026-08-25, restamped from the committed shared transition/system-semantics source
+at `e27995d0`.
 The raw
 per-declaration output is split by library — [`axiom-census.txt`](axiom-census.txt) (the main
 `SP1Clean` library, 885 declarations) and [`axiom-census-test.txt`](axiom-census-test.txt) (the
@@ -74,7 +74,7 @@ supports; the figures below cover their union.
 - No project `axiom` declarations occur in `SP1Clean/`.
 - No probed declaration carries `sorryAx`.
 - `skipKernelTC` and `native_decide` are absent from the main library.
-- 136 textual `native_decide` lines are isolated in `SP1CleanTest/` (the witness/trace conformance
+- 134 textual `native_decide` lines are isolated in `SP1CleanTest/` (the witness/trace conformance
   batteries, the `NonVacuity.lean` chip-assumptions witnesses, the `NonVacuityReal.lean` real-row
   satisfiability battery, and the independent-audit joint-premise regression).
 
