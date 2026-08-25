@@ -7,8 +7,13 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 owner="SP1Clean/Model/SP1Field.lean"
-hits="$(rg -l '(^|[[:space:]])(abbrev|def)[[:space:]]+SP1Prime|2130706433' \
-  SP1Clean SP1CleanTest scripts -g '*.lean' || true)"
+pattern='(^|[[:space:]])(abbrev|def)[[:space:]]+SP1Prime|2130706433'
+if command -v rg >/dev/null 2>&1; then
+  hits="$(rg -l "$pattern" SP1Clean SP1CleanTest scripts -g '*.lean' || true)"
+else
+  hits="$(find SP1Clean SP1CleanTest scripts -type f -name '*.lean' \
+    -exec grep -El "$pattern" {} + || true)"
+fi
 
 if [[ "$hits" != "$owner" ]]; then
   echo "FAIL: SP1Prime and its decimal characteristic must occur only in $owner"

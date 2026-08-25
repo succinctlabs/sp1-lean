@@ -6,12 +6,32 @@ cd "$(dirname "$0")/.."
 
 fail=0
 
+lean_files_matching() {
+  local pattern="$1"
+  if command -v rg >/dev/null 2>&1; then
+    rg -l "$pattern" SP1Clean SP1CleanTest -g '*.lean' || true
+  else
+    find SP1Clean SP1CleanTest -type f -name '*.lean' \
+      -exec grep -El "$pattern" {} + || true
+  fi
+}
+
+lean_lines_matching() {
+  local pattern="$1"
+  if command -v rg >/dev/null 2>&1; then
+    rg -n "$pattern" SP1Clean SP1CleanTest -g '*.lean' || true
+  else
+    find SP1Clean SP1CleanTest -type f -name '*.lean' \
+      -exec grep -EnH "$pattern" {} + || true
+  fi
+}
+
 check_owner() {
   local name="$1"
   local owner="$2"
   local hits
-  hits="$(rg -l "^[[:space:]]*(abbrev|def|structure|inductive)[[:space:]]+${name}([[:space:]{(:]|$)" \
-    SP1Clean SP1CleanTest -g '*.lean' || true)"
+  hits="$(lean_files_matching \
+    "^[[:space:]]*(abbrev|def|structure|inductive)[[:space:]]+${name}([[:space:]{(:]|$)")"
   if [[ "$hits" != "$owner" ]]; then
     echo "FAIL: $name must be declared only in $owner"
     if [[ -n "$hits" ]]; then
@@ -26,8 +46,8 @@ check_owner() {
 check_absent() {
   local name="$1"
   local hits
-  hits="$(rg -n "^[[:space:]]*(abbrev|def|structure|inductive)[[:space:]]+${name}([[:space:]{(:]|$)" \
-    SP1Clean SP1CleanTest -g '*.lean' || true)"
+  hits="$(lean_lines_matching \
+    "^[[:space:]]*(abbrev|def|structure|inductive)[[:space:]]+${name}([[:space:]{(:]|$)")"
   if [[ -n "$hits" ]]; then
     echo "FAIL: retired duplicate declaration $name has returned"
     echo "$hits"
