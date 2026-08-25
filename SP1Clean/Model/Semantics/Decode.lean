@@ -752,7 +752,7 @@ real decodes). -/
 def decodedInROM (prog : GuestProgram) (row : ProgramRow (ZMod p)) : Prop :=
   ∃ (w : BitVec 32) (I : instruction),
     prog.fetchWord (pcBitsOfRow row) = some w ∧
-    (∀ s, SailConfigured s → (ext_decode w).run s = .ok I s) ∧
+    ConfiguredDecode w I ∧
     instrToProgramRow' (rowPcVec row) I = some row
 
 set_option linter.unusedSectionVars false in

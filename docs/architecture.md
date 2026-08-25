@@ -383,21 +383,22 @@ and stores the public boundary once.
 `SupportedCoreNativeRelation` on `SupportedCoreNativeAdmissibleExecutionRelation`; its existential
 projection is `supported_core_native_complete`, and
 `sp1Ensemble_statement_of_supported_execution` exposes the direct Clean statement.  Admissibility
-contains the exact semantic relation, pinned Core row budget, named readiness facts for this exact
-compiler output, and `NativeTraceFootprint.Fits`.  It does not assume table constraints, channel
+is a restriction of `SupportedCoreOrdinaryShardExecutionRelation` by named readiness facts for this
+exact compiler output and `NativeTraceFootprint.Fits`. The semantic and native active-row counts are
+both checked by `CoreProfile.WithinOrdinaryRowLimit`. It does not assume table constraints, channel
 balance, or an existential generated trace.
 
-The source is deliberately capacity-bounded and still narrower than every exact ordinary execution.
+The source is deliberately narrower than the shared capacity-bounded ordinary relation.
 The remaining compiler-domain work includes registry-wide event validity; State and Memory chronology/row-agreement
-lemmas; literal-ledger Byte polarity and demand servability; initial-Memory content; configured-state
-Program row/decode agreement; and the actual interaction-count bound.  Deterministic representation
-facts should migrate out of readiness as their agreement theorems close.  These implications alone
-cannot widen completeness to the current unbounded exact relation: soundness does not return the
-Core row cap or physical `< p` capacity. A future `WitnessRelation.Correct` therefore needs one
-shared capacity-bounded semantic relation (or an equivalent two-sided refinement). The library does
-not claim unconditional public-language equality. The older abstract language-certificate API
-was removed because its map could ignore the semantic witness and therefore did not express
-compiler fidelity.
+lemmas; literal-ledger Byte polarity and demand servability; initial-Memory content; Program-row
+physical projection; and the actual interaction-count bound.  Deterministic representation
+facts should migrate out of readiness as their agreement theorems close. Configured decode itself
+has already moved to the shared `ConfiguredDecode` predicate below both directions. The remaining
+implications are named exactly by `NativeTraceTotalOnSupportedCore`;
+`supported_core_native_shard_correct_of_totality` and its public-language-equality corollary consume
+only that theorem. The library does not claim unconditional public-language equality until it is
+closed. The older abstract language-certificate API was removed because its map could ignore the
+semantic witness and therefore did not express compiler fidelity.
 
 ## Performance discipline
 

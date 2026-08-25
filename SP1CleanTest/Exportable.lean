@@ -28,13 +28,8 @@ namespace SP1Clean.ExportableTests
 
 open SP1Clean
 
-/-- SP1's field is KoalaBear, `2^31 - 2^24 + 1`; the circuits are field-generic, and this is where
-SP1's prover actually runs. -/
-abbrev SP1Prime : ℕ := 2130706433
-
-instance instFactSP1Prime : Fact (Nat.Prime SP1Prime) := ⟨by native_decide⟩
-instance instFact2pow17SP1Prime : Fact (2 ^ 17 < SP1Prime) := ⟨by norm_num [SP1Prime]⟩
-instance instFact2pow24SP1Prime : Fact (2 ^ 24 < SP1Prime) := ⟨by norm_num [SP1Prime]⟩
+/-! The concrete field and all standard size instances come from `Model.SP1Field`; test code does
+not own a second spelling of the production characteristic. -/
 
 /-! ## ALU and control flow (waves W1–W2) -/
 

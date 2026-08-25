@@ -1,5 +1,4 @@
 import SP1Clean
-import SP1CleanTest.Exportable
 
 /-! # Non-vacuity anchors for the chip soundness `Assumptions` (V3)
 
@@ -22,9 +21,6 @@ bounds at the concrete prime — confined to this test library per the project r
 namespace SP1Clean.NonVacuityTests
 
 open SP1Clean
-open SP1Clean.ExportableTests (SP1Prime)
-
-instance : NeZero SP1Prime := ⟨by norm_num [SP1Prime]⟩
 
 /-- `Word.isU64` is definitionally the decidable limb-wise bound `∀ i : Fin 4, w[i].val < 2^16`;
 registered as a `Decidable` instance so the anchors below can be discharged by `native_decide`. -/

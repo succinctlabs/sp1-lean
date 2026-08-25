@@ -38,8 +38,8 @@ Not completed:
 - cross-shard boot-to-halt soundness;
 - concrete syscall-handler refinements beyond the abstract relation;
 - ArkLib verifier knowledge soundness; and
-- a shared capacity-bounded semantic relation for soundness and completeness, plus the residual
-  implications from that relation to `NativeTraceReady` and `NativeTraceFootprint.Fits`; and
+- `NativeTraceTotalOnSupportedCore`, the residual implications from the shared bounded semantic
+  relation to `NativeTraceReady` and `NativeTraceFootprint.Fits`; and
 - the exact-upstream reconfiguration theorem relating this native compiler output to Rust's full
   Core trace.
 
@@ -285,9 +285,9 @@ The source relation must express supported, trace-generatable executions and con
 behavior. The conformance pipeline remains the empirical regression layer during this work but is not
 a substitute for the theorem.
 
-**Status (2026-08-24): deterministic all-table native completeness is closed on the explicit
-admissible compiler image; aligning both directions on one capacity-bounded semantic language
-remains open.**
+**Status (2026-08-25): deterministic all-table native completeness is closed on the explicit
+admissible compiler image, and both directions now use one capacity-bounded semantic language.
+Closing the transparent compiler-admissibility totality theorem remains open.**
 
 W4 built `ToClean/Air/TableBuild.lean` and local completeness tables for all 25 instruction chips,
 the 28 provider/boundary tables, and the verifier row.  W5 now adds the semantic construction:
@@ -305,9 +305,10 @@ the 28 provider/boundary tables, and the verifier row.  W5 now adds the semantic
 `supported_core_native_functionalCompleteness`
 (`SP1Clean/Soundness/NativeCompleteness.lean`) maps that trace into the unchanged
 `SupportedCoreNativeRelation`.  Its source,
-`SupportedCoreNativeAdmissibleExecutionRelation`, is the exact ordinary Sail relation plus the
-pinned Core row budget, the named compiler/readiness facts for this same execution, and the actual
-four-channel interaction footprint `< p`.  Constraints, channel balance, public equality, and the
+`SupportedCoreNativeAdmissibleExecutionRelation`, is the shared bounded ordinary Sail relation plus
+the named compiler/readiness facts for this same execution and the actual four-channel interaction
+footprint `< p`.  The semantic and native row counts both feed the one
+`CoreProfile.WithinOrdinaryRowLimit` policy. Constraints, channel balance, public equality, and the
 semantic boundary are conclusions.  `supported_core_native_complete` is its existential form and
 `sp1Ensemble_statement_of_supported_execution` is the direct Clean statement theorem.
 
@@ -323,17 +324,17 @@ What P3 still means:
   deterministic compiler, including canonical addresses and initial Memory content;
 - derive literal-ledger Byte polarity and Byte/Program demand servability instead of carrying them
   as broad closure assumptions;
-- close Program row agreement and the configured-state decode-stability gap (the semantic relation
-  records successful decode in the actual source state, while `ProgTruth` quantifies over all
-  configured states); and
+- close the remaining Program-row physical projection (configured-state decode is already the
+  shared `ConfiguredDecode` fact carried by each supported semantic transition); and
 - derive the emitted interaction footprint from the Core row budget and table arities.
 
-Closing these implications is necessary but not sufficient for `WitnessRelation.Correct`: the
-current exact soundness target is unbounded and therefore cannot return `WithinCoreShardLimit` or
-the physical `< p` capacity fact.  The capstone first needs a shared capacity-bounded semantic
-relation on both directions (or an equivalent strengthening/weakening proved on both sides).
-Until then no public-language equality is claimed. Reconfiguration to the exact upstream trace and
-cryptographic proof-system completeness remain separate workstreams.
+These implications are collected exactly by `NativeTraceTotalOnSupportedCore`. Capacity alignment
+is closed: `supported_core_native_shard_sound` and
+`supported_core_native_shard_functionalCompleteness` use the same bounded native/semantic relation
+pair, and `supported_core_native_shard_correct_of_totality` plus its language-equality corollary need
+only that one theorem. Until it is proved no unconditional public-language equality is claimed.
+Reconfiguration to the exact upstream trace and cryptographic proof-system completeness remain
+separate workstreams.
 
 ## Maintenance gates
 

@@ -14,9 +14,10 @@ segment, that every fetched instruction routes through the canonical 25-chip pro
 public endpoints and program boundary are honest.
 
 The existing `SupportedCoreLocalExecutionRelation` is a deliberately broad Sail target useful to
-soundness. `SupportedOrdinaryShardExecutionRelation` is the exact supported image a constructive
-trace compiler may consume. Keeping the exact relation here prevents completeness from defining
-"supported execution" in terms of a generated AIR trace.
+soundness. `SupportedOrdinaryShardExecutionRelation` supplies the shared semantic validity, and
+`SupportedCoreOrdinaryShardExecutionRelation` restricts that same relation to the pinned Core shard
+budget. Keeping both views here prevents completeness from defining "supported execution" in terms
+of a generated AIR trace or introducing a second execution carrier.
 -/
 
 open LeanRV64D.Defs
@@ -26,17 +27,14 @@ namespace SP1Clean.Execution
 open Sail LeanRV64D LeanRV64D.Functions
 open SP1Clean.Soundness.Target
 
-/-- Public statement of the native ordinary-instruction shard, named below the Soundness layer so
-both witness directions can depend on it. -/
-abbrev SupportedOrdinaryShardStatement (p : ℕ) :=
-  ProgramStatement (SupportedCorePrefixPublicValues (ZMod p))
-
 /-- One chronological transition retires normally, fetches, decodes, and routes to the canonical
 supported profile.
 
 The decoded instruction and chip identity are existential facts rather than a second trace carrier.
-The future compiler computes the same values from `source` and `program`; its correctness theorem
-will use this predicate to show that computation cannot take an unsupported branch. -/
+The decode is pinned once for every configured Sail state; its run at the actual source is a
+projection of that shared fact, not a separate completeness premise.  The compiler computes the
+same values from `source` and `program`, and uses this predicate to show that computation cannot take
+an unsupported branch. -/
 def SupportedDecodedTransition (program : GuestProgram)
     (located : Machine.LocatedTransition) : Prop :=
   located.transition.event = .ordinary ∧
@@ -45,7 +43,7 @@ def SupportedDecodedTransition (program : GuestProgram)
     ∃ pc : BitVec 64, ∃ word : BitVec 32, ∃ instruction : instruction,
       located.source.regs.get? Register.PC = some pc ∧
       program.fetchWord pc = some word ∧
-      (ext_decode word).run located.source = .ok instruction located.source ∧
+      ConfiguredDecode word instruction ∧
       ∃ chipId : InstructionChipId,
         instructionRouteId instruction = some chipId
 
@@ -55,21 +53,6 @@ def AllTransitionsSupported (program : GuestProgram)
   ∀ located ∈ execution.locatedTransitions,
     SupportedDecodedTransition program located
 
-/-- The precise decoder fact not supplied by `SupportedDecodedTransition`.
-
-The exact execution relation records one official decoder run of the word fetched at the
-transition's actual source PC. `decodedInROM` deliberately requires that same decoded instruction
-in every configured state. This source-level premise states exactly that fetched-transition hoist;
-it mentions neither a Clean row nor a Program-provider conclusion. -/
-def ConfiguredDecodeStable (program : GuestProgram)
-    (execution : Machine.EventExecutionTrace) : Prop :=
-  ∀ located ∈ execution.locatedTransitions, ∀ pc word decoded,
-    located.source.regs.get? Register.PC = some pc →
-      program.fetchWord pc = some word →
-      (ext_decode word).run located.source = .ok decoded located.source →
-      ∀ state, SailConfigured state →
-        (ext_decode word).run state = .ok decoded state
-
 /-- The existential decode evidence in the semantic relation agrees with the compiler's total,
 proof-independent decode projection. -/
 theorem SupportedDecodedTransition.decodeLocated
@@ -78,9 +61,10 @@ theorem SupportedDecodedTransition.decodeLocated
     ∃ decoded : instruction, ∃ chipId : InstructionChipId,
       SP1Clean.Semantics.decodeLocated? program located = some decoded ∧
         instructionRouteId decoded = some chipId := by
-  obtain ⟨_, _, _, pc, word, decoded, pcEq, fetch, decode, chipId, routed⟩ := supported
+  obtain ⟨_, _, configured, pc, word, decoded, pcEq, fetch, decode, chipId, routed⟩ := supported
   exact ⟨decoded, chipId,
-    SP1Clean.Semantics.decodeLocated?_eq_some_of pcEq fetch decode, routed⟩
+    SP1Clean.Semantics.decodeLocated?_eq_some_of pcEq fetch
+      (decode located.source configured), routed⟩
 
 /-- A routed ordinary transition cannot be the host-handled `ECALL` boundary.  This derives the
 negative premise of `Machine.EventStep.ordinary` from the exact transition evidence itself: the
@@ -105,7 +89,7 @@ theorem SupportedDecodedTransition.notAboutToExecuteEcall
     simpa [ECALL_ENC] using SailDecode.decode_ECALL located.source cfg.init cfg.priv
       cfg.mseccfg_disabled
   have instructionEq : instruction = LeanRV64D.Defs.instruction.ECALL () := by
-    have same := decode.symm.trans ecallDecode
+    have same := (decode located.source cfg).symm.trans ecallDecode
     injection same
   subst instruction
   simp [instructionRouteId, instructionRouteKey] at routed
@@ -119,7 +103,7 @@ with SP1's immutable Program table, and every normally retiring ordinary decode 
 25-chip profile. -/
 structure SupportedOrdinaryShardExecutionValid {p : ℕ} [Fact p.Prime]
     (handler : Machine.SyscallHandler)
-    (statement : SupportedOrdinaryShardStatement p)
+    (statement : SupportedCoreStatement p)
     (execution : Machine.EventExecutionTrace) : Prop where
   publicValuesWellFormed : statement.publicValues.LimbBounds
   programWellFormed : statement.program.WellFormed
@@ -143,21 +127,27 @@ structure SupportedOrdinaryShardExecutionValid {p : ℕ} [Fact p.Prime]
 /-- Exact semantic witness relation for the native 25-chip ordinary slice. -/
 def SupportedOrdinaryShardExecutionRelation {p : ℕ} [Fact p.Prime]
     (handler : Machine.SyscallHandler) :
-    WitnessRelation.Relation (SupportedOrdinaryShardStatement p)
+    WitnessRelation.Relation (SupportedCoreStatement p)
       Machine.EventExecutionTrace :=
   SupportedOrdinaryShardExecutionValid handler
 
-/-- The pinned executor's ordinary-instruction row budget.  `MAX_SHARD_SIZE` is a clock budget,
-and an ordinary row consumes eight ticks.  This predicate deliberately says nothing about native
-representability or field capacity; those are separate properties of the compiled active witness. -/
-def WithinCoreShardLimit (execution : Machine.EventExecutionTrace) : Prop :=
-  execution.steps ≤ _root_.SP1Clean.CoreProfile.maxOrdinaryTransitions
+/-- The one capacity-bounded semantic language shared by native soundness and completeness.
+
+This is a restriction of `SupportedOrdinaryShardExecutionRelation`, not a second semantic model:
+the public statement, proof-free execution witness, and all semantic fields are literally shared.
+Only the pinned v6.4.0 ordinary-row budget is added. -/
+def SupportedCoreOrdinaryShardExecutionRelation {p : ℕ} [Fact p.Prime]
+    (handler : Machine.SyscallHandler) :
+    WitnessRelation.Relation (SupportedCoreStatement p)
+      Machine.EventExecutionTrace :=
+  (SupportedOrdinaryShardExecutionRelation handler).restrict fun _ execution =>
+    _root_.SP1Clean.CoreProfile.WithinOrdinaryRowLimit execution.steps
 
 /-- The exact relation exposes an official Sail chain without translating through another custom
 execution model. -/
 theorem SupportedOrdinaryShardExecutionValid.sailChain {p : ℕ} [Fact p.Prime]
     {handler : Machine.SyscallHandler}
-    {statement : SupportedOrdinaryShardStatement p}
+    {statement : SupportedCoreStatement p}
     {execution : Machine.EventExecutionTrace}
     (valid : SupportedOrdinaryShardExecutionValid handler statement execution) :
     SailChain execution.steps execution.initialState execution.finalState :=
@@ -168,7 +158,7 @@ chosen in `SupportedDecodedTransition`. -/
 theorem SupportedOrdinaryShardExecutionValid.located_event_eq_ordinary {p : ℕ}
     [Fact p.Prime]
     {handler : Machine.SyscallHandler}
-    {statement : SupportedOrdinaryShardStatement p}
+    {statement : SupportedCoreStatement p}
     {execution : Machine.EventExecutionTrace}
     (valid : SupportedOrdinaryShardExecutionValid handler statement execution)
     {located : Machine.LocatedTransition} (member : located ∈ execution.locatedTransitions) :

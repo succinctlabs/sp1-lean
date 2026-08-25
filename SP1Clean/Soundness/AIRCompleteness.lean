@@ -56,6 +56,7 @@ open Air.Flat (Table EnsembleWitness)
 open SP1Clean.Ledger (SignedMults pushedMessages pulledMessages
   balancedInteractions_of_signed_perm)
 open SP1Clean.Channels (stateChannel byteChannel programChannel memoryChannel)
+open SP1Clean.Execution
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 25 < p)]
 

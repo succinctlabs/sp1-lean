@@ -152,9 +152,11 @@ On the reverse path, `nativeTrace` is a total proof-independent compiler over th
 ensemble result on `SupportedCoreNativeAdmissibleExecutionRelation`.  The compiler retains each
 source transition beside its generated event, so this boundary really is coupled to the supplied
 execution.  The former abstract language certificate was removed because its map could ignore that
-execution. Public-language equality remains intentionally unstated: beyond the residual readiness
-proofs, soundness and completeness need the same capacity-bounded semantic relation. The current
-exact soundness target is unbounded, unlike completeness's Core row cap and physical footprint.
+execution. Both directions now use `SupportedCoreOrdinaryShardExecutionRelation`, whose row count is
+checked by the single `CoreProfile.WithinOrdinaryRowLimit` policy; the native side projects its
+active-row count into that same policy. Public-language equality remains intentionally
+conditional on `NativeTraceTotalOnSupportedCore`, the residual readiness/footprint theorem for the
+deterministic compiler image.
 
 ## Boundaries intentionally not collapsed
 
@@ -194,8 +196,9 @@ refresh placement, canonical provider closure, and the proof-independent `native
 remaining work is no longer a missing compiler representation.  It is discharging the explicit
 readiness groups: rich per-chip event contracts; State/Memory chronology and physical-row agreement;
 literal-ledger polarity/servability; initial-Memory truth; Program row/configured-decode agreement;
-and the actual interaction footprint on the intended bounded semantic domain. The soundness target
-must be aligned with that same domain before a public-language equality theorem is type-correct.
+and the actual interaction footprint on the intended bounded semantic domain. The capacity-aligned
+soundness target and conditional correctness/language-equality API are now present; closing
+`NativeTraceTotalOnSupportedCore` removes the last native-domain restriction.
 
 All-25 exportable witness programs, SP1 trace dumps, and interpreter differentials remain valuable
 conformance evidence, but they are separate from those semantic inverse lemmas and from exact-Rust

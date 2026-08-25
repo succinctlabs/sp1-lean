@@ -1,7 +1,7 @@
 # Handoff: one native shard model for soundness and completeness
 
-**Audience: us, on another machine, with no context.** Updated 2026-08-24 after the
-bus-representation and shard-model consolidation on `dtumad/provider-closure`.
+**Audience: us, on another machine, with no context.** Updated 2026-08-25 after the
+shared-vocabulary and capacity-alignment pass on `dtumad/provider-closure`.
 
 Read [`overview.md`](../overview.md) and [`architecture.md`](../architecture.md) first. The design
 record for this cleanup is
@@ -9,46 +9,55 @@ record for this cleanup is
 
 ## 1. Outcome
 
-Soundness and completeness now share one operational witness and one physical native witness.  The
-forward theorem is closed for the exact image on which the deterministic compiler's semantic and
-capacity obligations hold; it no longer starts from an existential or hand-assembled trace.
+Soundness and completeness now share one public statement, one operational witness, one physical
+native witness, one configured-decode predicate, and one numeric Core row-limit policy. The forward
+theorem is closed for the deterministic compiler's admissible image; it no longer starts from an
+existential or hand-assembled trace.
 
 ```text
-                     supported_core_native_ordinary_sound
-native Clean AIR  -------------------------------------------->  exact ordinary shard
-     ^                                                               |
-     | supported_core_native_functionalCompleteness                   | nativeTrace
-     |                                                               | (total, proof-independent)
-     +---------------- native admissible image <----------------------+
+                      supported_core_native_shard_sound
+bounded native AIR  ------------------------------------------->  bounded ordinary shard
+       ^                                                              |
+       | supported_core_native_shard_functionalCompleteness           | nativeTrace
+       |                                                              | (total, proof-independent)
+       +------------ admissible restriction of that shard <-----------+
 ```
 
-The exact target is `Execution.SupportedOrdinaryShardExecutionRelation`. Its witness is the single
+The shared target is `Execution.SupportedCoreOrdinaryShardExecutionRelation`, a restriction of
+`Execution.SupportedOrdinaryShardExecutionRelation`. Its witness is the single
 proof-free `Machine.EventExecutionTrace`; validity supplies the official event-step semantics,
 normal retirement, the ordinary eight-tick schedule, public endpoints, committed-program boundary,
-and a successful route through the canonical 25-chip profile for every transition.
+and a successful route through the canonical 25-chip profile for every transition. Its only added
+policy is `CoreProfile.WithinOrdinaryRowLimit execution.steps`.
 
 The released direction theorems are:
 
 - `supported_core_native_ordinary_sound` is closed. Every witness accepted by
   `SupportedCoreNativeRelation` produces an exact supported ordinary event trace.
+- `supported_core_native_shard_sound` is the capacity-aligned projection from
+  `SupportedCoreNativeShardRelation` to the shared bounded semantic relation.
 - `supported_core_native_functionalCompleteness` is closed from
   `SupportedCoreNativeAdmissibleExecutionRelation`.  Its map is literally the deterministic
   `nativeTrace statement execution`; it is independent of the proof of admissibility.
+- `supported_core_native_shard_functionalCompleteness` maps the same source and same compiler into
+  the capacity-aligned native relation.
 - `supported_core_native_complete` is the existential projection of that functional theorem.
+- `supported_core_native_shard_correct_of_totality` and its language-equality corollary show that
+  `NativeTraceTotalOnSupportedCore` is the sole remaining native-domain condition.
 - `sp1Ensemble_statement_of_supported_execution` exposes the underlying Clean
   `Ensemble.Statement` directly.
 
-`SupportedCoreNativeAdmissibleExecutionRelation` is not a renamed AIR witness condition.  It is the
-exact ordinary Sail relation, the pinned Core row budget, the named field-free compiler/readiness
-facts for that same execution, and `NativeTraceFootprint.Fits` on the actual emitted interactions.
-In particular it contains neither channel balance nor table constraints; both are conclusions.
+`SupportedCoreNativeAdmissibleExecutionRelation` is not a renamed AIR witness condition. It is a
+`Relation.restrict` view of the shared bounded ordinary Sail relation, adding only the named
+field-free compiler/readiness facts for that same execution and `NativeTraceFootprint.Fits` on the
+actual emitted interactions. In particular it contains neither channel balance nor table
+constraints; both are conclusions.
 
-This closes whole-ensemble completeness for the honest deterministic compiler image.  It does not
-yet prove that every witness of the broader exact ordinary relation lies in that image.  Therefore
+This closes whole-ensemble completeness for the honest deterministic compiler image. It does not
+yet prove that every witness of the shared bounded ordinary relation lies in that image. Therefore
 there is deliberately no unconditional `WitnessRelation.Correct` or public-language-equality
-theorem: soundness targets the broader exact relation, while completeness currently has the
-explicitly narrower admissible source. In particular, the broader relation is unbounded and cannot
-yield `WithinCoreShardLimit` or the physical `< p` footprint merely by discharging readiness.
+theorem: `NativeTraceTotalOnSupportedCore` must first derive readiness and the physical `< p`
+footprint for every bounded semantic execution. Capacity alignment itself is no longer open.
 
 The older `supported_core_native_sound` remains useful as the broader local-Sail target. The exact
 ordinary theorem is the one completeness should use: its source excludes unsupported instructions
@@ -70,9 +79,11 @@ operational trace, not another execution witness.  Their agreement with built ro
 in the dedicated agreement modules or remains an explicit `NativeTraceReady` field; they must not
 be promoted into an independently supplied timeline.
 
-`FormalModel/SupportedShard.lean` owns the exact semantic relation below `Soundness/`, so both proof
-directions can depend on it. Its `SupportedDecodedTransition` retains the decoded instruction and
-selected `InstructionChipId` as evidence, not as another stored trace.  The deterministic compiler
+`FormalModel/Execution.lean` owns the one `SupportedCoreStatement` used by both directions, while
+`FormalModel/SupportedShard.lean` owns the exact semantic relation below `Soundness/`.
+`Model/Semantics/GuestProgram.lean` similarly owns the one `ConfiguredDecode` predicate used by
+both committed Program rows and supported transitions. `SupportedDecodedTransition` retains the
+decoded instruction and selected `InstructionChipId` as evidence, not as another stored trace. The deterministic compiler
 retains each `LocatedTransition` beside its decoded instruction and generated event; this is a
 certified view of the operational trace, not a second execution semantics.
 
@@ -183,17 +194,18 @@ that could ignore the supplied execution and therefore did not express compiler 
 boundary is the concrete `Execution.NativeCompilerReady` plus the small named invariants in
 `NativeTraceReady`, all indexed by the actual output of `compileExecution`.
 
-The all-25 compiler, bump placement, provider recount, public-boundary projection, and final AIR map
-are implemented. What remains on the compiler side is proving every residual `NativeTraceReady`
-group on the intended capacity-bounded subset of `SupportedOrdinaryShardExecutionRelation`:
+The all-25 compiler, bump placement, provider recount, public-boundary projection, capacity-aligned
+soundness/completeness API, and final AIR map are implemented. What remains on the compiler side is
+proving `NativeTraceTotalOnSupportedCore`: every residual `NativeTraceReady` group plus the emitted
+footprint on `SupportedCoreOrdinaryShardExecutionRelation`:
 
 - compiler success and registry-wide validity of each generated per-chip event;
 - State chronology/bump readiness and the built-instruction-row projection;
 - canonical Memory addresses, record chronology, physical-ledger agreement, and initial-state
   genesis content;
 - Byte consumer polarity and Byte/Program demand servability for the literal generated ledger;
-- Program-row projection plus stability of the decoder across the configured-state class required
-  by `ProgTruth`; and
+- Program-row physical projection (decoder stability is already the shared `ConfiguredDecode`
+  carried by `SupportedDecodedTransition` and `decodedInROM`); and
 - the actual emitted interaction count being below the field characteristic.
 
 Some of these are deterministic representation lemmas and should leave the readiness bundle as
@@ -205,12 +217,13 @@ first three are semantic inverse/refinement lemmas.  They must be proved from th
 step or added as precise source-language restrictions; they must not be replaced with an
 existential AIR witness.
 
-Deriving those facts remains necessary, but completeness cannot simply be widened to the current
-unbounded exact relation: its Core row cap and physical `< p` premise have no counterpart in the
-soundness conclusion. A `WitnessRelation.Correct` capstone therefore needs a shared
-capacity-bounded semantic relation on both directions, or equivalent strengthening/weakening
-lemmas that make the two domains coincide. Until then, public-language equality would be an
-overclaim even though all 53 native tables and the verifier row are covered by the current theorem.
+Deriving those facts remains necessary. The former capacity mismatch is closed: the native and
+semantic relations project their active-row/step counts into the single
+`CoreProfile.WithinOrdinaryRowLimit` predicate, and bounded soundness is proved. Consequently
+`supported_core_native_shard_correct_of_totality` and
+`supported_core_native_shard_language_eq_of_totality` require exactly the totality theorem above.
+Until it is closed, unconditional public-language equality would still be an overclaim even though
+all 53 native tables and the verifier row are covered by the current completeness theorem.
 
 ## 8. Separate upstream and cryptographic boundaries
 

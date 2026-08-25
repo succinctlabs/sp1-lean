@@ -8,13 +8,11 @@ The deterministic compiler builds instruction rows first and then reconstructs t
 provider from the literal keys those rows pull.  This module connects that canonical provider back
 to the semantic program named by the ordinary-execution relation.
 
-There are two logically separate seams.  `NativeProgramRowProjection` is the representation-only
-statement that an actual generated instruction Program pull is the projection of the retained
-located decode.  `ConfiguredDecodeStable` records the semantic decoder hoist from the relation's
-one actual-source decode to the `∀ SailConfigured` form required by `decodedInROM`.  The latter is
-not currently derivable from the generic decoder API: `Model/SailDecode.lean` deliberately exposes
-only concrete-word family witnesses.  Keeping the premises separate prevents a compiler-row
-equality from silently claiming that stronger decoder theorem.
+There is one representation seam: `NativeProgramRowProjection` says that an actual generated
+instruction Program pull is the projection of the retained located decode.  The shared semantic
+relation's `SupportedDecodedTransition` already owns the same decoded instruction for every
+configured Sail state, so the `decodedInROM` hoist is projected from semantic validity rather than
+stored again in `NativeTraceReady`.
 -/
 
 namespace SP1Clean.Soundness
@@ -117,7 +115,6 @@ theorem nativeProgramKey_decodedInROM
     (semantic : SupportedOrdinaryShardExecutionRelation handler statement execution)
     (compiler : NativeCompilerReady statement.program execution (nativeInitialClock statement))
     (projection : NativeProgramRowProjection statement execution)
-    (decodeStable : ConfiguredDecodeStable statement.program execution)
     {key : LookupKey}
     (keyMem : key ∈ (nativeBaseTrace statement execution).closingKeyList)
     (keyKind : key.1 = InteractionKind.Program) :
@@ -127,11 +124,12 @@ theorem nativeProgramKey_decodedInROM
     projection key keyMem keyKind
   have locatedMem : compiledRow.located ∈ execution.locatedTransitions :=
     compiledRow_located_mem compiler compiledRowMem
-  obtain ⟨-, -, -, pc, word, decoded, pcEq, fetch, decode, -, -⟩ :=
+  obtain ⟨-, -, sourceConfigured, pc, word, decoded, pcEq, fetch, decode, -, -⟩ :=
     semantic.supported compiledRow.located locatedMem
   have relationDecode :
       SP1Clean.Semantics.decodeLocated? statement.program compiledRow.located = some decoded :=
-    SP1Clean.Semantics.decodeLocated?_eq_some_of pcEq fetch decode
+    SP1Clean.Semantics.decodeLocated?_eq_some_of pcEq fetch
+      (decode compiledRow.located.source sourceConfigured)
   have decodedEq : compiledRow.decoded = decoded :=
     Option.some.inj (generatedDecode.symm.trans relationDecode)
   have pcValueEq : pc = pcBitsOfRow row :=
@@ -139,7 +137,7 @@ theorem nativeProgramKey_decodedInROM
   subst decoded
   refine ⟨row, keyEq, word, compiledRow.decoded, ?_, ?_, projected⟩
   · simpa only [pcValueEq] using fetch
-  · exact decodeStable compiledRow.located locatedMem pc word compiledRow.decoded pcEq fetch decode
+  · exact decode
 
 /-! ## Canonical provider grounding -/
 
@@ -179,8 +177,7 @@ theorem nativeTrace_programProviderBound
     (semantic : SupportedOrdinaryShardExecutionRelation handler statement execution)
     (compiler : NativeCompilerReady statement.program execution (nativeInitialClock statement))
     (servable : (nativeBaseTrace statement execution).DemandServable)
-    (projection : NativeProgramRowProjection statement execution)
-    (decodeStable : ConfiguredDecodeStable statement.program execution) :
+    (projection : NativeProgramRowProjection statement execution) :
     ProgramProviderBound (nativeTrace statement execution).witness := by
   intro raw member _
   let typed : TypedInteraction (programChannel (p := p)) :=
@@ -219,7 +216,7 @@ theorem nativeTrace_programProviderBound
     rw [program_round key _ selected keyServable]
     rfl
   obtain ⟨semanticRow, semanticKey, decoded⟩ :=
-    nativeProgramKey_decodedInROM semantic compiler projection decodeStable keyMem keyKind
+    nativeProgramKey_decodedInROM semantic compiler projection keyMem keyKind
   have typedKey :
       ProgramChip.programRowKey (rowOfMsg typed.message) = key :=
     (keyOf_toAccess_typedProgram typed).symm.trans rawKeyEq

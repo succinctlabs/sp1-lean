@@ -287,7 +287,6 @@ structure NativeTraceReady (statement : SupportedCoreStatement p)
   byteConsumers : (nativeBaseTrace statement execution).ByteConsumersOnlyPull
   demandServable : (nativeBaseTrace statement execution).DemandServable
   programProjection : NativeProgramRowProjection statement execution
-  decodeStable : ConfiguredDecodeStable statement.program execution
   memoryGenesis : NativeMemoryGenesis execution.initialState
     (TraceGen.compileExecution statement.program execution
       (nativeInitialClock statement)).memoryHistory
@@ -379,15 +378,32 @@ theorem nativeInitialClock_encodable (statement : SupportedCoreStatement p)
     initialBoundaryStateMessage_bounds statement.publicValues publicWellFormed
   exact clkNat_lt_of_limbs high low
 
-/-- Native admissibility is the exact supported ordinary execution, the pinned Core row budget,
-representability by the deterministic compiler, and Clean's sole field-capacity premise on actual
-interaction occurrences.  No provider-multiplicity half-field restriction appears. -/
+/-- Residual admissibility of the deterministic native compiler on one shared semantic witness.
+
+This predicate contains only facts about the total `nativeTrace` projection.  It deliberately does
+not repeat semantic execution validity or the Core row budget, which belong to the shared relation
+in `FormalModel.SupportedShard`. -/
+def NativeTraceAdmissible (statement : SupportedCoreStatement p)
+    (execution : Machine.EventExecutionTrace) : Prop :=
+  NativeTraceReady statement execution ∧
+    (NativeTraceFootprint.ofTrace (nativeTrace statement execution)).Fits p
+
+/-- Native completeness is currently proved on a restriction of the one shared bounded semantic
+relation.  `Relation.restrict` makes the layering explicit: this is not another execution model or
+witness carrier, only the still-open compiler-admissibility condition on `nativeTrace`. -/
 def SupportedCoreNativeAdmissibleExecutionRelation
     (handler : Machine.SyscallHandler) :
     WitnessRelation.Relation (SupportedCoreStatement p) Machine.EventExecutionTrace :=
-  fun statement execution =>
-    SupportedOrdinaryShardExecutionRelation handler statement execution ∧
-      WithinCoreShardLimit execution ∧ NativeTraceReady statement execution ∧
-        (NativeTraceFootprint.ofTrace (nativeTrace statement execution)).Fits p
+  (SupportedCoreOrdinaryShardExecutionRelation handler).restrict NativeTraceAdmissible
+
+/-- Exact remaining domain-closure statement for native shard completeness.
+
+Proving this proposition removes the last restriction between the shared bounded semantic relation
+and the deterministic compiler.  It is kept transparent: every residual field remains visible in
+`NativeTraceAdmissible`, and no alternate relation or existential AIR witness is introduced. -/
+def NativeTraceTotalOnSupportedCore (handler : Machine.SyscallHandler) : Prop :=
+  ∀ (statement : SupportedCoreStatement p) (execution : Machine.EventExecutionTrace),
+    SupportedCoreOrdinaryShardExecutionRelation handler statement execution →
+      NativeTraceAdmissible statement execution
 
 end SP1Clean.Soundness

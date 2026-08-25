@@ -82,8 +82,9 @@ theorem anchorExecution_semantic :
     exact absurd member List.not_mem_nil
 
 /-- The zero-step shard is strictly inside the pinned Core row budget. -/
-theorem anchorExecution_withinCoreShardLimit : WithinCoreShardLimit anchorExecution := by
-  simp [WithinCoreShardLimit]
+theorem anchorExecution_withinCoreRowLimit :
+    CoreProfile.WithinOrdinaryRowLimit anchorExecution.steps := by
+  simp [CoreProfile.WithinOrdinaryRowLimit]
 
 /-- The optional compiler succeeds definitionally on the empty chronological transition list. -/
 theorem anchorExecution_compileExecution?_eq :
@@ -197,11 +198,6 @@ theorem anchorExecution_memoryChronology :
         (nativeInitialClock stmt)).memoryHistory := by
   rw [anchorExecution_memoryHistory_nil]
   intro history member
-  exact absurd member List.not_mem_nil
-
-theorem anchorExecution_decodeStable :
-    ConfiguredDecodeStable anchorProgram anchorExecution := by
-  intro located member
   exact absurd member List.not_mem_nil
 
 /-- A fully executable presentation of the empty compiler skeleton.  Its preprocessed occurrence
@@ -431,20 +427,34 @@ theorem anchorExecution_nativeTraceReady : NativeTraceReady stmt anchorExecution
   byteConsumers := anchorExecution_byteConsumers
   demandServable := anchorExecution_demandServable
   programProjection := anchorExecution_programProjection
-  decodeStable := by simpa only [stmt] using anchorExecution_decodeStable
   memoryGenesis := by simpa only [stmt] using anchorExecution_memoryGenesis
 
 /-- The completeness theorem's exact source relation is nonempty. -/
 theorem anchorExecution_admissible :
     SupportedCoreNativeAdmissibleExecutionRelation anchorHandler stmt anchorExecution :=
-  ⟨anchorExecution_semantic, anchorExecution_withinCoreShardLimit,
+  ⟨⟨anchorExecution_semantic, anchorExecution_withinCoreRowLimit⟩,
     anchorExecution_nativeTraceReady, anchorExecution_footprintFits⟩
 
-/-- The functional capstone validates the compiler's literal 53-table witness. -/
+/-- The capacity-aligned functional capstone validates the compiler's literal 53-table witness in
+the same bounded native relation consumed by soundness. -/
+theorem anchorExecution_yields_boundedAirWitness :
+    SupportedCoreNativeShardRelation stmt (nativeTrace stmt anchorExecution).witness :=
+  (supported_core_native_shard_functionalCompleteness anchorHandler).map_valid
+    stmt anchorExecution anchorExecution_admissible
+
+/-- Forgetting only the named capacity restriction recovers the original native relation. -/
 theorem anchorExecution_yields_airWitness :
     SupportedCoreNativeRelation stmt (nativeTrace stmt anchorExecution).witness :=
-  (supported_core_native_functionalCompleteness anchorHandler).map_valid
-    stmt anchorExecution anchorExecution_admissible
+  anchorExecution_yields_boundedAirWitness.1
+
+/-- Bounded native soundness returns a witness of the exact same shared semantic relation from that
+generated AIR witness.  This exercises both directions without introducing an alternate execution
+carrier. -/
+theorem anchorExecution_bounded_roundTrip :
+    ∃ execution,
+      SupportedCoreOrdinaryShardExecutionRelation anchorHandler stmt execution :=
+  supported_core_native_shard_sound anchorHandler stmt
+    (nativeTrace stmt anchorExecution).witness anchorExecution_yields_boundedAirWitness
 
 /-- The direct Clean statement consequence is therefore non-vacuous at the concrete boundary. -/
 theorem anchorExecution_yields_ensembleStatement :

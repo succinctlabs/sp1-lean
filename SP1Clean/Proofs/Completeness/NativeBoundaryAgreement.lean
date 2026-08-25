@@ -33,7 +33,7 @@ theorem NativeTraceReady.semanticBoundary
   have clockEncodable := nativeInitialClock_encodable statement
     semantic.publicValuesWellFormed
   have programProvider := nativeTrace_programProviderBound semantic ready.compiler
-    ready.demandServable ready.programProjection ready.decodeStable
+    ready.demandServable ready.programProjection
   refine ⟨execution.initialState, {
     programWellFormed := semantic.programWellFormed
     programCommitted := ?_

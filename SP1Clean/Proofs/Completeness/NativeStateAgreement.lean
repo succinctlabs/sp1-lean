@@ -292,6 +292,56 @@ private theorem signedVal_one_nativeState : signedVal (1 : ZMod p) = 1 := by
     Nat.mod_eq_of_lt (by omega)]
   rfl
 
+/-- On selector-binary rows, the computable ledger's centered gate and the typed soundness gate
+select exactly the same physical instruction rows. -/
+private theorem filter_signedVal_one_eq_filter_isReal_one
+    (data : ProverData (ZMod p)) (rows : List (DecodedInstructionRow p))
+    (binary : ∀ decoded ∈ rows,
+      (decoded.toChipRow data).is_real = 0 ∨ (decoded.toChipRow data).is_real = 1) :
+    (rows.filter fun decoded => signedVal (decoded.toChipRow data).is_real = 1) =
+      rows.filter fun decoded => (decoded.toChipRow data).is_real = 1 := by
+  have hp : 2 < p := by have := Fact.out (p := 2 ^ 25 < p); omega
+  induction rows with
+  | nil => rfl
+  | cons decoded rows ih =>
+      simp only [List.filter_cons]
+      have head := binary decoded (by simp)
+      have tail : ∀ item ∈ rows,
+          (item.toChipRow data).is_real = 0 ∨ (item.toChipRow data).is_real = 1 := by
+        intro item member
+        exact binary item (by simp [member])
+      rcases head with zero | one
+      · have signedZero : signedVal (decoded.toChipRow data).is_real = 0 := by
+          rw [signedVal_is_real hp (Or.inl zero), zero, ZMod.val_zero]
+          rfl
+        have leftFalse : decide (signedVal (decoded.toChipRow data).is_real = 1) = false := by
+          simp [signedZero]
+        have rightFalse : decide ((decoded.toChipRow data).is_real = 1) = false := by
+          simp [zero]
+        simp only [leftFalse, rightFalse, Bool.false_eq_true, if_false]
+        exact ih tail
+      · have leftTrue : decide (signedVal (decoded.toChipRow data).is_real = 1) = true := by
+          simp [one, signedVal_one_nativeState]
+        have rightTrue : decide ((decoded.toChipRow data).is_real = 1) = true := by
+          simp [one]
+        simp only [leftTrue, rightTrue, if_true, List.cons.injEq, true_and]
+        exact ih tail
+
+/-- The active typed-row count is the length of the same instruction-link list used by the
+computable State hand-off.  This is the count-level payoff of the single typed/computable bridge;
+it does not introduce another ledger. -/
+theorem SupportedCoreTraceWitness.realDecodedInstructionRows_length_eq_stateInstrLinks
+    (trace : SupportedCoreTraceWitness p)
+    (binary : ∀ decoded ∈ decodedInstructionRows (p := p) trace.witness.tables,
+      (decoded.toChipRow trace.witness.data).is_real = 0 ∨
+        (decoded.toChipRow trace.witness.data).is_real = 1) :
+    (realDecodedInstructionRows trace.witness.data trace.witness.tables).length =
+      (stateInstrLinks trace).length := by
+  unfold realDecodedInstructionRows stateInstrLinks
+  have filtered := filter_signedVal_one_eq_filter_isReal_one trace.witness.data
+    (decodedInstructionRows (p := p) trace.witness.tables) binary
+  simpa only [List.length_map] using (congrArg List.length filtered).symm
+
 /-- Every generated StateBump row has the literal selector `1`.  This is independent of table
 constraints and hence does not need a well-formedness premise. -/
 theorem SupportedCoreTraceWitness.stateBumpSelectorBinary
@@ -484,5 +534,40 @@ theorem NativeTraceReady.stateLedgerPerm
     (witness_decodedInstructionRows_selectorBinary _
       (ready.constraints publicWellFormed))
     (nativeTrace_stateBumpSelectorBinary statement execution) ready.stateChronology
+
+/-- The generated native witness has exactly one active instruction row per semantic transition.
+
+The proof crosses the typed/computable boundary once through `stateInstrLinks`, uses the existing
+physical State-row projection, and then uses the compiler fold's length theorem. -/
+theorem NativeTraceReady.activeInstructionRows_length
+    {statement : SupportedCoreStatement p} {execution : Machine.EventExecutionTrace}
+    (ready : NativeTraceReady statement execution)
+    (publicWellFormed : statement.publicValues.LimbBounds) :
+    (realDecodedInstructionRows (nativeTrace statement execution).witness.data
+        (nativeTrace statement execution).witness.tables).length = execution.steps := by
+  let compiled := TraceGen.compileExecution statement.program execution
+    (nativeInitialClock statement)
+  have binary := witness_decodedInstructionRows_selectorBinary
+    (nativeTrace statement execution).witness
+      (ready.constraints publicWellFormed)
+  calc
+    _ = (stateInstrLinks (nativeTrace statement execution)).length :=
+      (nativeTrace statement execution).realDecodedInstructionRows_length_eq_stateInstrLinks binary
+    _ = (stateInstrLinks (nativeBaseTrace statement execution)).length := by
+      simp only [nativeTrace, SupportedCoreTraceWitness.canonicalClosure_stateInstrLinks]
+    _ = (physicalInstructionStateLinks (p := p) compiled.routedEvents).length :=
+      congrArg List.length ready.stateProjection
+    _ = compiled.routedEvents.length := by
+      simpa only [List.length_map] using
+        (physicalInstructionStateLinks_perm (p := p) compiled.routedEvents).length_eq
+    _ = compiled.rows.length := by
+      simp only [CompiledExecution.routedEvents, List.length_map]
+    _ = execution.locatedTransitions.length := by
+      obtain ⟨generated, generatedEq, -⟩ := ready.compiler
+      change (TraceGen.compileExecution statement.program execution
+        (nativeInitialClock statement)).rows.length = execution.locatedTransitions.length
+      rw [TraceGen.compileExecution_eq_of_some generatedEq]
+      exact TraceGen.compileLocatedTransitions?_rows_length generatedEq
+    _ = execution.steps := execution.locatedTransitions_length
 
 end SP1Clean.Soundness

@@ -104,9 +104,9 @@ theorem GroundedRow.supportedDecodedTransition
     (pc : state.regs.get? Register.PC = some (rcvPcOf (stateAccess row.view))) :
     SupportedDecodedTransition program
       ⟨state, ⟨Machine.ExecutionEvent.ordinary, next⟩⟩ := by
-  obtain ⟨word, instruction, fetch, decoded, projection⟩ :=
-    grounded.decoded.decodes state configured
-  obtain ⟨key, chipId, keyEq, routeEq⟩ := instrToProgramRow_route_exists projection
+  obtain ⟨word, instruction, fetch, decoded, projection⟩ := grounded.decoded
+  have projection' := instrToProgramRow'_some projection
+  obtain ⟨key, chipId, keyEq, routeEq⟩ := instrToProgramRow_route_exists projection'
   refine ⟨rfl, normal, configured, rcvPcOf (stateAccess row.view), word, instruction, pc, ?_,
     decoded, chipId, routeEq⟩
   exact fetch

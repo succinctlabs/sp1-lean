@@ -28,6 +28,10 @@ jobs:
         run: scripts/check_pins.sh
       - name: Root index imports every module
         run: scripts/check_root_index.sh
+      - name: SP1 field has one Lean owner
+        run: scripts/check_sp1_field_singleton.sh
+      - name: Shared shard vocabulary has one owner
+        run: scripts/check_shared_vocabulary.sh
       - name: Doc citations resolve
         run: scripts/check_report_citations.sh
       - name: Audit-surface index matches the tree
