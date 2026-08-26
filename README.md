@@ -41,24 +41,24 @@ The main library has no `sorry`, `stop`, project `axiom`, `sorryAx`, `skipKernel
 
 A constructive **native ensemble completeness** theorem is proved too.
 `supported_core_native_functionalCompleteness` deterministically compiles a supported admissible
-`Machine.EventExecutionTrace` into the same `SupportedCoreNativeRelation` consumed by soundness—all
+`Machine.CoreShardSemanticWitness` into the same `SupportedCoreNativeRelation` consumed by soundness—all
 53 tables plus the verifier row, with every physical row computed by the circuits' own generators.
 The compiler covers all 25 instruction families, inserts State/Memory refresh rows, constructs
 Memory boundaries, and recounts Byte/Range/Program providers from the emitted Clean interactions.
 Its map is proof-independent; `supported_core_native_complete` is the existential projection and
 `sp1Ensemble_statement_of_supported_execution` is the direct Clean statement.
 
-The source is explicitly `SupportedCoreNativeAdmissibleExecutionRelation`: the exact supported
-ordinary Sail relation restricted by the shared `CoreProfile.WithinOrdinaryRowLimit`, plus named
-compiler/semantic readiness facts and the actual interaction footprint `< p`. Constraints and all
+The source is explicitly `SupportedCoreNativeAdmissibleShardRelation`: the canonical
+`SupportedCoreShardExecutionRelation` restricted by named compiler/readiness facts about its
+deterministically evaluated trace and the actual interaction footprint `< p`. Constraints and all
 four channel balances are conclusions. `supported_core_native_shard_sound` and
 `supported_core_native_shard_functionalCompleteness` now use the same bounded native/semantic
 relation pair. The sole remaining condition for unconditional correctness and public-language
-equality is `NativeTraceTotalOnSupportedCore`: every execution in that bounded semantic relation
+equality is `NativeShardTraceTotal`: every witness in that bounded semantic relation
 must satisfy the transparent `NativeTraceAdmissible` compiler/output predicate.
 
 `SP1CleanTest/Audit/NativeCompletenessNonVacuity.lean` jointly witnesses the entire admissible source
-with a boundary-only exact execution and invokes both completeness capstones, so the theorem is not
+with a zero-event canonical shard and invokes both completeness capstones, so the theorem is not
 vacuous. Separately, `ActiveTraceNonVacuity.lean` exercises the lower generated-trace assembly path
 with a hand-assembled `JAL x0, 0` semantic record: its instruction-event count and decoded physical
 instruction-row count are both one, and soundness reaches the official-Sail local execution for any
@@ -69,8 +69,8 @@ regression, not an inhabitant of every admissibility premise. See the verificati
 
 The repository also contains a complete list-level model of the pinned upstream Core AIR:
 
-- the exact 34-table execution cluster;
-- the separate 6-table memory-boundary cluster;
+- the exact 34-table execution and 6-table Memory-boundary clusters, paired in one public shard
+  witness/relation;
 - every table's complete assertion and interaction lists;
 - the 160-cell public-value block; and
 - a preprocessed-commitment and exact natural interaction-balance relation.

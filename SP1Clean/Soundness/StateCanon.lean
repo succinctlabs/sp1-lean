@@ -225,7 +225,7 @@ theorem stateBump_canon_eq [Fact (2 ^ 25 < p)] {r : Inputs (ZMod p)}
 The two spellings are definitionally equal, but crossing them at a decoded `valueFromOffset` row
 would ask the unifier to normalize the row decoder; taking the message-level form here, over an
 abstract `r`, performs the crossing once where `r` is opaque
-(`docs/agents/perf-findings.md` §1). -/
+(`docs/agents/proof-patterns.md`, "Compile-time / performance landmines"). -/
 theorem stateBump_canon_eq_of_pulled_good [Fact (2 ^ 25 < p)] {r : Inputs (ZMod p)}
     (hspec : Spec r) (hreal : r.is_real = 1)
     (hgood_clk : (StateBumpChip.pulledMessage r).clk_high.val < 2 ^ 24)

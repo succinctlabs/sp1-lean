@@ -36,6 +36,17 @@ OUT_TEST = ROOT / "scripts" / "axiom_probe_test.lean"
 # Entries may name theorem or definition headlines; in particular functional-completeness maps are
 # deliberately proof-independent definitions whose proof fields are retained by the structure.
 EXACT_REQUIRED_THEOREMS = [
+    # One production field spelling and the common shard/bus representation laws.
+    ("SP1Clean/Model/SP1Field.lean", "sp1Prime_prime"),
+    ("SP1Clean/Model/SP1Field.lean", "pow17_lt_sp1Prime"),
+    ("SP1Clean/Model/SP1Field.lean", "pow24_lt_sp1Prime"),
+    ("SP1Clean/Model/SP1Field.lean", "pow25_lt_sp1Prime"),
+    ("SP1Clean/Model/InteractionBus.lean", "balanced_toSigned"),
+    ("SP1Clean/Model/Machine/Shard.lean",
+     "CoreShardSemanticWitness.trace?_ofOrdinaryTrace"),
+    ("SP1Clean/Model/Machine/Shard.lean",
+     "CoreShardSemanticWitness.evaluatedTrace_initialState"),
+    ("SP1Clean/FormalModel/CoreShard.lean", "executionTrace"),
     # Source-backed canonical preprocessing inventory and its literal Clean ledger.
     ("SP1Clean/Composition/PreprocessedProviders.lean",
      "inventoryPreprocessedKeys_eq_inventoryRows"),
@@ -71,9 +82,13 @@ EXACT_REQUIRED_THEOREMS = [
     ("SP1Clean/Proofs/Completeness/ExecutionCompiler.lean",
      "compileLocatedTransitions?_exists_of_views"),
     ("SP1Clean/Proofs/Completeness/ExecutionCompiler.lean",
-     "SupportedOrdinaryShardExecutionValid.compileExecution?_exists_of_instructionEventsReady"),
+     "SupportedCoreShardExecutionValid.compileExecution?_exists_of_instructionEventsReady"),
     ("SP1Clean/FormalModel/CoreAIRRelation.lean",
      "System.localValid_of_relationFor"),
+    ("SP1Clean/FormalModel/CoreAIRRelation.lean",
+     "System.execution_of_shardRelation"),
+    ("SP1Clean/FormalModel/CoreAIRRelation.lean",
+     "System.memoryBoundary_of_shardRelation"),
     ("SP1Clean/Composition/CoreSystemSemantics.lean", "transportMemoryBumpRow_input"),
     ("SP1Clean/Composition/CoreSystemSemantics.lean", "transportStateBumpRow_input"),
     ("SP1Clean/Composition/CoreSystemSemantics.lean", "syscallCore_assertions_iff"),
@@ -130,21 +145,41 @@ EXACT_REQUIRED_THEOREMS = [
      "nativeTrace_programProviderBound"),
     ("SP1Clean/Proofs/Completeness/NativeBoundaryAgreement.lean",
      "NativeTraceReady.semanticBoundary"),
-    # Deterministic ordinary-execution -> native ensemble completeness.
+    # Deterministic common-shard -> native ensemble completeness and paired correctness surface.
     ("SP1Clean/Soundness/NativeCompleteness.lean",
      "supported_core_native_functionalCompleteness"),
+    ("SP1Clean/Soundness/NativeCompleteness.lean",
+     "supported_core_native_shard_functionalCompleteness"),
     ("SP1Clean/Soundness/NativeCompleteness.lean", "supported_core_native_complete"),
+    ("SP1Clean/Soundness/NativeCompleteness.lean", "supported_core_native_shard_complete"),
+    ("SP1Clean/Soundness/NativeCompleteness.lean",
+     "supported_core_native_shard_correct_of_totality"),
+    ("SP1Clean/Soundness/NativeCompleteness.lean",
+     "supported_core_native_shard_language_eq_of_totality"),
     ("SP1Clean/Soundness/NativeCompleteness.lean",
      "sp1Ensemble_statement_of_supported_execution"),
     # Executable joint-premise regression for the exact admissible source and both capstones.
     ("SP1CleanTest/Audit/NativeCompletenessNonVacuity.lean",
      "anchorExecution_nativeTraceReady"),
     ("SP1CleanTest/Audit/NativeCompletenessNonVacuity.lean",
+     "anchorSemanticWitness_trace"),
+    ("SP1CleanTest/Audit/NativeCompletenessNonVacuity.lean",
      "anchorExecution_admissible"),
     ("SP1CleanTest/Audit/NativeCompletenessNonVacuity.lean",
      "anchorExecution_yields_airWitness"),
     ("SP1CleanTest/Audit/NativeCompletenessNonVacuity.lean",
      "anchorExecution_yields_ensembleStatement"),
+    ("SP1CleanTest/Audit/NativeCompletenessNonVacuity.lean",
+     "anchorExecution_bounded_roundTrip"),
+    # Joined active-path regression: one official Sail step, its exact deterministic compiler
+    # event, the nonempty bounded AIR witness, and soundness back into the shared semantic language.
+    ("SP1CleanTest/Audit/JointNonVacuity.lean", "anchorStep"),
+    ("SP1CleanTest/Audit/ActiveNativeCompleteness.lean",
+     "activeView_compiled_event_exists"),
+    ("SP1CleanTest/Audit/ActiveNativeCompleteness.lean", "activeExecution_semantic"),
+    ("SP1CleanTest/Audit/ActiveNativeCompleteness.lean",
+     "activeTrace_boundedNativeRelation"),
+    ("SP1CleanTest/Audit/ActiveNativeCompleteness.lean", "activeTrace_bounded_roundTrip"),
 ]
 
 EXACT_REQUIRED_TARGETS = [
@@ -373,7 +408,7 @@ TARGETS = [
      r"supportedCore_orderedRows_dynamic_of_obligations|"
      r"supportedCore_orderedRows_dynamic|supported_core_witness_grounding|"
      r"supported_core_native_grounding|supported_core_native_sound|"
-     r"supported_core_native_ordinary_sound)\b"),
+     r"supported_core_native_shard_execution|supported_core_native_shard_sound)\b"),
     # Exact v6.4.0 table/profile guards and the public ArkLib-facing Core AIR capstone.  These are
     # release headlines: adding a new capstone file must not silently leave it outside the census.
     ("SP1Clean/FormalModel/CoreProfile.lean",

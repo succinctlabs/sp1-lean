@@ -69,10 +69,10 @@ keeps the AIR-witness type and widens its relation to the semantic target's prei
 ```lean
 theorem sp1_verifier_sound
     (airRefinement : WitnessRelation.FunctionalRefinement
-      (CoreAIR.Current.Relation preprocessedBinding .execution)
-      (Execution.SP1CoreShardExecutionRelation .base handler programBinding))
+      (CoreAIR.Current.ShardRelation preprocessedBinding)
+      (Execution.SP1CoreShardSemanticRelation .base handler programBinding))
     (hVerifier : verifier.knowledgeSoundness init impl
-      (WitnessRelation.asSet (CoreAIR.Current.Relation preprocessedBinding .execution))
+      (WitnessRelation.asSet (CoreAIR.Current.ShardRelation preprocessedBinding))
       acceptRejectRel knowledgeError) :
     verifier.knowledgeSoundness init impl
       (WitnessRelation.asSet

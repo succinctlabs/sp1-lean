@@ -253,8 +253,10 @@ stream.
 - manifest-resolved pin reporting, gating any present `.lake` checkout against the manifest;
 - recorded-value cross-checks (`scripts/check_pins.sh`: lakefile ↔ manifest ↔ this report's pin
   table ↔ `CoreProfile.sp1SemanticRevision` ↔ the authoritative census ledger and raw snapshots);
-- root-index completeness (`scripts/check_root_index.sh`) and doc-citation resolution
-  (`scripts/check_report_citations.sh`);
+- root-index completeness (`scripts/check_root_index.sh`), maintained-document/link/module-docstring
+  freshness (`scripts/check_current_docs.py`), report-citation resolution
+  (`scripts/check_report_citations.sh`), and an independent exact 25-chip release inventory
+  (`scripts/check_release_surface.py`);
 - a zero-tolerance source proof-deferral scan;
 - a zero-tolerance project-axiom scan;
 - `skipKernelTC` and main-library `native_decide` guards;

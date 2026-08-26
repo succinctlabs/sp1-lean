@@ -5,9 +5,9 @@ import SP1Clean.Proofs.Completeness.InstructionEvent
 /-!
 # Chronological ordinary-execution compiler
 
-This is the total, proof-independent fold from the one operational witness
-`Machine.EventExecutionTrace` to the chronological instruction/access data consumed by native trace
-assembly.  Each transition is decoded again from the committed program, compiled through the one
+This is the total, proof-independent fold from the `Machine.EventExecutionTrace` deterministically
+evaluated from the common shard witness to the chronological instruction/access data consumed by
+native trace assembly. Each transition is decoded again from the committed program, compiled through the one
 canonical access plan, and scheduled with its required register refreshes.  The result retains the
 source `LocatedTransition`, decoded instruction, dependent routed event, access schedule, clock,
 and outgoing frontier in one carrier.
@@ -80,7 +80,7 @@ noncomputable def compileLocatedTransitions? (program : GuestProgram) :
           finalClock := tail.finalClock
           finalFrontier := tail.finalFrontier }
 
-/-- Compile the derived chronological view of the one proof-free execution carrier. -/
+/-- Compile the chronological trace view evaluated from a common shard witness. -/
 noncomputable def compileExecution? (program : GuestProgram)
     (execution : Machine.EventExecutionTrace) (initialClock : ℕ) : Option CompiledExecution :=
   compileLocatedTransitions? program initialClock AccessFrontier.initial execution.locatedTransitions
@@ -268,23 +268,30 @@ def NativeCompilerReady (statementProgram : GuestProgram)
     TraceGen.compileExecution? statementProgram execution initialClock = some compiled ∧
       compiled.WellFormed
 
-/-- The shared semantic relation already discharges the outer transition projection for the
+/-- The common semantic relation already discharges the outer transition projection for the
 chronological compiler.  Consequently, compiler success reduces to the one-row event compiler on
-the retained view; fetch, decode, image, and route are not separate completeness premises. -/
-theorem SupportedOrdinaryShardExecutionValid.compileExecution?_exists_of_instructionEventsReady
-    {p : ℕ} [Fact p.Prime] {handler : Machine.SyscallHandler}
-    {statement : SupportedCoreStatement p} {execution : Machine.EventExecutionTrace}
-    {initialClock : ℕ}
-    (valid : SupportedOrdinaryShardExecutionValid handler statement execution)
-    (ready : ∀ located ∈ execution.locatedTransitions,
+the evaluated trace; fetch, decode, image, and route are not separate completeness premises. -/
+theorem SupportedCoreShardExecutionValid.compileExecution?_exists_of_instructionEventsReady
+    {p : ℕ} [Fact p.Prime]
+    {statement : SupportedCoreStatement p}
+    {witness : Machine.CoreShardSemanticWitness} {initialClock : ℕ}
+    (valid : SupportedCoreShardExecutionValid statement witness)
+    (ready : ∀ located ∈
+        (witness.evaluatedTrace (supportedCoreShardModel (p := p))).locatedTransitions,
       ∀ view : SP1Clean.Semantics.SP1TransitionView,
         SP1Clean.Semantics.projectSP1Transition? statement.program located = some view →
           ∀ frontier clock, TraceGen.InstructionEventReady view frontier clock) :
     ∃ compiled,
-      TraceGen.compileExecution? statement.program execution initialClock = some compiled := by
+      TraceGen.compileExecution? statement.program
+        (witness.evaluatedTrace (supportedCoreShardModel (p := p))) initialClock =
+          some compiled := by
+  let execution := witness.evaluatedTrace (supportedCoreShardModel (p := p))
+  obtain ⟨-, -, -, -, -, -, supported, -⟩ := valid.evaluatedTrace_facts
+  have statementSupported : AllTransitionsSupported statement.program execution := by
+    simpa only [valid.program_eq] using supported
   apply TraceGen.compileExecution?_exists_of_views
   intro located member
-  obtain ⟨view, projected, -⟩ := (valid.supported located member).view
+  obtain ⟨view, projected, -⟩ := (statementSupported located member).view
   exact ⟨view, projected, ready located member view projected⟩
 
 end SP1Clean.Execution

@@ -287,7 +287,7 @@ unifier to normalise the decoder: `simp only [memoryBumpRow_closedForm]` rewrite
 a structure literal and the surrounding projections reduce by iota.  Crossing the same gap by
 `exact`/`rfl` instead forces `Eval.eval`'s `fromElements ∘ Vector.map ∘ toElements` through `whnf`
 once per occurrence, which is the documented decoded-row landmine
-(`docs/agents/perf-findings.md` §1). -/
+(`docs/agents/proof-patterns.md`, "Compile-time / performance landmines"). -/
 theorem memoryBumpRow_closedForm (t : Table (ZMod p)) (row : Array (ZMod p)) :
     memoryBumpRow t row =
       ({ access :=

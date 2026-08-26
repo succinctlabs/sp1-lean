@@ -342,6 +342,7 @@ import SP1Clean.Model.Machine.Boot
 import SP1Clean.Model.Machine.Schedule
 import SP1Clean.Model.Machine.Syscall
 import SP1Clean.Model.Machine.EventExecution
+import SP1Clean.Model.Machine.Shard
 import SP1Clean.Model.Machine.Execution
 import SP1Clean.Proofs.Sail.TryStepReduction
 import SP1Clean.Proofs.Sail.Advance
@@ -482,6 +483,7 @@ import SP1Clean.FormalModel.Contracts.CoreAIR
 import SP1Clean.FormalModel.CoreProfile
 import SP1Clean.FormalModel.OpcodeTable
 import SP1Clean.FormalModel.CoreAIRRelation
+import SP1Clean.FormalModel.CoreShard
 import SP1Clean.FormalModel.Relations
 import SP1Clean.FormalModel.Execution
 import SP1Clean.FormalModel.SupportedShard

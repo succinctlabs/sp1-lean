@@ -68,7 +68,7 @@ def programChannel : Channel (ZMod p) ProgramMsg where
 
 /-- The Byte channel (SP1 `InteractionKind.Byte`), lookups into the preprocessed `ByteChip`/`RangeChip`.
 Its `Guarantees` is `ByteRowSpec`, the byte-table membership predicate — and **Byte is the root of
-arithmetic lookup facts** (`docs/bus-model.md` §7). The byte receiver is a *preprocessed static table*
+arithmetic lookup facts**. The byte receiver is a *preprocessed static table*
 whose rows satisfy `ByteRowSpec` by construction, so a consumer can soundly **pull** and obtain the
 lookup fact locally. Memory and Program likewise expose only row-local hygiene (`isU64` and `RowSpec`);
 State is the sole structural channel with `Guarantees := True`.
@@ -77,7 +77,7 @@ pulls `(op, value, w, 0)` and gets `ByteRowSpec`; a reader that only emits the c
 Gating is **multiplicity-gated** (`Channel.pullIf`, mult `-is_real`), faithful to SP1's
 `send_byte(op, value, w, 0, is_real)`: the value is passed **raw** (no `is_real * value` fold) and padding
 (`mult = 0`) drops out of the LogUp sum entirely (`mult / fingerprint(values)` with `mult = 0`), owing
-nothing — post-#398 a receive owes no `Requirements` at all (`docs/bus-model.md` §7). The provider side is
+nothing — post-#398 a receive owes no `Requirements` at all. The provider side is
 `Proofs/Chips/ByteChip/` (pushes the table, proves each row); with it landed, the pull's justification
 is closed by the native Byte/Range providers and ensemble balance; the exact/native artifact recounts
 their demand in `Composition/PreprocessedProviders.lean`. Pulled by
@@ -92,7 +92,8 @@ open Classical in
 with `FormalCircuit.toSubcircuit_interactions` (which rewrites that flat list back to the child `main`'s
 operations). Keeping the result as `interactionsWith channel ((circuit.main input).operations n)` — rather
 than the unfolded `.interactions.filter` — is what lets a child's bottom-up `interactionsWith_<chan>_eq`
-rfl-lemma fire when a parent composes it (the readers' Memory/Program recovery, `docs/bus-model.md` §5/§7).
+rfl-lemma fire when a parent composes it (the readers' Memory/Program recovery described in
+`ToClean/Circuit/InteractionRecovery.lean`).
 Tagged `circuit_norm` at **high priority** so it fires before Clean's more-general
 `Operations.interactionsWith_subcircuit` (which would expose the raw `FlatOperation` form and lose the
 fold). -/

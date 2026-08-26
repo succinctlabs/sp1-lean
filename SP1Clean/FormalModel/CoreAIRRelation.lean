@@ -13,9 +13,9 @@ The active table list is witness data but must equal one of the two pinned Rust 
 omitting a hard table, or quietly adding a helper table, a failed equality rather than an informal
 coverage claim.
 
-`Cluster.tables_nodup` and `TableRefinement.sound` are part of the reserved exact-AIR/ArkLib
-composition API: declared ahead of the `CoreAIRRefinementObligations` closure that will consume
-them, so they are expected to be unreferenced in-tree today. -/
+`Cluster.tables_nodup` and the paired `System.shardRelation` are part of the reserved
+exact-AIR/ArkLib composition API: declared ahead of the `CoreAIRRefinementObligations` closure that
+consumes them. -/
 
 namespace SP1Clean.CoreAIR
 
@@ -88,6 +88,32 @@ def System.relationFor {Public : Type} (system : System Public) (cluster : Clust
     WitnessRelation.Relation Public (Witness system.Row) :=
   fun statement witness => witness.cluster = cluster ∧ system.relation statement witness
 
+/-- The exact proof-free witness of one Core shard consists of both upstream clusters.  Keeping the
+pair in one carrier prevents an AIR refinement or ArkLib extractor from authenticating execution
+rows while silently omitting the six memory-boundary tables. -/
+structure ShardWitness {Public : Type} (system : System Public) where
+  execution : Witness system.Row
+  memoryBoundary : Witness system.Row
+
+/-- Exact paired 34+6-table relation for a Core shard. -/
+def System.shardRelation {Public : Type} (system : System Public) :
+    WitnessRelation.Relation Public (ShardWitness system) :=
+  fun statement witness =>
+    system.relationFor .execution statement witness.execution ∧
+      system.relationFor .memoryBoundary statement witness.memoryBoundary
+
+theorem System.execution_of_shardRelation {Public : Type} {system : System Public}
+    {statement : Public} {witness : ShardWitness system}
+    (valid : system.shardRelation statement witness) :
+    system.relationFor .execution statement witness.execution :=
+  valid.1
+
+theorem System.memoryBoundary_of_shardRelation {Public : Type} {system : System Public}
+    {statement : Public} {witness : ShardWitness system}
+    (valid : system.shardRelation statement witness) :
+    system.relationFor .memoryBoundary statement witness.memoryBoundary :=
+  valid.2
+
 /-- Recover one table row's complete local validity directly from a cluster-restricted relation.
 This is the shared elimination rule for exact-row consumers: they should not depend on the nested
 conjunction layout of `System.relation`/`relationFor`. -/
@@ -102,21 +128,5 @@ theorem System.localValid_of_relationFor {Public : Type} {system : System Public
 /-- The extraction adapter is for the exact current semantic source/profile. -/
 def System.IsCurrent {Public : Type} (system : System Public) : Prop :=
   system.profile = CoreProfile.current
-
-/-- Constructive, profile-checked refinement from exact extracted tables to a semantic relation.
-This is the object the ArkLib AIR extractor should post-compose with. -/
-structure TableRefinement {Public ExecutionWitness : Type} (system : System Public)
-    (cluster : Cluster)
-    (execution : WitnessRelation.Relation Public ExecutionWitness) where
-  currentProfile : system.IsCurrent
-  refinement : WitnessRelation.FunctionalRefinement (system.relationFor cluster) execution
-
-/-- Forget table/profile metadata and recover ordinary witness-producing soundness. -/
-theorem TableRefinement.sound {Public ExecutionWitness : Type} {system : System Public}
-    {cluster : Cluster}
-    {execution : WitnessRelation.Relation Public ExecutionWitness}
-    (refinement : TableRefinement system cluster execution) :
-    WitnessRelation.Sound (system.relationFor cluster) execution :=
-  refinement.refinement.sound
 
 end SP1Clean.CoreAIR

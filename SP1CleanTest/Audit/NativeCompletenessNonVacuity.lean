@@ -7,10 +7,14 @@ import SP1CleanTest.Audit.TraceNonVacuity
 # Non-vacuity of deterministic native completeness
 
 The deterministic native compiler is exercised on the smallest honest semantic shard: the
-boundary-only execution at the concrete audit program and state.  Unlike the existing generated
-trace anchor, this witness starts from `Machine.EventExecutionTrace`, runs through `nativeTrace`,
-and therefore checks that the admissible-execution relation used by native completeness is jointly
-satisfiable.
+zero-event execution at the concrete audit program and state.  Unlike the existing generated
+trace anchor, this starts from the common `Machine.CoreShardSemanticWitness`, runs its evaluator,
+then runs `nativeTrace`; it therefore checks that the exact relation used by native completeness is
+jointly satisfiable.
+
+`Audit/ActiveNativeCompleteness.lean` complements this cheapest total-pipeline anchor with one
+official Sail transition and checks that its deterministic compiler result is the circuit-built
+JAL event used by the active AIR witness.
 -/
 
 open LeanRV64D.Defs
@@ -24,9 +28,6 @@ open SP1Clean.TraceGenTests
 open SP1Clean.Audit.JointNonVacuity
 open SP1Clean.Audit.TraceNonVacuity
 open SP1Clean.Channels (stateChannel byteChannel programChannel memoryChannel)
-
-/-- No syscall transition occurs in the boundary-only execution, so the handler is immaterial. -/
-def anchorHandler : Machine.SyscallHandler := fun _ _ _ _ => False
 
 /-- The proof-free, zero-transition semantic execution at the shared audit state. -/
 noncomputable def anchorExecution : Machine.EventExecutionTrace where
@@ -55,31 +56,51 @@ theorem pv_limbBounds : pv.LimbBounds := by
 theorem anchorProgram_encodable : Commit.Encodable anchorProgram :=
   anchorData_canonicalEncoding.encodable_progOf anchorData
 
-/-- The boundary-only execution is an exact supported ordinary shard.  Transition-local fields
-are vacuous; the non-vacuous content is the committed program and configured/ROM-loaded initial
-Sail state inherited from the joint audit anchor. -/
+/-- The zero-event trace embedded into the one common semantic witness. -/
+noncomputable def anchorSemanticWitness : Machine.CoreShardSemanticWitness :=
+  Machine.CoreShardSemanticWitness.ofOrdinaryTrace anchorProgram ⟨[]⟩ anchorExecution
+
+theorem anchorSemanticWitness_trace :
+    anchorSemanticWitness.trace? (supportedCoreShardModel (p := SP1Prime)) =
+      some anchorExecution := by
+  exact Machine.CoreShardSemanticWitness.trace?_ofOrdinaryTrace
+    (supportedCoreShardModel (p := SP1Prime)) anchorProgram ⟨[]⟩ anchorExecution
+    (Machine.EventTransitionsValid.nil anchorState)
+    (fun transition member => absurd member List.not_mem_nil)
+
+@[simp] theorem anchorSemanticWitness_evaluatedTrace :
+    anchorSemanticWitness.evaluatedTrace (supportedCoreShardModel (p := SP1Prime)) =
+      anchorExecution :=
+  Machine.CoreShardSemanticWitness.evaluatedTrace_eq_of_trace? anchorSemanticWitness_trace
+
+/-- The common witness is an exact supported shard.  Transition-local fields are vacuous; the
+non-vacuous content is the committed program and configured/ROM-loaded initial Sail state inherited
+from the joint audit anchor. -/
 theorem anchorExecution_semantic :
-    SupportedOrdinaryShardExecutionRelation anchorHandler stmt anchorExecution where
-  publicValuesWellFormed := pv_limbBounds
+    SupportedCoreShardExecutionRelation stmt anchorSemanticWitness where
+  statementValid := pv_limbBounds
   programWellFormed := anchorProgram_wellFormed
-  programEncodable := anchorProgram_encodable
+  programBound := rfl
+  programValid := anchorProgram_encodable
+  contractValid := trivial
   romLoaded := anchorState_romLoaded
   configured := anchorState_configured
   codeMemoryCompatible := anchor_codeMemoryCompatible
-  segment := by
-    refine ⟨Machine.EventTransitionsValid.nil anchorState, trivial, ?_, ?_, ?_⟩
-    · simpa only [anchorExecution, stmt] using anchorBoundaryFacts.initialPc
+  memoryWellFormed := ⟨List.nodup_nil,
+    fun cell member => absurd member List.not_mem_nil⟩
+  memoryAgrees := fun cell member => absurd member List.not_mem_nil
+  shardCase := by
+    refine .execution [] anchorExecution rfl rfl anchorSemanticWitness_trace
+      (Machine.EventTransitionsValid.nil anchorState) trivial rfl ?_ ?_ ?_
+    · simpa only [anchorExecution, stmt, supportedCoreShardModel,
+        supportedCoreShardBoundary] using anchorBoundaryFacts.initialPc
     · change anchorState.regs.get? Register.PC =
         some (supportedPcBits (0 : ZMod SP1Prime) 1 0)
       rw [supportedPcBits_anchor]
       exact anchorState_pc
-    · rfl
-  allOrdinary := by
-    intro transition member
-    exact absurd member List.not_mem_nil
-  supported := by
-    intro located member
-    exact absurd member List.not_mem_nil
+    · exact ⟨fun transition member => absurd member List.not_mem_nil,
+        fun located member => absurd member List.not_mem_nil,
+        by simp [CoreProfile.WithinOrdinaryRowLimit]⟩
 
 /-- The zero-step shard is strictly inside the pinned Core row budget. -/
 theorem anchorExecution_withinCoreRowLimit :
@@ -431,16 +452,16 @@ theorem anchorExecution_nativeTraceReady : NativeTraceReady stmt anchorExecution
 
 /-- The completeness theorem's exact source relation is nonempty. -/
 theorem anchorExecution_admissible :
-    SupportedCoreNativeAdmissibleExecutionRelation anchorHandler stmt anchorExecution :=
-  ⟨⟨anchorExecution_semantic, anchorExecution_withinCoreRowLimit⟩,
+    SupportedCoreNativeAdmissibleShardRelation stmt anchorSemanticWitness :=
+  ⟨anchorExecution_semantic,
     anchorExecution_nativeTraceReady, anchorExecution_footprintFits⟩
 
 /-- The capacity-aligned functional capstone validates the compiler's literal 53-table witness in
 the same bounded native relation consumed by soundness. -/
 theorem anchorExecution_yields_boundedAirWitness :
     SupportedCoreNativeShardRelation stmt (nativeTrace stmt anchorExecution).witness :=
-  (supported_core_native_shard_functionalCompleteness anchorHandler).map_valid
-    stmt anchorExecution anchorExecution_admissible
+  (supported_core_native_shard_functionalCompleteness).map_valid
+    stmt anchorSemanticWitness anchorExecution_admissible
 
 /-- Forgetting only the named capacity restriction recovers the original native relation. -/
 theorem anchorExecution_yields_airWitness :
@@ -451,16 +472,16 @@ theorem anchorExecution_yields_airWitness :
 generated AIR witness.  This exercises both directions without introducing an alternate execution
 carrier. -/
 theorem anchorExecution_bounded_roundTrip :
-    ∃ execution,
-      SupportedCoreOrdinaryShardExecutionRelation anchorHandler stmt execution :=
-  supported_core_native_shard_sound anchorHandler stmt
+    ∃ witness,
+      SupportedCoreShardExecutionRelation stmt witness :=
+  supported_core_native_shard_sound stmt
     (nativeTrace stmt anchorExecution).witness anchorExecution_yields_boundedAirWitness
 
 /-- The direct Clean statement consequence is therefore non-vacuous at the concrete boundary. -/
 theorem anchorExecution_yields_ensembleStatement :
     (sp1Ensemble (p := SP1Prime)).Statement pv := by
   simpa only [stmt] using
-    sp1Ensemble_statement_of_supported_execution anchorHandler stmt anchorExecution
+    sp1Ensemble_statement_of_supported_execution stmt anchorSemanticWitness
       anchorExecution_admissible
 
 end SP1Clean.Audit.NativeCompletenessNonVacuity

@@ -10,12 +10,12 @@
 # in this repo carries ZERO `maxHeartbeats`; every entry below is a generated definition or a measured
 # structural case, and each states its floor bracket and its mechanism.
 #
-# Before adding an entry, read docs/agents/perf-findings.md §1 — extract over OPAQUE arguments, and
-# check what the extraction can still see. Then meet the bar in §7: a measured floor bracket from a
-# real ladder, a named mechanism, at least one attempted fix with its measured result, and a reason the
-# cause cannot be moved (not merely that a first attempt did not move it). If the site is generated,
-# fix the emitter in `update_extracted.py` instead — its blanket emission has repeatedly proven one to
-# two orders of magnitude over what any definition actually needed.
+# Before adding an entry, read docs/agents/proof-patterns.md — extract over OPAQUE arguments, and
+# check what the extraction can still see. Then meet the documented bar: a measured floor bracket
+# from a real ladder, a named mechanism, at least one attempted fix with its measured result, and a
+# reason the cause cannot be moved (not merely that a first attempt did not move it). If the site is
+# generated, fix the emitter in `update_extracted.py` instead — its blanket emission has
+# repeatedly proven one to two orders of magnitude over what any definition actually needed.
 #
 # For calibration: upstream Clean has ZERO `maxHeartbeats` in 44,603 lines and 4 `maxRecDepth` sites,
 # all in constant tables, capped at 2048, none in a proof.
@@ -65,5 +65,3 @@ maxRecDepth    SP1Clean/Faithful/BranchChip.lean                       1000   1
 # failing value is not a margin. Scoped, not file-level: a file-level bump silently covers declarations
 # that never needed it.
 maxRecDepth    SP1Clean/FormalModel/Trace/Witness.lean                  800   1
-
-

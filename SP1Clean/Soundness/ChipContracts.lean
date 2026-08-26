@@ -4655,7 +4655,7 @@ omit [Fact (2 ^ 17 < p)] [Fact (2 ^ 25 < p)] in
 /-- The produced messages of one boolean-gated pull/push pair: the pushed message on an active
 gate, nothing on a padding row.  Stated over an **abstract** gate so that instantiating it at a
 decoded table row never asks the unifier to normalise the row decoder
-(`docs/agents/perf-findings.md` §1 — the decoded-row normalisation landmine). -/
+(`docs/agents/proof-patterns.md` — the decoded-row normalisation landmine). -/
 private lemma producedMessages_gatedPair {Message : TypeMap} [ProvableType Message]
     {channel : Channel (ZMod p) Message} {gate : ZMod p} {pulled pushed : Message (ZMod p)}
     (hp : 2 < p) (hbool : gate = 0 ∨ gate = 1) :
@@ -4760,7 +4760,7 @@ private theorem val_lt_of_byteU8PairPull_guarantee
 /-- **The byte-grounded half of one active MemoryBump row's evidence**, over an abstract row
 variable: the four refreshed-clock limb ranges and the two difference-limb ranges, each read off the
 matching `is_real`-gated byte pull.  Split from the assert half below so each keeps its own
-elaboration budget (`docs/agents/perf-findings.md` §1 — the per-declaration cumulative overflow). -/
+elaboration budget (`docs/agents/proof-patterns.md` — the per-declaration cumulative overflow). -/
 private theorem memoryBump_byteEvidence_of_env
     (r : Var MemoryBumpChip.Inputs (ZMod p)) (offset : ℕ) (env : Environment (ZMod p))
     (byteG : ((MemoryBumpChip.main r).operations offset).ChannelGuarantees
@@ -5004,7 +5004,7 @@ omit [Fact (2 ^ 17 < p)] in
 /-- **The pure-arithmetic core of the refresh's strict time increase**, over abstract field
 scalars: the two received 24-bit bounds on the pulled limbs, the four refreshed-limb ranges, the
 two difference-limb ranges and the three `compare_low`-selected identities force the ℕ-decoded
-clock to increase.  Stated away from the decoded row (`docs/agents/perf-findings.md` §1) so the
+clock to increase.  Stated away from the decoded row (`docs/agents/proof-patterns.md`) so the
 `ZMod.val` lifting and its two `omega` closers never run against a decoded-row context. -/
 private lemma bump_clkNat_lt
     {ph pl cl16 c1624 c2432 c3248 clow dlow dhigh : ZMod p}
@@ -5076,7 +5076,7 @@ theorem memoryBump_isRefresh
   obtain ⟨h016, h3248, h1624, h2432, hcl, hhieq, hdiff, hdlow, hdhigh⟩ :=
     memoryBump_evidence witness constraints balanced tableMem real
   -- Make the decoded row opaque before the definitional crossings below (the `set`-free form of
-  -- `docs/agents/perf-findings.md` §3's opacity device).
+  -- `docs/agents/proof-patterns.md`'s opacity device).
   obtain ⟨r, hr⟩ : ∃ r, memoryBumpRow (memoryBumpTable witness) row = r := ⟨_, rfl⟩
   rw [hr] at h016 h3248 h1624 h2432 hcl hhieq hdiff hdlow hdhigh hClk hHigh ⊢
   clear hr

@@ -28,8 +28,8 @@ Each is a `byteChannel.pullIf` (multiplicity `-is_real`, **raw** value — post-
 message (the in-circuit byte-op correctness), which the proof projects through
 `byteRowSpec_range`/`byteRowSpec_u8range_pair`; on padding (`mult = 0`) it owes and receives nothing.
 The guarantee is backed at the ensemble/balance level by the landed Byte/Range providers
-(`Proofs/Chips/ByteChip/`) and the native provider recount. Background: `docs/bus-model.md` §5
-(HISTORICAL — read its banner).
+(`Proofs/Chips/ByteChip/`) and the native provider recount. The current bus/grounding boundary is
+documented in `docs/architecture.md` under "Structural buses and semantic grounding".
 
 `clk_target` is the operand's access clock (`clk_low + 4/3/2` for op_a/op_b/op_c) — a cross-block
 input. The chip-witnessed columns are computed from it (`prev_low := clk_target - 1`, `diff := 0`, so the

@@ -25,23 +25,36 @@ local instance nativeBoundaryAgreementFieldBound : Fact (2 ^ 24 < p) :=
 and Memory agreement layers derive the two canonical provider bindings rather than storing them as
 opaque readiness fields. -/
 theorem NativeTraceReady.semanticBoundary
-    {handler : Machine.SyscallHandler} {statement : SupportedCoreStatement p}
-    {execution : Machine.EventExecutionTrace}
-    (ready : NativeTraceReady statement execution)
-    (semantic : SupportedOrdinaryShardExecutionRelation handler statement execution) :
-    SemanticBoundaryBinding statement (nativeTrace statement execution).witness := by
-  have clockEncodable := nativeInitialClock_encodable statement
-    semantic.publicValuesWellFormed
-  have programProvider := nativeTrace_programProviderBound semantic ready.compiler
+    {statement : SupportedCoreStatement p}
+    {semanticWitness : Machine.CoreShardSemanticWitness}
+    (ready : NativeTraceReady statement
+      (semanticWitness.evaluatedTrace (supportedCoreShardModel (p := p))))
+    (semantic : SupportedCoreShardExecutionRelation statement semanticWitness) :
+    SemanticBoundaryBinding statement
+      (nativeTrace statement
+        (semanticWitness.evaluatedTrace (supportedCoreShardModel (p := p)))).witness := by
+  let execution := semanticWitness.evaluatedTrace (supportedCoreShardModel (p := p))
+  have publicWellFormed :=
+    Execution.SupportedCoreShardExecutionValid.publicValuesWellFormed semantic
+  have programEq := Execution.SupportedCoreShardExecutionValid.program_eq semantic
+  have programWellFormed : statement.program.WellFormed := by
+    simpa only [programEq] using semantic.programWellFormed
+  have programEncodable : Commit.Encodable statement.program := by
+    simpa only [programEq] using
+      Execution.SupportedCoreShardExecutionValid.programEncodable semantic
+  obtain ⟨-, -, -, initialPc, -, -, -, -⟩ :=
+    Execution.SupportedCoreShardExecutionValid.evaluatedTrace_facts semantic
+  have clockEncodable := nativeInitialClock_encodable statement publicWellFormed
+  have programProvider := nativeTrace_programProviderBound semantic rfl ready.compiler
     ready.demandServable ready.programProjection
-  refine ⟨execution.initialState, {
-    programWellFormed := semantic.programWellFormed
+  refine ⟨semanticWitness.initialState, {
+    programWellFormed := programWellFormed
     programCommitted := ?_
-    initialPc := semantic.segment.2.2.1
+    initialPc := ?_
     initialClock := ?_
-    romLoaded := semantic.romLoaded
+    romLoaded := ?_
     configured := semantic.configured
-    codeMemoryCompatible := semantic.codeMemoryCompatible
+    codeMemoryCompatible := ?_
     programProvider := programProvider
     memoryProvider := ?_
     memoryProviderUnique := nativeTrace_memoryInitProviderUnique statement execution
@@ -51,16 +64,24 @@ theorem NativeTraceReady.semanticBoundary
   · change Commit.StatementFor
       (Commit.dataOfAt statement.program (nativeInitialClock statement)) statement.program
     exact Commit.dataOfAt_statementFor (p := p) statement.program (nativeInitialClock statement)
-      semantic.programWellFormed semantic.programEncodable clockEncodable
+      programWellFormed programEncodable clockEncodable
+  · simpa only [execution, Machine.CoreShardSemanticWitness.evaluatedTrace_initialState,
+      supportedCoreShardBoundary]
+      using initialPc
   · change Commit.initClkNat
       (Commit.dataOfAt statement.program (nativeInitialClock statement)) =
         nativeInitialClock statement
     exact Commit.initClkNat_dataOfAt statement.program (nativeInitialClock statement)
       clockEncodable
+  · simpa only [programEq] using semantic.romLoaded
+  · rw [← programEq]
+    exact semantic.codeMemoryCompatible
   · simpa only [nativeTrace, nativeBaseTrace, nativeBaseTraceOfCompiled,
       SupportedCoreTraceWitness.canonicalClosure_data,
       SupportedCoreTraceWitness.witness_data,
       Commit.initClkNat_dataOfAt statement.program (nativeInitialClock statement)
-        clockEncodable] using ready.memoryProviderBound
+        clockEncodable, execution,
+      Machine.CoreShardSemanticWitness.evaluatedTrace_initialState] using
+        ready.memoryProviderBound
 
 end SP1Clean.Soundness

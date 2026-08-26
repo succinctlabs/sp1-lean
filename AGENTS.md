@@ -63,7 +63,7 @@ to a canonical Rust exporter so it does not obscure the verifier/refinement boun
 
 **This workstream's current priority:** instantiate the exact v6.4.0 Core AIR refinement bundle. Native
 timed grounding, every one of the 25 chip contracts, and `supported_core_native_sound` are closed. The
-34-table execution and 6-table memory-boundary relations exist, but full upstream soundness remains open
+paired 34-table execution and 6-table memory-boundary shard relation exists, but full upstream soundness remains open
 until the six Core system tables derive the native boundary facts and
 `CoreAIRRefinementObligations` has a closed construction. Until then only
 `sp1_air_refinement_of_obligations`/`sp1_air_sound_of_obligations` are declared; the unqualified names
@@ -75,8 +75,10 @@ remain reserved. See `docs/roadmap.md` and `docs/architecture.md`.
   **no stray `info:` notes** — leave the build output clean (see the `ring` note below). This builds
   **only the main library** — it carries no `native_decide` (gated by `scripts/check_no_native_decide.sh`).
 - Tests: `lake test` (the `SP1CleanTest` `testDriver`). Builds/elaborates the exportability battery and
-  the non-vacuity/real-row satisfiability anchors — the project's **only** `native_decide`. Runs on top
-  of the cached main-library oleans (the test lib imports `SP1Clean`, never vice-versa). Trace
+  the non-vacuity/real-row satisfiability anchors — including the active official-Sail-step ↔
+  deterministic-compiler ↔ circuit-event regression — and is the project's **only**
+  `native_decide`. Runs on top of the cached main-library oleans (the test lib imports `SP1Clean`,
+  never vice-versa). Trace
   conformance against SP1's real prover is the separate dump-anchored pipeline
   (`export/sp1dump/` + the `--testdata` generation-time gate + `scripts/run_interp_diff.sh`).
 - Single file: `lake env lean SP1Clean/Proofs/Chips/AddChip/Formal.lean` (elaborates against the
@@ -240,15 +242,16 @@ Mirror-rust layout under `SP1Clean/`:
   and timed grounding. The converse is now the proof-independent all-25 compiler under
   `Proofs/Completeness/{InstructionEvent,ExecutionCompiler,NativeTraceCompiler}.lean` plus the
   stratum-10 `Soundness/NativeCompleteness.lean` capstone: it constructs all 53 tables and proves
-  constraints/four-channel balance on `SupportedCoreNativeAdmissibleExecutionRelation`. Widening that
+  constraints/four-channel balance on `SupportedCoreNativeAdmissibleShardRelation`. Widening that
   compiler domain remains named semantic-readiness/footprint work. Soundness and completeness now
-  share `SupportedCoreOrdinaryShardExecutionRelation` and the single
-  `CoreProfile.WithinOrdinaryRowLimit` policy; `NativeTraceTotalOnSupportedCore` is the exact remaining
+  share `SupportedCoreShardExecutionRelation` and the single
+  `CoreProfile.WithinOrdinaryRowLimit` policy; `NativeShardTraceTotal` is the exact remaining
   condition for unconditional correctness and public-language equality. No unconditional equality
   is claimed yet. The bespoke
   `MachineSoundness`/`MachineConsistency` `TraceValid` capstone was retired 2026-06-05.
   `Soundness/CoreAIR.lean` is the exact v6.4.0 deterministic boundary: its `_of_obligations`
-  combinators consume the `.execution` cluster only and expose the unclosed field-by-field proof bundle.
+  combinators consume the paired 34+6-table `CoreAIR.Current.ShardRelation` and expose the unclosed
+  field-by-field proof bundle plus an explicit external loader/platform context.
   The frozen Eulerian-path interface (`GatedVm/`, `TargetVm.lean`, `AdvanceDispatch.lean`, the
   `Soundness/Decode.lean` walk half) was deleted 2026-08 — its scheduled post-seam retirement; the
   live-path survivors are `Walk.lean`'s graph core, `RowEffectDefs.lean`'s `RefinesAt`/`RowEffect`
@@ -276,7 +279,8 @@ the whole **main** library, so `lake build` builds all of it) plus per-pillar bu
 `SP1Model` / `SP1Extracted` / `SP1FormalModel` / `SP1Native` / `SP1Proofs` (selected by submodule globs, e.g.
 `"SP1Clean.Math.+"`; `SP1Proofs` groups `Proofs` + `Faithful` + `Soundness`). `lake build SP1Extracted`
 builds just that layer. Separately, the top-level **test** library `SP1CleanTest` (glob `"SP1CleanTest.+"`,
-the `testDriver` → `lake test`) holds the exportability/non-vacuity anchors and trace-generator
+the `testDriver` → `lake test`) holds the exportability/non-vacuity anchors (including
+`Audit/ActiveNativeCompleteness.lean`) and trace-generator
 substrate; it imports `SP1Clean` but is **not** part of the umbrella, so `lake build SP1Clean` never
 compiles it (keeping the main build `native_decide`-free). Isolation is **by convention** — Lake does
 not forbid cross-layer imports within one package; the auto-gen guard is the `Extracted/`
@@ -461,8 +465,9 @@ These are the keepers from sp1-lean's "faithful sub-circuit composition" discipl
   `scripts/check_option_escapes.sh` (the CI `guards` job + `run_audit.sh`) **prohibits** both options: any
   site not named in `scripts/option_escapes_allowlist.txt` fails the build. It is not a ratchet and not a
   budget — a ratchet permits a new hatch as long as an old one leaves; this does not. When a proof blows
-  up (heavy `toBitVec64`/carry rw chains are the usual suspects), **fold it** — `docs/agents/perf-findings.md`
-  §1 "The rule". The allowlist is a last resort with a four-part bar (§7), not an allowance.
+  up (heavy `toBitVec64`/carry rw chains are the usual suspects), **fold it** — see
+  `docs/agents/proof-patterns.md` § "Elaboration budgets and option escapes". The allowlist is a
+  last resort with a four-part bar, not an allowance.
 - **Never write the phrases `set_option maxHeartbeats` or `set_option maxRecDepth` into a Lean comment or
   docstring under `SP1Clean/` / `SP1CleanTest/`.** The guard greps for the **full `set_option …` phrase** and
   does not parse Lean, so a comment quoting a whole directive scores as a live site and fails the build.
@@ -518,7 +523,8 @@ These are the keepers from sp1-lean's "faithful sub-circuit composition" discipl
   not a reason to hand-write the field. These lemmas also tidy `circuit_proof_start`; mind the soundness
   requirement-tail caveat. Full recipe: `docs/agents/proof-patterns.md` "ElaboratedCircuit field obligations".
 - **When a proof is slow, extract over *opaque* arguments — and check what the extraction can still see.**
-  This is the single highest-yield move (`docs/agents/perf-findings.md` §1 "The rule"). The cost hides in
+  This is the single highest-yield move (`docs/agents/proof-patterns.md` § "Compile-time and kernel
+  performance"). The cost hides in
   places the goal text does not show: in the local *context* rather than the goal, in a `have`'s *type*
   rather than its proof, in the *order* of two tactic steps, in a struct *literal* where `fromElements`
   belonged, in rewrites that each renormalise a large context. The fix is to interpose an opaque variable,
@@ -528,7 +534,8 @@ These are the keepers from sp1-lean's "faithful sub-circuit composition" discipl
 - **Ladder before you believe a cause you found by reading code.** A structural hypothesis promoted on a
   code-read predicts nothing until a measured ladder confirms it: a mechanism can be genuine, verifiable,
   and irrelevant — including one that is upstream Clean's own documented performance rule (measured delta:
-  0.008%). Measure first. Details: `docs/agents/perf-findings.md` §1 "The rule".
+  0.008%). Measure first; keep the timing transcript with the review artifact rather than as a
+  permanent point-in-time document.
 - Full landmine list + the witnessed-`FormalCircuit` recipe: `docs/agents/proof-patterns.md`.
 
 ## MCP servers
@@ -557,10 +564,6 @@ after installing or toggling.
   completeness.
 - `docs/goal-overview.md` — the completed-state contract (verifier + completeness targets). Not
   current status; never cite it as such.
-- `docs/chip-standardization.md` — the completed 25/25 `ChipKind.advance` interface record.
-- `docs/bus-model.md` — HISTORICAL (pre-consolidation bus model); kept only because source
-  doc-comments cite its section numbers. Read its banner before citing.
-- `docs/proposals/consolidation-progress.md` — the consolidation checkpoint board.
 - `docs/release-audit.md` — the honest-claim / trust-boundary report (axiom census and zero-deferral gate;
   regenerate with `scripts/run_audit.sh`). The census is **split by library**: the main scope diffs
   `docs/snapshots/axiom-census.txt` (needs the `SP1Clean` oleans; CI `audit` job runs
@@ -569,8 +572,9 @@ after installing or toggling.
   tree **clean on a pass**: it diffs each fresh census against its committed snapshot and fails on
   drift; only an explicit `scripts/run_audit.sh --update` rewrites the snapshot(s) for the scope(s)
   run (inspect and commit the delta — a moved auto-generated `bv_decide` `ax_N_M✝` index is
-  hygienic). It also runs `check_pins.sh`, `check_root_index.sh`, and `check_report_citations.sh`
-  as gates, so none need a separate invocation.
+  hygienic). It also runs `check_pins.sh`, `check_root_index.sh`, `check_current_docs.py`,
+  `check_release_surface.py`, and `check_report_citations.sh` as gates, so none need a separate
+  invocation.
 - `docs/agents/lean-sail-notes.md` — the v4.32.2 environment, the git dependency pins, the Sail
   code-generation workaround, and the `lake update` trap.
 - `docs/agents/clean-upstream.md` — **the Clean pin is currently a fork.** Its state and exit
@@ -579,25 +583,15 @@ after installing or toggling.
 - `docs/agents/sail-model-provenance.md` — the generated `Lean_RV64D` snapshot's provenance: the
   two-key SP1 config and its four generated sites, why stock upstream makes the memory-bridge
   lemmas false, the regeneration pipeline, and the re-pinning procedure.
-- `docs/agents/proof-patterns.md` — the witnessed-`FormalCircuit` soundness/completeness recipe + concrete
-  landmines + the **Golf & cleanup discipline** section (how to golf/clean proofs safely).
-- `docs/agents/cleanup-profile.md` — **binding house rules for `/cleanup` and `/cleanup-all`.** The
-  `mathlib-quality` plugin is written for mathlib and several of its hard gates would break this build or
-  corrupt the audit surface (it unsqueezes `simp only`, splits `∧` statements,
-  privatises single-file decls, rewrites `≥`→`≤`, and deletes "wrapper" lemmas). Read this file first; it
-  overrides the plugin where they conflict.
-- `docs/agents/perf-findings.md` — **how to avoid an elaboration budget.** §1 is the rule (extract over
-  opaque arguments; check what the extraction can still see), then the folded-vs-unfolded predictor, the
-  cause classes with worked fixes, the diagnostic instrument, the measurement traps, and §7's bar for the
-  rare site that may be allowlisted. Read it before diagnosing any slow or blowing-up declaration.
-- `docs/agents/cleanup-deferred.md` — the owner-decision queue: every duplication found
-  and deliberately not fixed, grouped by blocker (shallow-file hoist · statement change · deletion ·
-  `Faithful/**` conservative-only · cross-module round), with measured sizes; the "deliberately NOT taken"
-  decisions; and the 42-entry rename queue, which is **queued, never applied**.
+- `docs/agents/proof-patterns.md` — the witnessed-`FormalCircuit` soundness/completeness recipe +
+  concrete landmines + the binding **Golf & cleanup discipline** section. It records the
+  source-compatibility, audit-surface, proof-performance, and elaboration-option rules that override
+  generic mathlib cleanup advice. The `mathlib-quality` plugin is a discovery rubric here, not an
+  authority to change public statements, privatise audit declarations, broaden `simp`, or unfold
+  performance-sensitive definitions.
 - `docs/agents/porting-recipe.md` — step-by-step checklist to port a new chip from the Add/Bitwise template.
 - `docs/agents/extraction.md` — the constraint-extraction pipeline (compiler → Python → Lean DSL).
-- `docs/agents/mul-operation-learnings.md` — Mul-specific soundness/completeness pitfalls.
-- `docs/snapshots/compile-profile.md` — per-module wall-clock compile profile + worst offenders + common threads
-  (point-in-time snapshot); re-run with `scripts/profile_compile.sh`.
+- Generate compile profiles on demand with `scripts/profile_compile.sh`; keep point-in-time timings
+  with the review artifact that uses them rather than in the maintained documentation set.
 - `docs/snapshots/axiom-ledger.md` — machine-checked `#print axioms` inventory per theorem (point-in-time
   snapshot; re-generate before release).

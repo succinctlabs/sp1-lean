@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # The reproducible audit harness behind `docs/release-audit.md` / `docs/snapshots/axiom-ledger.md`.
 #
-# Runs, in order: (A0) pin record, (A1) recorded-pin cross-checks + root-index + report-citation
-# gates, (A2) sorry/axiom text inventory with gates, (A3) the authoritative `#print axioms` census
+# Runs, in order: (A0) pin record, (A1) recorded-pin cross-checks + root-index +
+# release-surface + report-citation gates, (A2) sorry/axiom text inventory with gates, (A3) the
+# authoritative `#print axioms` census
 # over the released theorem set (via `scripts/gen_axiom_probe.py`), split into two scopes so each
 # probe elaborates against exactly the oleans its build target produces:
 #   main — `scripts/axiom_probe.lean`      vs `docs/snapshots/axiom-census.txt`      (needs `lake build SP1Clean`)
@@ -105,6 +106,14 @@ else
 fi
 
 echo
+echo "== A1 maintained documentation (gate) =="
+if python3 scripts/check_current_docs.py; then
+  :
+else
+  echo "FAIL: maintained documentation or module docstrings drifted (see above)"; fail=1
+fi
+
+echo
 echo "== A1 report citations (gate) =="
 if scripts/check_report_citations.sh; then
   :
@@ -142,6 +151,14 @@ if scripts/check_audit_surface.sh; then
   :
 else
   echo "FAIL: docs/audit-surface.md is out of sync with the tree (see above)"; fail=1
+fi
+
+echo
+echo "== A1 25-chip release surface (gate) =="
+if python3 scripts/check_release_surface.py; then
+  :
+else
+  echo "FAIL: the instruction-chip audit inventory is incomplete (see above)"; fail=1
 fi
 
 echo

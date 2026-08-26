@@ -9,9 +9,9 @@ import SP1Clean.Soundness.AIR
 /-!
 # Deterministic native ensemble trace compiler
 
-This is the functional seam between the one operational witness,
-`Machine.EventExecutionTrace`, and the ordinary 53-table Clean ensemble.  The compiler has no
-proof argument and makes no row choices:
+This is the low-level functional seam between the common shard witness's evaluated
+`Machine.EventExecutionTrace` and the ordinary 53-table Clean ensemble. The compiler has no proof
+argument and makes no row choices:
 
 * `Execution.compileExecution` selects the chronological instruction events and Memory refreshes;
 * `CompiledExecution.memoryHistory` determines one Memory-init/final row per touched location;
@@ -388,22 +388,26 @@ def NativeTraceAdmissible (statement : SupportedCoreStatement p)
   NativeTraceReady statement execution ∧
     (NativeTraceFootprint.ofTrace (nativeTrace statement execution)).Fits p
 
-/-- Native completeness is currently proved on a restriction of the one shared bounded semantic
-relation.  `Relation.restrict` makes the layering explicit: this is not another execution model or
-witness carrier, only the still-open compiler-admissibility condition on `nativeTrace`. -/
-def SupportedCoreNativeAdmissibleExecutionRelation
-    (handler : Machine.SyscallHandler) :
-    WitnessRelation.Relation (SupportedCoreStatement p) Machine.EventExecutionTrace :=
-  (SupportedCoreOrdinaryShardExecutionRelation handler).restrict NativeTraceAdmissible
+/-! ## Canonical shard source
 
-/-- Exact remaining domain-closure statement for native shard completeness.
+The low-level compiler consumes the common witness's evaluated `EventExecutionTrace`; its public
+completeness relation therefore has the same witness type and semantic validity as soundness. -/
 
-Proving this proposition removes the last restriction between the shared bounded semantic relation
-and the deterministic compiler.  It is kept transparent: every residual field remains visible in
-`NativeTraceAdmissible`, and no alternate relation or existential AIR witness is introduced. -/
-def NativeTraceTotalOnSupportedCore (handler : Machine.SyscallHandler) : Prop :=
-  ∀ (statement : SupportedCoreStatement p) (execution : Machine.EventExecutionTrace),
-    SupportedCoreOrdinaryShardExecutionRelation handler statement execution →
-      NativeTraceAdmissible statement execution
+/-- Compiler admissibility of the deterministic trace represented by a canonical shard witness. -/
+noncomputable def NativeShardTraceAdmissible (statement : SupportedCoreStatement p)
+    (witness : Machine.CoreShardSemanticWitness) : Prop :=
+  NativeTraceAdmissible statement
+    (witness.evaluatedTrace (supportedCoreShardModel (p := p)))
+
+/-- The canonical semantic language restricted only by the still-visible compiler facts. -/
+noncomputable def SupportedCoreNativeAdmissibleShardRelation :
+    WitnessRelation.Relation (SupportedCoreStatement p) Machine.CoreShardSemanticWitness :=
+  (SupportedCoreShardExecutionRelation (p := p)).restrict NativeShardTraceAdmissible
+
+/-- Exact remaining domain-closure statement on the one public semantic relation. -/
+noncomputable def NativeShardTraceTotal : Prop :=
+  ∀ (statement : SupportedCoreStatement p) (witness : Machine.CoreShardSemanticWitness),
+    SupportedCoreShardExecutionRelation statement witness →
+      NativeShardTraceAdmissible statement witness
 
 end SP1Clean.Soundness

@@ -35,9 +35,10 @@ profile discharges three of the four channels without touching a row.
 
 This is deliberately the *static* profile rather than a per-row evaluated one. Evaluating a built
 row to read its interactions back is the documented performance catastrophe of this code base
-(`docs/agents/perf-findings.md` §1); the row-dependent half of a profile belongs on the soundness
-side's decode layer, applied to rows that satisfy `Constraints` — which
-`Air.Flat.Table.build_constraints` supplies for every table built by `Proofs/Completeness/`.
+(`docs/agents/proof-patterns.md`, "Compile-time / performance landmines"); the row-dependent half of
+a profile belongs on the soundness side's decode layer, applied to rows that satisfy
+`Constraints` — which `Air.Flat.Table.build_constraints` supplies for every table built by
+`Proofs/Completeness/`.
 
 ## What is not here
 
