@@ -11,6 +11,10 @@ zero-event execution at the concrete audit program and state.  Unlike the existi
 trace anchor, this starts from the common `Machine.CoreShardSemanticWitness`, runs its evaluator,
 then runs `nativeTrace`; it therefore checks that the exact relation used by native completeness is
 jointly satisfiable.
+
+`Audit/ActiveNativeCompleteness.lean` complements this cheapest total-pipeline anchor with one
+official Sail transition and checks that its deterministic compiler result is the circuit-built
+JAL event used by the active AIR witness.
 -/
 
 open LeanRV64D.Defs

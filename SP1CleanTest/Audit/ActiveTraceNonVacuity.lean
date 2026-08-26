@@ -13,7 +13,8 @@ The semantic event and provider lists are deliberately hand-assembled in a
 tables, however, are assembled through each circuit's own witness builder, and
 `supported_core_generated_trace_complete` checks every resulting row before yielding the native AIR relation
 consumed by soundness.  The explicit active-row counts prevent this regression from silently
-collapsing back to the boundary-only case.
+collapsing back to the boundary-only case. `Audit/ActiveNativeCompleteness.lean` additionally ties
+this exact event to an official Sail step and the deterministic execution compiler.
 -/
 
 namespace SP1Clean.Audit.ActiveTraceNonVacuity

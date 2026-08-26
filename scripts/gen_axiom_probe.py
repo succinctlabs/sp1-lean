@@ -171,6 +171,15 @@ EXACT_REQUIRED_THEOREMS = [
      "anchorExecution_yields_ensembleStatement"),
     ("SP1CleanTest/Audit/NativeCompletenessNonVacuity.lean",
      "anchorExecution_bounded_roundTrip"),
+    # Joined active-path regression: one official Sail step, its exact deterministic compiler
+    # event, the nonempty bounded AIR witness, and soundness back into the shared semantic language.
+    ("SP1CleanTest/Audit/JointNonVacuity.lean", "anchorStep"),
+    ("SP1CleanTest/Audit/ActiveNativeCompleteness.lean",
+     "activeView_compiled_event_exists"),
+    ("SP1CleanTest/Audit/ActiveNativeCompleteness.lean", "activeExecution_semantic"),
+    ("SP1CleanTest/Audit/ActiveNativeCompleteness.lean",
+     "activeTrace_boundedNativeRelation"),
+    ("SP1CleanTest/Audit/ActiveNativeCompleteness.lean", "activeTrace_bounded_roundTrip"),
 ]
 
 EXACT_REQUIRED_TARGETS = [

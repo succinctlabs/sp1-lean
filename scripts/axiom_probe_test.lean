@@ -1,7 +1,8 @@
 import SP1CleanTest.Audit.NativeCompletenessNonVacuity
+import SP1CleanTest.Audit.JointNonVacuity
+import SP1CleanTest.Audit.ActiveNativeCompleteness
 import SP1CleanTest.NonVacuityReal
 import SP1CleanTest.Audit.ActiveTraceNonVacuity
-import SP1CleanTest.Audit.JointNonVacuity
 import SP1CleanTest.Audit.OneAddNativePremises
 import SP1CleanTest.Audit.ProviderMultiplicity
 import SP1CleanTest.Audit.TraceNonVacuity
@@ -17,6 +18,11 @@ Run via `lake env lean scripts/axiom_probe_test.lean` (see `scripts/run_audit.sh
 #print axioms SP1Clean.Audit.NativeCompletenessNonVacuity.anchorExecution_yields_airWitness
 #print axioms SP1Clean.Audit.NativeCompletenessNonVacuity.anchorExecution_yields_ensembleStatement
 #print axioms SP1Clean.Audit.NativeCompletenessNonVacuity.anchorExecution_bounded_roundTrip
+#print axioms SP1Clean.Audit.JointNonVacuity.anchorStep
+#print axioms SP1Clean.Audit.ActiveNativeCompleteness.activeView_compiled_event_exists
+#print axioms SP1Clean.Audit.ActiveNativeCompleteness.activeExecution_semantic
+#print axioms SP1Clean.Audit.ActiveNativeCompleteness.activeTrace_boundedNativeRelation
+#print axioms SP1Clean.Audit.ActiveNativeCompleteness.activeTrace_bounded_roundTrip
 #print axioms SP1Clean.NonVacuityRealTests.constraintsHold_of_check
 #print axioms SP1Clean.NonVacuityRealTests.rTypeEventInputs_is_real
 #print axioms SP1Clean.NonVacuityRealTests.aluTypeEventInputs_is_real

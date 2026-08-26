@@ -181,6 +181,9 @@ them; it does not maintain a second list that could drift from extraction.
 | `sp1Ensemble_statement_of_supported_execution` | `SP1Clean/Soundness/NativeCompleteness.lean` | The direct Clean `Ensemble.Statement` consequence |
 | `anchorExecution_admissible` | `SP1CleanTest/Audit/NativeCompletenessNonVacuity.lean` | A concrete zero-event common shard witness jointly inhabits every admissibility premise |
 | `anchorExecution_yields_airWitness` | `SP1CleanTest/Audit/NativeCompletenessNonVacuity.lean` | The functional capstone returns its literal compiled 53-table witness |
+| `activeView_compiled_event_exists` | `SP1CleanTest/Audit/ActiveNativeCompleteness.lean` | The official-Sail self-jump's projected input compiles to the exact JAL circuit event used by the active trace |
+| `activeExecution_semantic` | `SP1CleanTest/Audit/ActiveNativeCompleteness.lean` | A genuine one-transition Sail execution inhabits the shared supported-shard semantic relation |
+| `activeTrace_bounded_roundTrip` | `SP1CleanTest/Audit/ActiveNativeCompleteness.lean` | The nonempty circuit-built AIR witness lies in the bounded native relation and soundness reconstructs a semantic witness |
 | `SupportedCoreGeneratedTraceRelation` | `SP1Clean/Soundness/AIRCompleteness.lean` | The lower generated-trace assembly boundary, kept distinct from semantic completeness |
 
 Completeness now covers the deterministic compiler's full 53-table admissible image: all 25 instruction

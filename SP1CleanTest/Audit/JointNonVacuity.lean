@@ -831,6 +831,23 @@ def AnchorInv (s : SailState) : Prop :=
 theorem anchorInv_base : AnchorInv anchorState :=
   ⟨anchorState_pc, anchorState_romLoaded, anchorState_configured⟩
 
+/-- The committed self-jump takes one official Sail step and exposes the exact row effect used by
+both the reachability invariant and the active deterministic-compiler audit. -/
+theorem anchorStep :
+    ∃ next, SailStep anchorState next ∧ RowEffect anchorProgram jalView anchorState next := by
+  exact Advance.advance_of_jal_x0 (p := SP1Prime) (prog := anchorProgram) (r := jalView)
+    anchorState_configured anchorState_romLoaded
+    (by rw [jalView_rcvPc]; exact anchorState_pc) jalView_decodedInROM rfl rfl rfl
+    (by rw [jalView_sndPc]; decide)
+    (fun imm hb => by
+      have hb' : bitVecToWord (p := SP1Prime) ((0#21 : BitVec 21).signExtend 64) =
+          bitVecToWord (imm.signExtend 64) := hb
+      have h64 := congrArg Word.toBitVec64 hb'
+      rw [toBitVec64_bitVecToWord, toBitVec64_bitVecToWord] at h64
+      rw [jalView_rcvPc, jalView_sndPc,
+        show sign_extend (m := 64) imm = imm.signExtend 64 from rfl, ← h64]
+      decide)
+
 /-- One interpreter step from an invariant state re-establishes the invariant: the step is the
 committed self-jump (`advance_of_jal_x0` plus determinism of the `EStateM` run), whose `RowEffect`
 commits pc `0x10000` with no register write, no memory write, and configuration persistence. -/

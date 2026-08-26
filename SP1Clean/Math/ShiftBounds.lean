@@ -5,8 +5,8 @@ import Mathlib.Tactic
 
 Common to `srl_within_byte_shift*` (`Proofs/Chips/ShiftRightChip/Core.lean`) and
 `sll_within_byte_shift*` (`Proofs/Chips/ShiftLeftChip/Core.lean`). Proving each fact once collapses
-the ~100 `nlinarith` call sites to `exact`/one-liners (compile-time win; see
-`docs/snapshots/compile-profile.md` thread B).
+the ~100 `nlinarith` call sites to `exact`/one-liners. This is the opaque-helper pattern documented
+in `docs/agents/proof-patterns.md`.
 
 Every lemma is generic over byte-decomposition radices `M`, `N` with `M * N = 65536`. -/
 

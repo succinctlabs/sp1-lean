@@ -21,10 +21,11 @@
 # instead of fixing the cause.
 #
 # **Adding an entry is a last resort, not a way to make a build pass.** The bar is in
-# `docs/agents/perf-findings.md` §7: a measured floor bracket, a named mechanism, at least one attempted
-# fix with its result, and a reason the cause cannot be moved. Start from §1 — extract over opaque
-# arguments, and check what the extraction can still see. If the site is generated, fix the emitter in
-# `update_extracted.py` rather than allowlisting its output.
+# `docs/agents/proof-patterns.md` § "Elaboration budgets": a measured floor bracket, a named
+# mechanism, at least one attempted fix with its result, and a reason the cause cannot be moved.
+# Start from its compile-time section — extract over opaque arguments and check what the
+# extraction can still see. If the site is generated, fix the emitter in `update_extracted.py`
+# rather than allowlisting its output.
 #
 # Mirrors scripts/check_no_native_decide.sh / check_no_skipkerneltc.sh: exit 0 = clean, 1 = violation.
 # Run from the repo root.
@@ -58,9 +59,9 @@ if ! diff -u "$tmp_allow" "$tmp_actual" > /tmp/.option_escapes_diff 2>&1; then
   echo >&2
   sed -n '3,$p' /tmp/.option_escapes_diff >&2
   echo >&2
-  echo "      Fix the cause instead of adding an entry — docs/agents/perf-findings.md §1:" >&2
+  echo "      Fix the cause instead of adding an entry — docs/agents/proof-patterns.md:" >&2
   echo "      extract over OPAQUE arguments, and check what the extraction can still see." >&2
-  echo "      Adding an allowlist entry is a LAST RESORT and has a bar (perf-findings.md §7):" >&2
+  echo "      Adding an allowlist entry is a LAST RESORT and has a documented bar:" >&2
   echo "      a measured floor bracket, a named mechanism, an attempted fix with its result," >&2
   echo "      and a reason the cause cannot be moved. Generated site? Fix update_extracted.py." >&2
   status=1

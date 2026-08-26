@@ -394,9 +394,10 @@ churn from the base move itself).
 ## Cleanup / polish backlog (non-blocking)
 
 Deferred quality/perf TODOs — none gate the VM theorem; pick up opportunistically. The
-*how-to-golf-safely* rules live in `docs/agents/cleanup-profile.md` (the binding house rules for
-`/cleanup` and `/cleanup-all`) and `docs/agents/proof-patterns.md` § "Golf & cleanup discipline"
-+ § "Compile-time / performance landmines".
+how-to-golf-safely rules live in `docs/agents/proof-patterns.md` § "Golf & cleanup discipline"
+and § "Compile-time / performance landmines". Those project rules override generic mathlib cleanup
+advice where Clean's folded terms, public audit declarations, or source-stable theorem statements
+are involved.
 
 - **`linter.style.longLine`** — the one remaining syntactic linter not yet enabled (the last
   candidate noted in AGENTS.md § Linters). Current fallout, lines over 100 **codepoints** in
@@ -429,9 +430,9 @@ Deferred quality/perf TODOs — none gate the VM theorem; pick up opportunistica
   § deliberate layering exceptions) onto `FormalModel/Contracts/`. Chip `Spec`s are
   perf-sensitive (folded-hypothesis doctrine) and the moves rebuild the heaviest proof families —
   measure per chip, one at a time. Lt/Bitwise's split `Spec`s are deliberate and stay.
-- **Re-run `scripts/profile_compile.sh` on v4.32.2** — `docs/snapshots/compile-profile.md`
-  self-declares STALE (its timings are v4.31/Sail-v4). An overnight solo run refreshes it; until
-  then the banner stands.
+- **Re-run `scripts/profile_compile.sh` after a suspected performance regression** — keep the
+  generated report as a review artifact for the affected change; point-in-time timing output is not
+  maintained as evergreen repository documentation.
 - **Unify the two time models** — retire the `MicroTime` compatibility layer into the
   `Machine.SP1MachineModel.schedule` event model (or derive it as the ordinary-schedule instance),
   discharging the capstone's `UsesOrdinarySchedule` bridging hypothesis structurally. Real

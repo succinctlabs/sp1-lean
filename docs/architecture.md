@@ -420,7 +420,8 @@ for an old one.
 Hand-written Lean carries **zero** `maxHeartbeats`, matching upstream Clean, which has none in 44,603
 lines; the allowlisted sites are generated definitions plus a small number of measured structural
 `maxRecDepth` cases. A blowup is normally a masked `whnf` cost, so the required fix is to fold it, not to
-raise a number: see [`agents/perf-findings.md`](agents/perf-findings.md).
+raise a number: see [`agents/proof-patterns.md`](agents/proof-patterns.md), especially
+"Compile-time / performance landmines".
 
 The project-specific patterns are in [`agents/proof-patterns.md`](agents/proof-patterns.md); Clean's own
 `doc/performance-problems.md`, `doc/proving-guide.md`, `AGENTS.md`, and `Clean/Air/README.md` remain the

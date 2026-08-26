@@ -577,6 +577,11 @@ zero-event canonical execution shard and invokes both native completeness capsto
 and matching native provider occurrences balance all four buses. Completeness circuit-generates the
 physical AIR rows, then derives both a native AIR witness and an official-Sail local execution. This
 last test is the active-row assembly regression, not a full or verified trace generator.
+`ActiveNativeCompleteness.lean` closes the concrete seam between those anchors: it proves one
+official Sail self-jump, projects and compiles it to the exact JAL circuit event used by the active
+trace, embeds the nonempty execution in the shared semantic relation, and checks bounded native
+soundness on the active AIR witness. It does not prove the total compiler trace equals that
+hand-assembled trace or discharge `NativeShardTraceTotal` for arbitrary executions.
 The model's total boot-loader field (ROM+image loading for arbitrary well-formed programs) remains
 follow-up work; (ii) the shard-local initial state comes from the boundary binding, not from
 `model.boot`.
@@ -653,6 +658,12 @@ count bounds. `activeTrace_yields_airWitness` invokes generated-trace assembly, 
 physical rows; `activeTrace_yields_localExecution` immediately invokes native soundness on the
 result. The anchor demonstrates one real row through the complete assembly path; it is not yet an
 inhabitant of every residual premise of `SupportedCoreNativeAdmissibleShardRelation`.
+
+The companion `SP1CleanTest/Audit/ActiveNativeCompleteness.lean` proves that the official Sail
+`JAL x0, 0` step projects through the deterministic compiler to that exact `activeEvent`, and that
+both the resulting one-step semantic execution and the circuit-built active witness inhabit their
+respective bounded relations. This is a joined non-vacuity regression, not an equality proof between
+`nativeTrace` and the hand-assembled `activeTrace`.
 
 ## 8. The headline theorem and the conditional exact-AIR layer
 
@@ -861,6 +872,11 @@ rows, per-family decode facts, and the joint hypothesis bundle:
   generated-trace assembly circuit-generates its physical AIR rows, then passes the witness through
   `supported_core_native_sound` to the official-Sail local-execution relation. It is not a full or
   verified trace generator.
+- The **active compiler join** (`SP1CleanTest/Audit/ActiveNativeCompleteness.lean`): one official
+  Sail self-jump is a valid supported semantic execution, its proof-independent projection compiles
+  to the exact JAL event above, and the active circuit-built witness lies in the bounded native
+  relation. The theorem deliberately stops short of identifying the complete compiler-produced
+  trace with the hand-assembled one.
 
 ## 10. Trust base
 
@@ -1107,9 +1123,10 @@ Stated plainly:
    all four channel balances are proved.  Admissibility still records the per-chip event-validity,
    initial-Memory, Program-row projection, and actual-footprint facts not yet derived for
    a general bounded ordinary Sail execution. `NativeCompletenessNonVacuity.lean` jointly inhabits
-   every premise in the zero-event canonical execution case; the active JAL-x0 anchor separately inhabits the older
-   generated-trace assembly path. Capacity alignment is closed; unconditional public-language
-   equality now depends exactly on `NativeShardTraceTotal`.
+   every premise in the zero-event canonical execution case; `ActiveNativeCompleteness.lean` joins
+   one official Sail step to the exact JAL circuit event and the nonempty bounded native witness,
+   without claiming full compiler-trace equality. Capacity alignment is closed; unconditional
+   public-language equality now depends exactly on `NativeShardTraceTotal`.
 7. **The extracted-to-native local ensemble transport is complete under named contracts; its global
    semantic refinement is not.** `SP1Clean/Composition/` composes every chip anchor with valid
    exact execution and separately authenticated memory-boundary witnesses, a caller-supplied
@@ -1180,7 +1197,8 @@ regeneration requires a clean checkout of the pinned sp1 extraction branch
 (`dtumad/lean-extraction`) and a Rust toolchain — see `docs/agents/extraction.md`. The
 axiom census snapshot lives at `docs/snapshots/axiom-ledger.md`; regenerate before citing.
 Report citations — every cited repo path and cited declaration name — are checked by
-`scripts/check_report_citations.sh`, and recorded pin values by `scripts/check_pins.sh` — both
-run as gates inside `scripts/run_audit.sh` and in CI, so a stale citation or a drifted recorded
-pin fails the build rather than surviving in prose. (Quoted signature *text* is not
-machine-compared; the tree is authoritative.)
+`scripts/check_report_citations.sh`, maintained documentation by `scripts/check_current_docs.py`,
+the exact 25-chip release inventory by `scripts/check_release_surface.py`, and recorded pin values
+by `scripts/check_pins.sh`. These run as gates inside `scripts/run_audit.sh` and in CI, so a stale
+citation, missing chip artifact, or drifted recorded pin fails the build rather than surviving in
+prose. (Quoted signature *text* is not machine-compared; the tree is authoritative.)

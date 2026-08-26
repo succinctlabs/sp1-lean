@@ -90,7 +90,7 @@ theorem soundness : GeneralFormalCircuit.Soundness (ZMod p) main Assumptions Spe
   -- `rw … at`/`linear_combination`/`simp`/`interval_cases` in the ~280 lines of `case spec` below,
   -- which is 80% of this declaration's heartbeat budget. Clearing them here is a context fold, not a
   -- raised ceiling: measured 224,929 → 167,375 heartbeats, i.e. from 12.5% over the 200000 default to
-  -- 16% under it. (`perf-findings.md` §1: the cost was in the context, not the goal.)
+  -- 16% under it. (`proof-patterns.md`: the cost was in the context, not the goal.)
   clear h_srl_b2 h_sra_b2 h_srlw_b2 h_sraw_b2 h_sum_b2 h_b0_2 h_b1_2 h_b2_2 h_b3_2 h_b4_2
     h_s0b2 h_s1w2 h_s1b2 h_s2w2 h_s2b2 h_s3w2 h_s3b2 h_onehot2 h_v01_2 h_v012_2 h_v0123_2
     h_split2_2 h_lr0_2 h_lr1_2 h_lr2_2 h_lr3_2 h_smv2 h_o0_2 h_o1_2 h_o2_2 h_o3_2 h_o4_2

@@ -54,20 +54,20 @@ any `maxHeartbeats`/`maxRecDepth` site not named in `scripts/option_escapes_allo
 It is not a ratchet and not a budget — a ratchet permits a new hatch as long as an old one leaves; this does
 not. So when a proof blows its budget, the fix is to **fold the blowup**, using the recipes below.
 
-The allowlist is a **last resort, not an allowance**. The bar for an entry is
-[`perf-findings.md`](perf-findings.md) §7: a measured floor bracket, a named mechanism, at least one
-attempted fix with its result, and a reason the cause cannot be moved — every existing entry carries all
-four, recorded inline in the allowlist file. Start instead from that file's §1 "The rule": extract over
-OPAQUE arguments, and check what the extraction can still see. That one rule accounts for most sites that
-turn out to be fixable. If the site is *generated*, fix the emitter in `update_extracted.py` rather than
-allowlisting its output.
+The allowlist is a **last resort, not an allowance**. The bar for an entry is a measured floor
+bracket, a named mechanism, at least one attempted fix with its result, and a reason the cause
+cannot be moved — every existing entry carries all four inline. Start instead by extracting over
+OPAQUE arguments and checking what the extraction can still see. That one rule accounts for most
+sites that turn out to be fixable. If the site is *generated*, fix the emitter in
+`update_extracted.py` rather than allowlisting its output.
 
 > **The guard greps for the full `set_option <option>` phrase, so never write that phrase into a Lean
 > comment or docstring under `SP1Clean/` or `SP1CleanTest/`.** It does not parse Lean, so a comment quoting
 > a whole directive scores as a live site and fails the build. (The bare option name in prose is fine.)
 > When recording a measured ladder in the source — which you should — phrase it without the directive:
 > *"the former 8M ceiling was ~170× over; measured floor bracket (40000, 100000]"*. Keep such notes to
-> **one line**; multi-line transcripts belong in `perf-findings.md`.
+> **one line**; multi-line transcripts belong with the review artifact that motivated the
+> measurement.
 
 **1. `simp` → `simp only` — the biggest lever for chip/contract closers.** A full `simp [X.circuit, X.main,
 …, circuit_norm]` drags in the *entire default simpset* — that, not the `circuit`/`main` unfold, is the real
@@ -147,7 +147,7 @@ directive before committing — the guard rejects it.
 **5. Where `simp → simp only` will NOT help.** On the DivRem/Mul/Shift arithmetic heavies the cost is
 `nlinarith` / `linear_combination` / product-glue `simpa` / `omega` over big arithmetic / kernel
 `2^64`-whnf / kernel `decide`/`bv_decide` / term size — none of it a default-simpset drag, and the measured
-sweep over that family produced **zero** speedup (`compile-profile.md:131`). Chase the term-intrinsic cost
+sweep over that family produced **zero** speedup. Chase the term-intrinsic cost
 instead (the abstract-`BitVec` helpers and shared-tail dedup below). In `Faithful/`, the full `simp` is
 doing real `List`/`Perm`/`decide` work *and* shaping residuals for a downstream `rw`, so squeeze it
 per-theorem or not at all. In generated `Extracted/` modules the only lever is right-sizing the emit in
@@ -586,7 +586,7 @@ and `/--` openers (strip/restore them).
   heartbeats and now close at the default. The moves that get you there: prefer the default field
   obligations; `simp [circuit_norm] at <hyp>` to align forms before `exact`; witness via `fromElements #v[…]`
   so `toElements` reduces (see above); and extract heavy work through a lemma over an **opaque** argument
-  (`perf-findings.md` §1 "The rule").
+  (the opaque-argument rule above).
 
 ## Reader composition (nested-struct readers as composed `FormalCircuit`s)
 
@@ -642,8 +642,8 @@ plain `circuit_proof_start`.
   assumptions and this circuit's gate obligations (e.g. `env.get(op_a_0) * wv = 0`), so a flat
   `refine ⟨trivial, …, ?_, ?_⟩` fits; pull a witnessed-`0` column out as the k-th conjunct of `h_env`
   (`obtain ⟨_, _, h0, -⟩ := h_env`) and close each gate with `rw [h0, zero_mul]`. See `Native/Readers/RTypeReader.lean`.
-  (For *channel*-emitting readers the tails carry real `Guarantees` content — see `../bus-model.md` §3 for
-  that boilerplate; `Channel` is the faithful way to model the State/Byte/Program/Memory interactions.)
+  (For *channel*-emitting readers the tails carry real `Guarantees` content; `Model/Channels.lean`
+  and `docs/architecture.md`'s structural-bus section are the current contract.)
 
 ## `ElaboratedCircuit` field obligations: let the default tactics close them (don't hand-write proofs)
 
@@ -738,9 +738,8 @@ See `Proofs/Chips/AddChip/Formal.lean` and `Native/Readers/RegisterAccessCols.le
 
 ## Compile-time / performance landmines
 
-The compile-time profile lives in `docs/snapshots/compile-profile.md` (regenerate with
-`scripts/profile_compile.sh`); the per-declaration elaboration-budget record is
-[`perf-findings.md`](perf-findings.md). These are the durable, still-true lessons behind them — apply them
+Generate a point-in-time compile profile with `scripts/profile_compile.sh` when needed; do not keep
+stale timing snapshots as architecture documentation. These are the durable lessons — apply them
 when adding a chip or chasing a slow file. The broad attribute/macro wins have already been harvested
 (below); remaining cost is term-intrinsic in the DivRem/Shift/Mul heavies, so new slowness almost
 always means a *local* regression against one of these.
@@ -827,10 +826,11 @@ always means a *local* regression against one of these.
 ## Golf & cleanup discipline
 
 How to golf/clean a proof without breaking the repo's invariants (axiom-clean, 0-warning, no `info:`,
-no elaboration-budget escape hatch). The remaining deferred cleanup TODOs live under `docs/roadmap.md`
-§ "Cleanup / polish backlog"; the available cleanup skills are catalogued at the end of this section, and
-the binding house rules for `/cleanup` and `/cleanup-all` — which override the `mathlib-quality` plugin
-where they conflict — are in [`cleanup-profile.md`](cleanup-profile.md).
+no elaboration-budget escape hatch). The remaining cleanup TODOs live under `docs/roadmap.md`
+§ "Cleanup / polish backlog". Generic `mathlib-quality` advice is a useful discovery rubric, but
+the rules here win where it proposes changing public statement shape or source compatibility, making
+declarations private, replacing targeted `simp only`, unfolding a folded Clean term, or deleting a
+wrapper that belongs to the audit surface.
 
 **Instant, always-safe wins** (the bulk of the line savings):
 - `:= by rfl` → `:= rfl`; `show T from by tac` → `show T by tac`; `rw […] at h; exact h` → `rwa […] at h`;
