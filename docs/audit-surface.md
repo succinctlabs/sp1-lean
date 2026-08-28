@@ -50,6 +50,7 @@ kernel, each with the question it decides. Reading these, plus `FormalModel/Cont
 | `Machine.CoreShardSemanticWitness` | `SP1Clean/Model/Machine/Shard.lean` | The one proof-free program/Memory-boundary/initial-state/event carrier shared by native and exact Core |
 | `CoreShardSemanticWitness.evaluatedTrace` | `SP1Clean/Model/Machine/Shard.lean` | The total proof-independent evaluator consumed by the trace compiler |
 | `CoreShardExecutionRelation` | `SP1Clean/FormalModel/CoreShard.lean` | The one semantic relation skeleton specialized by native and exact Core |
+| `CoreShardContract` | `SP1Clean/FormalModel/CoreShard.lean` | The narrow extension hook: four explicit fields, no defaults — every trivial instantiation is a visible choice |
 | `SupportedCoreShardExecutionRelation` | `SP1Clean/FormalModel/SupportedShard.lean` | The normal-retirement, 25-route, capacity-bounded specialization shared by both native directions |
 | `SP1TransitionView` | `SP1Clean/Model/Semantics/TransitionView.lean` | The one proof-free fetch/decode/route/access projection shared by both directions |
 | `projectSP1Transition?` | `SP1Clean/Model/Semantics/TransitionView.lean` | How an operational transition is projected, including the explicit optional access-plan result |

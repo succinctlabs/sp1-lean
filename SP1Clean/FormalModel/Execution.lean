@@ -284,6 +284,9 @@ def sp1CoreShardContract {p : ℕ} {Digest : Type}
     CoreAIR.CommitRowsMatch statement.publicValues witness.syscallEvents ∧
       CoreAIR.CommitRowsSetFlags statement.publicValues witness.syscallEvents ∧
       statement.publicValues.CommitTransitionValid
+  -- Deliberately trivial: the exact routing/instruction profile of an execution shard is not yet
+  -- formalized at this layer; the execution branch's laws live in the refinement obligations.
+  executionValid := fun _ _ _ => True
 
 /-- Exact Core validity is a specialization of the one canonical shard validity record. -/
 abbrev SP1CoreShardSemanticValid {p : ℕ} {Digest : Type}

@@ -121,6 +121,9 @@ def supportedCoreShardContract {p : ℕ} [Fact p.Prime] :
     CoreShardContract (SupportedCoreStatement p) where
   statementValid := fun statement => statement.publicValues.LimbBounds
   programValid := fun _ program => Commit.Encodable program
+  -- Deliberately trivial: the native provider binding travels in
+  -- `SupportedCoreNativeRelation`'s boundary conjunct, not in the shard contract.
+  witnessValid := fun _ _ => True
   executionValid := fun _ witness execution =>
     execution.AllOrdinary ∧
       AllTransitionsSupported witness.program execution ∧
