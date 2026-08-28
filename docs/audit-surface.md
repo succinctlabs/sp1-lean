@@ -66,7 +66,7 @@ kernel, each with the question it decides. Reading these, plus `FormalModel/Cont
 | `sp1Tables` | `SP1Clean/Soundness/SP1Ensemble.lean` | The 25 instruction tables |
 | `sp1ProviderTables` | `SP1Clean/Soundness/SP1Ensemble.lean` | The 28 provider/boundary tables and their order |
 | `sp1StateVerifierMain` | `SP1Clean/Soundness/SP1Ensemble.lean` | The boundary row, incl. its public-limb range checks |
-| `SP1StateBoundary` | `SP1Clean/FormalModel/Contracts/PublicValues.lean` | What is public |
+| `SP1StateBoundary` | `SP1Clean/FormalModel/Contracts/PublicValues.lean` | What is public: the range-checked State-endpoint limbs plus the committed-but-unconstrained terminal cells (`exit_code`, `is_execution_shard`, digest) awaiting halt/COMMIT semantics |
 | `ChipKind` | `SP1Clean/Soundness/ChipRow.lean` | The per-chip interface (`chipSpec`, `advanceReady`, `view`, `advance`) — 25 registrations |
 | `RowEffect` | `SP1Clean/Soundness/RowEffectDefs.lean` | What each row is proved to *do* |
 | `ValueOperandsBound` | `SP1Clean/Soundness/RowEffectDefs.lean` | How a row's operands are tied to machine state |

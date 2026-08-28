@@ -51,12 +51,13 @@ local instance coreEnsembleFieldBound : Fact (2 ^ 17 < p) :=
 
 /-! ## Public-boundary projection -/
 
-/-- Project the exact shard public values onto the fourteen cells consumed by the native
-boundary verifier.
+/-- Project the exact shard public values onto the native boundary carrier: the fourteen
+State-endpoint limbs consumed by the boundary verifier plus the three terminal-cell mirrors
+(`exit_code`, `is_execution_shard`, the flattened digest).
 
 The timestamp reversal is load-bearing: upstream W3 is `(bits 32..48, 24..32, 16..24, 0..16)`,
 whereas `SP1StateBoundary` names `(0..16, 16..24, 24..32, 32..48)`.  The pc vectors already use
-the native low-to-high limb order. -/
+the native low-to-high limb order; the terminal cells are copied verbatim. -/
 def exactNativeBoundary (publicValues : SP1PublicValues (ZMod p)) : SP1PublicIO (ZMod p) where
   init_clk_0_16 := publicValues.initial_timestamp[3]
   init_clk_16_24 := publicValues.initial_timestamp[2]
@@ -72,6 +73,9 @@ def exactNativeBoundary (publicValues : SP1PublicValues (ZMod p)) : SP1PublicIO 
   final_pc0 := publicValues.next_pc[0]
   final_pc1 := publicValues.next_pc[1]
   final_pc2 := publicValues.next_pc[2]
+  exit_code := publicValues.exit_code
+  is_execution_shard := publicValues.is_execution_shard
+  committed_value_digest := publicValues.committed_value_digest.flatten
 
 omit [Fact p.Prime] [Fact (2 ^ 24 < p)] in
 /-- The native verifier's initial U8 pair has the exact public-value interaction's operand order.
@@ -90,6 +94,17 @@ omit [Fact p.Prime] [Fact (2 ^ 24 < p)] in
     ((exactNativeBoundary publicValues).final_clk_24_32,
       (exactNativeBoundary publicValues).final_clk_16_24) =
       (publicValues.last_timestamp[1], publicValues.last_timestamp[2]) := rfl
+
+omit [Fact p.Prime] [Fact (2 ^ 24 < p)] in
+/-- The three terminal cells are copied verbatim from the exact record — the anchor a re-pin's
+layout change would trip. -/
+@[simp] theorem exactNativeBoundary_terminalCells
+    (publicValues : SP1PublicValues (ZMod p)) :
+    ((exactNativeBoundary publicValues).exit_code,
+      (exactNativeBoundary publicValues).is_execution_shard,
+      (exactNativeBoundary publicValues).committed_value_digest) =
+      (publicValues.exit_code, publicValues.is_execution_shard,
+        publicValues.committed_value_digest.flatten) := rfl
 
 omit [Fact (2 ^ 24 < p)] in
 /-- Recombination after the W3 reversal is the exact high-clock expression emitted by the

@@ -79,7 +79,8 @@ both ends), in the split-limb field order `clk_0_16, clk_16_24, clk_24_32, clk_3
 pc2` per end.  The recombination projections then give `init_clk_high = 0`, `init_clk_low = 1`
 (and the same finally), so the verifier row's final-state pull and initial-state push are the same
 State message with cancelling multiplicities, exactly as before the split. -/
-def pv : SP1StateBoundary (ZMod SP1Prime) := ⟨1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0⟩
+def pv : SP1StateBoundary (ZMod SP1Prime) :=
+  ⟨1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1, Vector.replicate 32 0⟩
 
 /-- The public statement of the boundary-only shard. -/
 def stmt : SupportedCoreStatement SP1Prime := ⟨anchorProgram, pv⟩
@@ -538,7 +539,7 @@ theorem sp1StateVerifierMain_byteInteractions (pi : Var SP1PublicIO (ZMod SP1Pri
 
 /-- A public boundary whose two middle timestamp bytes are pairwise distinct at both ends. -/
 def asymmetricClockBoundary : SP1PublicIO (ZMod SP1Prime) :=
-  ⟨0, 1, 2, 0, 0, 1, 0, 0, 3, 4, 0, 0, 1, 0⟩
+  ⟨0, 1, 2, 0, 0, 1, 0, 0, 3, 4, 0, 0, 1, 0, 0, 1, Vector.replicate 32 0⟩
 
 /-- Evaluated verifier Byte interactions for the asymmetric-clock regression. -/
 def asymmetricClockVerifierByteInteractions : List (Interaction (ZMod SP1Prime)) :=

@@ -107,6 +107,7 @@ def supportedCoreShardBoundary {p : ℕ} [Fact p.Prime]
     statement.publicValues.final_clk_low
   finalPc := supportedPcBits statement.publicValues.final_pc0 statement.publicValues.final_pc1
     statement.publicValues.final_pc2
+  exit := statement.publicValues.exitCodeBits
 
 /-- Operational model of the syscall-free native instruction profile.  Program identity is one
 field of the model, so neither proof direction can silently execute a different ROM. -/

@@ -22,16 +22,23 @@ census will find them unreferenced in-tree, which is this design choice, not dea
 
 namespace SP1Clean
 
-/-- The two State-bus endpoints committed by the current Clean ensemble — **split-limb form**
-(W3 D5-A, external report Finding 2). Each end carries its clock as the upstream `SP1Timestamp`
-`(16, 8, 8, 16)` limbs (`clk_0_16`/`clk_16_24`/`clk_24_32`/`clk_32_48`, ascending) plus the three
-16-bit pc limbs; the folded State-bus pair is recovered by the `init_clk_high`/`init_clk_low`/
-`final_clk_high`/`final_clk_low` recombination projections below, so `Semantics.clkNat` call sites
-and the boundary State messages read exactly as before. The split is what lets the boundary
-verifier range-check every committed limb in-circuit (`sp1StateVerifier`'s byte pulls), making the
-initial State message's canonicity a theorem of the ensemble rather than an
-`InitialBoundaryFacts` premise — and it is the faithful shape: SP1's real public values commit
-timestamps in precisely these limbs. -/
+/-- The State-bus endpoints and terminal cells committed by the current Clean ensemble —
+**split-limb form** (W3 D5-A, external report Finding 2). Each end carries its clock as the
+upstream `SP1Timestamp` `(16, 8, 8, 16)` limbs (`clk_0_16`/`clk_16_24`/`clk_24_32`/`clk_32_48`,
+ascending) plus the three 16-bit pc limbs; the folded State-bus pair is recovered by the
+`init_clk_high`/`init_clk_low`/`final_clk_high`/`final_clk_low` recombination projections below,
+so `Semantics.clkNat` call sites and the boundary State messages read exactly as before. The
+split is what lets the boundary verifier range-check every committed limb in-circuit
+(`sp1StateVerifier`'s byte pulls), making the initial State message's canonicity a theorem of the
+ensemble rather than an `InitialBoundaryFacts` premise — and it is the faithful shape: SP1's real
+public values commit timestamps in precisely these limbs.
+
+The three terminal fields mirror the corresponding cells of the 160-cell upstream record
+(`exit_code`, `is_execution_shard`, and the flattened 8×4-byte `committed_value_digest`).  They
+are **committed but deliberately unconstrained** by the boundary verifier, faithful to upstream:
+SP1's own AIR gives `exit_code` no independent range check (the halt row binds it to the reduced
+`op_b` word) and constrains the digest cells only on COMMIT rows.  Their meaning arrives with the
+halt/COMMIT-row semantics (semantics-gap campaign Track 2). -/
 structure SP1StateBoundary (F : Type) where
   init_clk_0_16 : F
   init_clk_16_24 : F
@@ -47,6 +54,9 @@ structure SP1StateBoundary (F : Type) where
   final_pc0 : F
   final_pc1 : F
   final_pc2 : F
+  exit_code : F
+  is_execution_shard : F
+  committed_value_digest : Vector F 32
 deriving ProvableStruct
 
 section Recombined
@@ -87,8 +97,10 @@ def SP1StateBoundary.LimbBounds {p : ℕ} [Fact p.Prime] (b : SP1StateBoundary (
 abbrev SP1PublicIO := SP1StateBoundary
 
 /-- Exact public-values type of the supported-core prefix theorem.  Naming the prefix explicitly
-records that the current Clean ensemble constrains only the State-bus boundary — no exit code,
-digest, or other terminal field (those belong to the full 160-cell layout below). -/
+records that this is still a strict prefix of the full 160-cell layout below: the ensemble
+constrains the State-bus boundary limbs in-circuit, while the terminal cells (`exit_code`,
+`is_execution_shard`, `committed_value_digest`) are committed carrier data awaiting their
+halt/COMMIT-row semantics. -/
 abbrev SupportedCorePrefixPublicValues := SP1StateBoundary
 
 /-! ## The real SP1 shard public-values layout
@@ -503,5 +515,10 @@ def SP1PublicValues.nextPcBits {p : ℕ} (pv : SP1PublicValues (ZMod p)) : BitVe
 /-- The committed exit code as a Sail-width bit-vector. -/
 def SP1PublicValues.exitCodeBits {p : ℕ} (pv : SP1PublicValues (ZMod p)) : BitVec 64 :=
   BitVec.ofNat 64 pv.exit_code.val
+
+/-- The native boundary's committed exit code as a Sail-width bit-vector — the same decode as
+`SP1PublicValues.exitCodeBits`, on the prefix carrier. -/
+def SP1StateBoundary.exitCodeBits {p : ℕ} (b : SP1StateBoundary (ZMod p)) : BitVec 64 :=
+  BitVec.ofNat 64 b.exit_code.val
 
 end SP1Clean

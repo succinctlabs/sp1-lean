@@ -69,6 +69,10 @@ abbrev ProgramStatement.finalClkNat {p : ℕ} (statement : SupportedCoreStatemen
   SP1Clean.Semantics.clkNat statement.publicValues.final_clk_high
     statement.publicValues.final_clk_low
 
+/-- The committed exit code of a supported-core statement, decoded to the Sail width. -/
+abbrev ProgramStatement.exitCodeBits {p : ℕ} (statement : SupportedCoreStatement p) : BitVec 64 :=
+  statement.publicValues.exitCodeBits
+
 /-! ### The plain-Sail conclusion -/
 
 /-- Proof-free carrier of the plain-Sail conclusion: one finite segment of the official Sail run
@@ -254,6 +258,7 @@ def sp1CoreShardBoundary {p : ℕ} {Digest : Type}
   initialPc := statement.publicValues.pcStartBits
   finalClock := statement.publicValues.last_timestamp.toNat
   finalPc := statement.publicValues.nextPcBits
+  exit := statement.publicValues.exitCodeBits
 
 /-- Exact Core operational model.  The executable host handler supplies both evaluation and the
 relational graph checked by the shared semantics. -/

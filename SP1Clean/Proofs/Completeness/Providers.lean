@@ -900,6 +900,12 @@ def boundaryInputs (initClk initPc finalClk finalPc : ℕ) : SP1PublicIO (ZMod p
   final_pc0 := ((finalPc % 2 ^ 16 : ℕ) : ZMod p)
   final_pc1 := ((finalPc / 2 ^ 16 % 2 ^ 16 : ℕ) : ZMod p)
   final_pc2 := ((finalPc / 2 ^ 32 % 2 ^ 16 : ℕ) : ZMod p)
+  -- The terminal cells of a non-halting, non-committing execution shard: exit code zero, the
+  -- execution-shard selector one, and an all-zero digest.  Committed carrier data only — the
+  -- boundary verifier constrains none of them (matching upstream).
+  exit_code := 0
+  is_execution_shard := 1
+  committed_value_digest := Vector.replicate 32 0
 
 /-- **The verifier row needs no premise**: limbing a natural is what makes every committed limb
 canonical, so `LimbBounds` — the honest-prover contract and the row's whole `Spec` — holds for any
