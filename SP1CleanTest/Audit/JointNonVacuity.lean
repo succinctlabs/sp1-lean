@@ -922,6 +922,6 @@ witness yields the honest 0-step local Sail execution between the equal endpoint
 theorem supportedCoreNativeRelation_nonvacuous :
     SupportedCoreNativeRelation (p := SP1Prime) stmt jointWitness :=
   ⟨⟨rfl, jointWitness_constraints, jointWitness_balanced⟩,
-   ⟨anchorState, anchorBoundaryFacts⟩⟩
+   anchorBoundaryFacts.binding⟩
 
 end SP1Clean.Audit.JointNonVacuity

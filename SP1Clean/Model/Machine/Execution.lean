@@ -251,9 +251,11 @@ theorem LocalExecutionSegmentWitness.clockAt_anchor {model : SP1MachineModel}
   exact (localScheduleAt_eq_scheduleAt program_eq initialReached n).symm
 
 /-- A finite execution prefix whose endpoint is SP1's halting ECALL with the claimed exit code.  This
-belongs at the composed-execution boundary, not at every shard or partial-chip AIR boundary. -/
+belongs at the composed-execution boundary, not at every shard or partial-chip AIR boundary.  The
+exit code is the 64-bit value SP1 reads from `a0`/x10 — the one exit-code spelling used everywhere
+(`SP1PublicValues.exitCodeBits` is the public-cell decode into the same type). -/
 structure HaltedExecutionWitness {model : SP1MachineModel} (ctx : ExecutionCtx model)
-    (exitCode : ℕ) extends PrefixExecutionWitness ctx where
+    (exitCode : BitVec 64) extends PrefixExecutionWitness ctx where
   halted : SP1Halted ctx.program exitCode finalState
 
 /-- Closed carrier for a finite successful prefix. -/
@@ -274,7 +276,7 @@ structure ClosedLocalExecutionSegmentWitness (model : SP1MachineModel) where
 /-- Closed carrier for a complete execution ending at the halting ECALL. -/
 structure ClosedHaltedExecutionWitness (model : SP1MachineModel) where
   context : ExecutionCtx model
-  exitCode : ℕ
+  exitCode : BitVec 64
   execution : HaltedExecutionWitness context exitCode
 
 end SP1Clean.Machine

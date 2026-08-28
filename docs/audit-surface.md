@@ -14,7 +14,8 @@ rejected `T`. The entire risk of *proving the wrong thing* lives in `Stmt(T)` an
 instance context.
 
 That is what makes auditing this repository tractable. The review measured the split for
-`supported_core_native_sound`: 13,943 constants in the proof closure, 10,665 in the statement
+the then-current (model-scheduled) `supported_core_native_sound` — the headline has since moved
+to the plain-Sail statement, which only shrinks the statement closure: 13,943 constants in the proof closure, 10,665 in the statement
 closure, of which 7,487 are proof-typed (inert for meaning) — leaving **3,178 data/definition-typed
 constants across 243 modules** as the real surface, and confirming the repository's own claim that
 `FormalModel/Contracts/` is where it concentrates.
@@ -38,12 +39,19 @@ kernel, each with the question it decides. Reading these, plus `FormalModel/Cont
 | `CoreProfile.WithinOrdinaryRowLimit` | `SP1Clean/FormalModel/CoreProfile.lean` | The one numeric Core row-budget policy used by both witness representations |
 | `SupportedCoreNativeRelation` | `SP1Clean/Soundness/AIR.lean` | The hypothesis side: exactly two conjuncts |
 | `SupportedCoreNativeShardRelation` | `SP1Clean/Soundness/AIR.lean` | The same native relation restricted to the pinned active-row budget |
-| `supported_core_native_sound` | `SP1Clean/Soundness/AIR.lean` | The headline theorem |
+| `supported_core_native_sound` | `SP1Clean/Soundness/AIR.lean` | The headline theorem: the plain-Sail conclusion, no model parameter, no schedule hypothesis |
+| `supported_core_native_sound_scheduled` | `SP1Clean/Soundness/AIR.lean` | The model-scheduled corollary — the shard-composition seam |
 | `supported_core_native_shard_sound` | `SP1Clean/Soundness/AIR.lean` | Capacity-aligned soundness into the one canonical semantic relation |
-| `SupportedCoreLocalExecutionRelation` | `SP1Clean/FormalModel/Execution.lean` | What the conclusion actually says |
+| `SupportedCoreLocalExecutionRelation` | `SP1Clean/FormalModel/Execution.lean` | What the model-scheduled conclusion actually says |
+| `SupportedCoreSailRelation` | `SP1Clean/FormalModel/Execution.lean` | The plain-Sail conclusion: a normally-retiring run between the committed endpoints at eight ticks per step, with a well-formed Memory boundary agreeing with real location content at both ends |
+| `SailSegmentWitness` | `SP1Clean/FormalModel/Execution.lean` | The proof-free run/boundary carrier of the plain-Sail conclusion |
+| `exists_populated_memoryBoundary` | `SP1Clean/Soundness/MemoryBoundaryTruth.lean` | How the boundary is populated: per canonically-addressed, genesis-backed committed finalize record — the two population filters are named follow-up, not soundness gaps |
+| `ShardStartState` | `SP1Clean/FormalModel/Execution.lean` | What the conclusion pins about the shard's start state (public pc, ROM, configuration) |
+| `supportedCoreLocalExecution_of_sailRelation` | `SP1Clean/FormalModel/Execution.lean` | The no-strength-lost adapter from the plain-Sail form back to the model-scheduled form |
 | `Machine.CoreShardSemanticWitness` | `SP1Clean/Model/Machine/Shard.lean` | The one proof-free program/Memory-boundary/initial-state/event carrier shared by native and exact Core |
 | `CoreShardSemanticWitness.evaluatedTrace` | `SP1Clean/Model/Machine/Shard.lean` | The total proof-independent evaluator consumed by the trace compiler |
 | `CoreShardExecutionRelation` | `SP1Clean/FormalModel/CoreShard.lean` | The one semantic relation skeleton specialized by native and exact Core |
+| `CoreShardContract` | `SP1Clean/FormalModel/CoreShard.lean` | The narrow extension hook: four explicit fields, no defaults — every trivial instantiation is a visible choice |
 | `SupportedCoreShardExecutionRelation` | `SP1Clean/FormalModel/SupportedShard.lean` | The normal-retirement, 25-route, capacity-bounded specialization shared by both native directions |
 | `SP1TransitionView` | `SP1Clean/Model/Semantics/TransitionView.lean` | The one proof-free fetch/decode/route/access projection shared by both directions |
 | `projectSP1Transition?` | `SP1Clean/Model/Semantics/TransitionView.lean` | How an operational transition is projected, including the explicit optional access-plan result |
@@ -65,22 +73,29 @@ kernel, each with the question it decides. Reading these, plus `FormalModel/Cont
 
 ## The assumed semantic boundary
 
-`InitialBoundaryFacts` has **eleven** fields. The PR #110 review tabulated twelve named premises;
-the twelfth, `MemoryPullTimestampHighBound`, is now *derived* from the produced side of the
-capstone's own per-location Memory balance and no longer exists as a declaration.
+The public premise `SemanticBoundaryBinding` is regrouped for reading: three commitment facts
+(program well-formedness, `Commit.StatementFor`, the committed initial clock), the 3-field
+`ShardStartState`, the code/data-separation contract, and the 4-field external bundle
+`ProviderBindingContracts`. The commitment/start-state conjuncts follow from a configured initial
+state, a committed program, and a canonical `ProverData` choice; the bundle is the assumed core.
+`InitialBoundaryFacts` is the equivalent flat proof-layer carrier the timed-grounding engine
+consumes — `semanticBoundaryBinding_iff` is the kernel-checked equivalence, superseding the
+earlier prose observation that "seven of eleven fields are derivable". (The PR #110 review
+tabulated a twelfth premise, `MemoryPullTimestampHighBound`; it is *derived* from the produced
+side of the capstone's own per-location Memory balance and no longer exists as a declaration.)
 
 | Declaration | File | Question it decides |
 |---|---|---|
-| `InitialBoundaryFacts` | `SP1Clean/Soundness/ProviderBindings.lean` | The eleven-field assumed boundary |
-| `SemanticBoundaryBinding` | `SP1Clean/Soundness/ProviderBindings.lean` | How the boundary attaches to a witness |
+| `SemanticBoundaryBinding` | `SP1Clean/Soundness/ProviderBindings.lean` | The regrouped public boundary premise |
+| `ProviderBindingContracts` | `SP1Clean/Soundness/ProviderBindings.lean` | The four-field assumed core: provider content + uniqueness |
+| `InitialBoundaryFacts` | `SP1Clean/Soundness/ProviderBindings.lean` | The equivalent flat proof-layer carrier |
+| `semanticBoundaryBinding_iff` | `SP1Clean/Soundness/ProviderBindings.lean` | The recorded equivalence between the two |
 | `ProgramProviderBound` | `SP1Clean/Soundness/ProviderBindings.lean` | Program-table content (assumed; §7.3 — needs C1) |
 | `MemoryInitProviderBound` | `SP1Clean/Soundness/ProviderBindings.lean` | Memory-init content at the boundary |
 | `MemoryInitProviderUnique` | `SP1Clean/Soundness/ProviderBindings.lean` | One init record per location — not derivable from balance |
 | `MemoryFinalizeProviderUnique` | `SP1Clean/Soundness/ProviderBindings.lean` | One finalize pull per location — likewise |
 
-Seven of the eleven follow from a configured initial state, a committed program, and a canonical
-`ProverData` choice. Four need real construction: `programProvider`, `memoryProvider`, and the two
-uniqueness fields. The uniqueness pair is the sharpest residual — Clean balance cannot force it,
+The uniqueness pair is the sharpest residual — Clean balance cannot force it,
 upstream's mechanism is the MemoryGlobal strictly-increasing-address chain this ensemble omits, and
 the premise is stated per `locOf` (8-byte cell) while that chain orders exact byte addresses. That
 granularity gap is recorded on the definitions themselves.
@@ -93,6 +108,7 @@ granularity gap is recorded on the definitions themselves.
 | `SailStep` | `SP1Clean/Model/Semantics/GuestProgram.lean` | One step of the real generated interpreter |
 | `SailRetiresNormally` | `SP1Clean/Model/Semantics/GuestProgram.lean` | Excludes trap/illegal/wait exits by recording the official `Retire_Success` branch |
 | `SailChain` | `SP1Clean/Model/Semantics/GuestProgram.lean` | A multi-step run |
+| `SailRetireChain` | `SP1Clean/Model/Semantics/GuestProgram.lean` | A multi-step run in which every step retires normally; downgrades via `toSailChain` |
 | `SailConfigured` | `SP1Clean/Model/Semantics/GuestProgram.lean` | Which platform state is assumed (incl. the single RWX PMA region) |
 | `ConfiguredDecode` | `SP1Clean/Model/Semantics/GuestProgram.lean` | The one word/instruction decode fact shared by Program truth and shard semantics |
 | `SailCodeMemoryCompatible` | `SP1Clean/Model/Semantics/GuestProgram.lean` | The code/data separation contract — self-modifying code excluded by assumption |

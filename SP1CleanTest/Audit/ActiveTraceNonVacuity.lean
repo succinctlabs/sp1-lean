@@ -1070,7 +1070,7 @@ theorem activeTrace_public_eq : activeTrace.publicValues = activeStatement.publi
 /-- The active providers bind the trace to the committed program and concrete initial Sail state. -/
 theorem activeTrace_semanticBoundaryBinding :
     SemanticBoundaryBinding activeStatement activeTrace.witness :=
-  ⟨anchorState, activeTrace_boundaryFacts⟩
+  activeTrace_boundaryFacts.binding
 
 /-! ## Active relation and AIR witness -/
 
@@ -1095,12 +1095,12 @@ theorem activeTrace_yields_airWitness :
     ∃ witness, SupportedCoreNativeRelation activeStatement witness :=
   ⟨activeTrace.witness, activeTrace_nativeRelation⟩
 
-/-- The circuit-built active row passes through native AIR soundness to an official-Sail local
-execution segment for every machine model using SP1's ordinary eight-tick schedule. -/
-theorem activeTrace_yields_localExecution (model : Machine.SP1MachineModel)
-    (ordinary : model.UsesOrdinarySchedule) :
-    ∃ execution, SupportedCoreLocalExecutionRelation model activeStatement execution := by
-  exact supported_core_native_sound model ordinary activeStatement activeTrace.witness
+/-- The circuit-built active row passes through native AIR soundness to a normally-retiring
+official-Sail run — the model-free plain-Sail conclusion, strictly stronger than the former
+per-machine-model local-execution anchor. -/
+theorem activeTrace_yields_sailExecution :
+    ∃ w, SupportedCoreSailRelation activeStatement w := by
+  exact supported_core_native_sound activeStatement activeTrace.witness
     activeTrace_nativeRelation
 
 end SP1Clean.Audit.ActiveTraceNonVacuity

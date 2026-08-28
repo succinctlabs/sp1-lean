@@ -23,16 +23,16 @@ open SP1Clean.Soundness.Target
 
 /-- The deliberately narrow extension hook around the fixed Core-shard semantics.
 
-`statementValid` and `programValid` describe authenticated public/profile data.  `boundaryValid`
-and `executionValid` add branch-specific laws such as commit-row behavior or the ordinary
-instruction routing profile.  They supplement, rather than restate, the common clauses below. -/
+`statementValid` and `programValid` describe authenticated public/profile data.  `executionValid`
+adds execution-branch laws such as the ordinary instruction routing profile.  They supplement,
+rather than restate, the common clauses below.  No field carries a default: every trivial
+instantiation is a visible, reviewable choice at the specialization site. -/
 structure CoreShardContract (Statement : Type) where
-  statementValid : Statement → Prop := fun _ => True
-  programValid : Statement → GuestProgram → Prop := fun _ _ => True
-  witnessValid : Statement → CoreShardSemanticWitness → Prop := fun _ _ => True
-  boundaryValid : Statement → CoreShardSemanticWitness → Prop := fun _ _ => True
+  statementValid : Statement → Prop
+  programValid : Statement → GuestProgram → Prop
+  witnessValid : Statement → CoreShardSemanticWitness → Prop
   executionValid : Statement → CoreShardSemanticWitness →
-    EventExecutionTrace → Prop := fun _ _ _ => True
+    EventExecutionTrace → Prop
 
 /-- The two branches of the one canonical shard relation.  The execution trace is not independent
 witness data: it must be the result of evaluating the event list stored in `witness`. -/
@@ -44,7 +44,6 @@ inductive CoreShardCase {Statement : Type} (model : CoreShardModel Statement)
       witness.events = none →
       (model.boundary statement).initialPc = (model.boundary statement).finalPc →
       (model.boundary statement).initialClock = (model.boundary statement).finalClock →
-      contract.boundaryValid statement witness →
       CoreShardCase model contract statement witness
   | execution (events : List ExecutionEvent) (trace : EventExecutionTrace) :
       (model.boundary statement).isExecution = true →

@@ -219,7 +219,7 @@ theorem shardCase {Digest : Type}
   | false =>
       obtain ⟨noEvents, pc, clock⟩ :=
         proofs.boundaryCase statement witness valid execution
-      exact .boundary execution noEvents pc clock trivial
+      exact .boundary execution noEvents pc clock
   | true =>
       obtain ⟨events, trace, hasEvents, evaluated, traceValid, clocked, finalClock,
           initialPc, finalPc⟩ := proofs.executionCase statement witness valid execution

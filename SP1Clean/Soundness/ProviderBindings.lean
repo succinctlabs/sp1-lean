@@ -282,7 +282,24 @@ theorem MemoryInitProviderBound.localMemTruth_of_mem_produced
   rw [reboundEq, messageEq] at semantic
   exact Semantics.localMemTruth_of_initial isU64 clkBound semantic.1 semantic.2
 
-/-- Proof-only facts tying one selected initial Sail state to the public and provider boundary. -/
+/-- The genuinely-external application contracts of the semantic boundary: the provider-table
+semantics and per-location uniqueness facts that no native constraint proves (upstream discharges
+them through the verifying key's preprocessed commitment and its boundary mechanisms).  Everything
+else in the boundary premise is a commitment or start-state fact derivable from a configured,
+committed state; the audit rule (F2) is that these four fields stay visible in the final theorem
+type rather than being folded into derived structure. -/
+structure ProviderBindingContracts
+    (witness : EnsembleWitness (sp1Ensemble (p := p)))
+    (initial : SailState) (initialClock : ℕ) : Prop where
+  programProvider : ProgramProviderBound witness
+  memoryProvider : MemoryInitProviderBound witness initial initialClock
+  memoryInitUnique : MemoryInitProviderUnique witness
+  memoryFinalizeUnique : MemoryFinalizeProviderUnique witness
+
+/-- Proof-only facts tying one selected initial Sail state to the public and provider boundary.
+This flat record is the proof-layer carrier consumed by the timed-grounding engine; the public
+premise is the regrouped `SemanticBoundaryBinding` below, and `semanticBoundaryBinding_iff`
+records their equivalence. -/
 structure InitialBoundaryFacts
     (statement : ProgramStatement (SupportedCorePrefixPublicValues (ZMod p)))
     (witness : EnsembleWitness (sp1Ensemble (p := p))) (initial : SailState) : Prop where
@@ -320,12 +337,63 @@ theorem InitialBoundaryFacts.localStateTruth
   · exact boundary.romLoaded
   · exact boundary.configured
 
-/-- The non-execution companion relation required by supported-core AIR soundness.  It fixes the
-committed program, chooses the concrete state represented by the initial public boundary, and binds
-the Program/Memory provider tables to those semantic objects. -/
+/-- The non-execution companion relation required by supported-core AIR soundness, regrouped for
+reading: three commitment facts (program well-formedness, program commitment, committed initial
+clock), the shard start state, the code/data-separation contract, and the four-field external
+provider bundle.  It fixes the committed program, chooses the concrete state represented by the
+initial public boundary, and binds the Program/Memory provider tables to those semantic objects. -/
 def SemanticBoundaryBinding
     (statement : ProgramStatement (SupportedCorePrefixPublicValues (ZMod p)))
     (witness : EnsembleWitness (sp1Ensemble (p := p))) : Prop :=
-  ∃ initial, InitialBoundaryFacts statement witness initial
+  ∃ initial,
+    statement.program.WellFormed ∧
+    Commit.StatementFor witness.data statement.program ∧
+    Commit.initClkNat witness.data = statement.initClkNat ∧
+    ShardStartState statement initial ∧
+    SailCodeMemoryCompatible statement.program initial ∧
+    ProviderBindingContracts witness initial (Commit.initClkNat witness.data)
+
+/-- Repackage the flat proof-layer record as the regrouped public binding. -/
+theorem InitialBoundaryFacts.binding
+    {statement : ProgramStatement (SupportedCorePrefixPublicValues (ZMod p))}
+    {witness : EnsembleWitness (sp1Ensemble (p := p))} {initial : SailState}
+    (boundary : InitialBoundaryFacts statement witness initial) :
+    SemanticBoundaryBinding statement witness :=
+  ⟨initial, boundary.programWellFormed, boundary.programCommitted, boundary.initialClock,
+    ⟨boundary.initialPc, boundary.romLoaded, boundary.configured⟩,
+    boundary.codeMemoryCompatible,
+    ⟨boundary.programProvider, boundary.memoryProvider, boundary.memoryProviderUnique,
+      boundary.memoryFinalizeProviderUnique⟩⟩
+
+/-- Recover the flat proof-layer record from the regrouped public binding. -/
+theorem SemanticBoundaryBinding.boundaryFacts
+    {statement : ProgramStatement (SupportedCorePrefixPublicValues (ZMod p))}
+    {witness : EnsembleWitness (sp1Ensemble (p := p))}
+    (binding : SemanticBoundaryBinding statement witness) :
+    ∃ initial, InitialBoundaryFacts statement witness initial := by
+  obtain ⟨initial, wellFormed, committed, clockEq, start, codeMem, contracts⟩ := binding
+  exact ⟨initial,
+    { programWellFormed := wellFormed
+      programCommitted := committed
+      initialPc := start.pc
+      initialClock := clockEq
+      romLoaded := start.romLoaded
+      configured := start.configured
+      codeMemoryCompatible := codeMem
+      programProvider := contracts.programProvider
+      memoryProvider := contracts.memoryProvider
+      memoryProviderUnique := contracts.memoryInitUnique
+      memoryFinalizeProviderUnique := contracts.memoryFinalizeUnique }⟩
+
+/-- The recorded equivalence: the regrouped public binding says exactly what the flat record
+says.  The "seven of eleven fields are derivable" observation of earlier audits is this theorem's
+grouping — the derivable fields are the commitment/start-state conjuncts, the assumed core is
+`ProviderBindingContracts`. -/
+theorem semanticBoundaryBinding_iff
+    (statement : ProgramStatement (SupportedCorePrefixPublicValues (ZMod p)))
+    (witness : EnsembleWitness (sp1Ensemble (p := p))) :
+    SemanticBoundaryBinding statement witness ↔
+      ∃ initial, InitialBoundaryFacts statement witness initial :=
+  ⟨SemanticBoundaryBinding.boundaryFacts, fun ⟨_, boundary⟩ => boundary.binding⟩
 
 end SP1Clean.Soundness

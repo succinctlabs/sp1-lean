@@ -65,7 +65,7 @@ Run via `lake env lean scripts/axiom_probe_test.lean` (see `scripts/run_audit.sh
 #print axioms SP1Clean.Audit.ActiveTraceNonVacuity.activeTrace_memoryHandoff
 #print axioms SP1Clean.Audit.ActiveTraceNonVacuity.activeTrace_nativeRelation
 #print axioms SP1Clean.Audit.ActiveTraceNonVacuity.activeTrace_yields_airWitness
-#print axioms SP1Clean.Audit.ActiveTraceNonVacuity.activeTrace_yields_localExecution
+#print axioms SP1Clean.Audit.ActiveTraceNonVacuity.activeTrace_yields_sailExecution
 #print axioms SP1Clean.Audit.JointNonVacuity.verifierBytePulls_asymmetricClockOrder
 #print axioms SP1Clean.Audit.JointNonVacuity.supportedCoreNativeRelation_nonvacuous
 #print axioms SP1Clean.Audit.OneAddNativePremises.constraints_hold

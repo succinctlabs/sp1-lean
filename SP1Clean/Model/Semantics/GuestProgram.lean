@@ -186,6 +186,32 @@ theorem SailChain.snoc : ∀ {n : ℕ} {a b : SailState}, SailChain n a b →
   | refl s => exact fun hs => .step hs (.refl _)
   | step h1 _ ih => exact fun hs => .step h1 (ih hs)
 
+/-- An `n`-step official-Sail chain in which every step retires normally, i.e. takes
+`run_hart_active`'s `Retire_Success` branch.  Strictly stronger than `SailChain`: the same real
+interpreter run, with the per-step trap, illegal-instruction, wait, and extension-failure exits
+excluded.  The grounding walk proves this form directly — each fired row's `RowEffect` carries
+`SailRetiresNormally` — so top-level conclusions can state trap-free execution rather than mere
+step completion. -/
+inductive SailRetireChain : ℕ → SailState → SailState → Prop
+  | refl (s : SailState) : SailRetireChain 0 s s
+  | step {n : ℕ} {s s' s'' : SailState} :
+      SailRetiresNormally s s' → SailRetireChain n s' s'' → SailRetireChain (n + 1) s s''
+
+/-- A normally-retiring chain is, in particular, a real Sail chain. -/
+theorem SailRetireChain.toSailChain : ∀ {n : ℕ} {a b : SailState},
+    SailRetireChain n a b → SailChain n a b := by
+  intro n a b h
+  induction h with
+  | refl s => exact .refl s
+  | step h1 _ ih => exact .step h1.sailStep ih
+
+theorem SailRetireChain.snoc : ∀ {n : ℕ} {a b : SailState}, SailRetireChain n a b →
+    ∀ {c : SailState}, SailRetiresNormally b c → SailRetireChain (n + 1) a c := by
+  intro n a b h
+  induction h with
+  | refl s => exact fun hs => .step hs (.refl _)
+  | step h1 _ ih => exact fun hs => .step h1 (ih hs)
+
 /-- Compatibility contract between SP1's immutable trusted-program fetch and the official Sail
 interpreter's unified instruction/data memory.
 
@@ -220,9 +246,6 @@ def ECALL_ENC : BitVec 32 := 0x00000073#32
 
 /-- `SyscallCode::HALT` (read from `t0`/x5). -/
 def HALT_SYSCALL : BitVec 64 := 0
-
-/-- The committed exit code as the 64-bit value SP1 reads from `a0`/x10. -/
-def exitOf (exit_code : ZMod p) : BitVec 64 := BitVec.ofNat 64 exit_code.val
 
 /-- "About to execute the halting ECALL": the PC points at an `ECALL` encoding in the program ROM,
 `t0` holds `HALT`, and `a0` holds the exit code. -/

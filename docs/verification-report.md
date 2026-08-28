@@ -47,9 +47,9 @@ The deliverables:
   local-execution capstone is now visibly a projection of this reusable result.
 - **D5 — The headline theorem.** `supported_core_native_sound`
   (`SP1Clean/Soundness/AIR.lean`): every constraint-satisfying, channel-balanced witness of the
-  53-table ensemble, with an explicit boundary premise, yields a genuine finite run
-  of the official (SP1-configured, §3.2) Sail RV64 interpreter between the public
-  program-counter/clock endpoints (§8).
+  53-table ensemble, with an explicit boundary premise, yields a genuine finite,
+  normally-retiring run of the official (SP1-configured, §3.2) Sail RV64 interpreter between the
+  public program-counter/clock endpoints — with no machine-model parameter (§8).
 - **D6 — Conformance testing against the real prover.** A dump-anchored pipeline reconstructs
   every event row of all 25 chips from the circuits' own witness generators and matches it
   cell-for-cell against full trace matrices dumped from SP1's actual Rust prover at SP1's field,
@@ -516,7 +516,7 @@ grounding engine (`Soundness/TimedGrounding.lean`, `RankedGrounding.lean`,
 The payoff theorem of this layer:
 
 ```lean
--- SP1Clean/Soundness/AIR.lean
+-- SP1Clean/Soundness/GroundingInternal.lean
 theorem supported_core_witness_grounding ... :
     ∃ orderedRows, SupportedCoreGrounding statement witness initial orderedRows
 ```
@@ -531,7 +531,7 @@ The exported consumer endpoint is `supported_core_native_grounding`: from
 `InitialBoundaryFacts` and the complete `SupportedCoreGrounding` record. In particular callers can
 directly consume the walk's `finalStateTruth` and `memoryFinalizeTruth`; they are no longer proved
 internally and discarded by the only public capstone. `supported_core_native_sound` projects this
-record onward to the local Sail execution relation.
+record onward to the plain-Sail relation `SupportedCoreSailRelation`.
 
 This is the central methodological contrast with bus treatments that assume well-formedness
 properties on read and verify them on write, justifying the global argument on paper (§11): here
@@ -562,11 +562,14 @@ bookkeeping around an abstract relation.
 
 ### 7.2 The machine model parameter
 
-The capstone quantifies over a `Machine.SP1MachineModel` (scheduling + boot packaging) restricted
-by `UsesOrdinarySchedule` (ordinary instructions take the 8-tick schedule). Only the schedule
-field is consumed by the shard-local theorem; boot reachability is deliberately deferred to a
-later anchor. Two honest notes: (i) no `SP1MachineModel` instance is currently constructed
-in-repo, so the theorem is a parametric conditional — the configured-state core is witnessed
+The headline capstone carries no machine-model parameter: its conclusion states the eight-tick
+clock count directly. The model-scheduled corollary `supported_core_native_sound_scheduled`
+quantifies over a `Machine.SP1MachineModel` (scheduling + boot packaging) restricted by
+`UsesOrdinarySchedule` (ordinary instructions take the 8-tick schedule); it is the seam later
+shard composition consumes. Only the schedule field is consumed by the shard-local corollary;
+boot reachability is deliberately deferred to a later anchor. Two honest notes: (i) no
+`SP1MachineModel` instance is currently constructed
+in-repo, so the scheduled corollary is a parametric conditional — the configured-state core is witnessed
 (`isInitialState_nonvacuous`, `FormalModel/Trace/Witness.lean`), and the relevant end-to-end bundles
 have explicit joint witnesses. `JointNonVacuity.lean` proves `SupportedCoreNativeRelation` outright
 for a boundary-only witness over a real one-instruction program.
@@ -655,8 +658,8 @@ The lower generated-trace assembly bundle is satisfiable in the active case:
 and decoded physical instruction-row count are both one, preventing regression to the boundary-only
 or zero-event cases, and its four explicit ledgers have lengths 4/46/2/4 and satisfy exact integer balance plus the
 count bounds. `activeTrace_yields_airWitness` invokes generated-trace assembly, which circuit-generates the
-physical rows; `activeTrace_yields_localExecution` immediately invokes native soundness on the
-result. The anchor demonstrates one real row through the complete assembly path; it is not yet an
+physical rows; `activeTrace_yields_sailExecution` immediately invokes native soundness on the
+result, reaching the model-free plain-Sail relation. The anchor demonstrates one real row through the complete assembly path; it is not yet an
 inhabitant of every residual premise of `SupportedCoreNativeAdmissibleShardRelation`.
 
 The companion `SP1CleanTest/Audit/ActiveNativeCompleteness.lean` proves that the official Sail
@@ -682,11 +685,15 @@ def SupportedCoreNativeRelation :
   **all** 53 tables (+ the state-boundary verifier), and **all** channels balance — verified for
   this report quantifier-by-quantifier down into Clean's `FlatEnsemble` (∀-tables, ∀-rows;
   no existential slips).
-- `SP1SemanticBoundaryRelation`: there is an initial Sail state bound to the committed program
-  and the provider tables' boundary facts (`RomLoaded`, `SailConfigured`, initial PC/clock,
-  provider bounds, the per-location init/finalize *uniqueness* facts, and the
-  `SailCodeMemoryCompatible` code-memory contract — 11 fields in all,
-  `InitialBoundaryFacts` in `SP1Clean/Soundness/ProviderBindings.lean`). This is an explicit
+- `SP1SemanticBoundaryRelation` (= `SemanticBoundaryBinding`): there is an initial Sail state
+  bound to the committed program and the provider tables' boundary facts, regrouped for reading
+  as three commitment facts (program well-formedness, `Commit.StatementFor`, the committed
+  initial clock), the 3-field `ShardStartState` (public initial PC, `RomLoaded`,
+  `SailConfigured`), the `SailCodeMemoryCompatible` code-memory contract, and the 4-field
+  assumed core `ProviderBindingContracts` (Program/Memory-init provider content and the two
+  per-location uniqueness facts). The flat 11-field `InitialBoundaryFacts` remains the
+  proof-layer carrier, with `semanticBoundaryBinding_iff` the kernel-checked equivalence
+  (`SP1Clean/Soundness/ProviderBindings.lean`). This is an explicit
   companion *premise* — provider tables mean what they say — not something derivable from
   balance alone.
 
@@ -702,21 +709,30 @@ from the init provider's `assertZero clk_high`/`assertZero clk_low`, each instru
 from its `TouchOK` window under the verifier row's range-checked `< 2^48` shard-time ceiling, and
 each MemoryBump refresh push from that chip's in-circuit range checks — so by balance every pulled
 record carries them too (`pushGood`/`pullGood` in
-`supportedCore_orderedRows_dynamic_of_obligations`, `SP1Clean/Soundness/AIR.lean`).
+`supportedCore_orderedRows_dynamic_of_obligations`, `SP1Clean/Soundness/GroundingInternal.lean`).
 
 ### 8.2 The theorem
 
 ```lean
-theorem supported_core_native_sound (model : Machine.SP1MachineModel)
-    (ordinary : model.UsesOrdinarySchedule) :
+theorem supported_core_native_sound :
     WitnessRelation.Sound (SupportedCoreNativeRelation (p := p))
-      (SupportedCoreLocalExecutionRelation model)
+      (SupportedCoreSailRelation (p := p))
 ```
 
 Read precisely: for every statement and every witness in the native relation, **there exists** a
-shard-local execution witness — a genuine finite `try_step` run of the official Sail RV64
-interpreter, on the committed program, whose PC and clock endpoints are the statement's public
-values. Axiom census: `propext`, `Classical.choice`, `Quot.sound`, plus the disclosed Sail
+shard-local run witness — a genuine finite `try_step` run of the official Sail RV64 interpreter,
+on the committed program, in which every step retires normally (`SailRetireChain` — the trap,
+illegal-instruction, wait, and extension-failure exits are excluded), starting from a
+`ShardStartState` (public initial PC, committed ROM loaded, platform configured), ending at the
+public final PC, and taking exactly `(finalClk − initClk)/8` instructions — together with a
+well-formed Memory boundary, populated per canonically-addressed, genesis-backed committed
+finalize record, whose cells agree with real location content in the initial and final Sail
+states (`exists_populated_memoryBoundary` from the walk's exported value currency at the
+committed final clock). There is no
+machine-model parameter and no schedule hypothesis; the model-scheduled form is the corollary
+`supported_core_native_sound_scheduled` via the no-strength-lost adapter
+`supportedCoreLocalExecution_of_sailRelation`. Axiom census: `propext`, `Classical.choice`,
+`Quot.sound`, plus the disclosed Sail
 platform hooks and `bv_decide` constants inherited from the bridges (§3.3). No `sorryAx`
 anywhere in the released set (empty allowlist, gated in CI).
 
@@ -870,7 +886,7 @@ rows, per-family decode facts, and the joint hypothesis bundle:
   semantic trace record for JAL-x0 whose instruction-event count and decoded physical instruction-row
   count are both one, with matching native provider occurrences and all four buses balanced. The
   generated-trace assembly circuit-generates its physical AIR rows, then passes the witness through
-  `supported_core_native_sound` to the official-Sail local-execution relation. It is not a full or
+  `supported_core_native_sound` to the plain-Sail relation. It is not a full or
   verified trace generator.
 - The **active compiler join** (`SP1CleanTest/Audit/ActiveNativeCompleteness.lean`): one official
   Sail self-jump is a valid supported semantic execution, its proof-independent projection compiles
@@ -951,8 +967,9 @@ three (for instance the transport layer's `transportTable_constraints` and the b
   here only so readers of earlier versions of this report can see where it went.
 - **M3 — The syscall handler.** SP1 host-syscall behavior is confined behind the
   `SyscallHandler` interface; its faithfulness to SP1's host is out of scope.
-- **M4 — The machine model.** The capstone is parametric over `SP1MachineModel` +
-  `UsesOrdinarySchedule`; no instance is constructed in-repo yet (§7.2).
+- **M4 — The machine model.** The headline capstone is model-free; its scheduled corollary is
+  parametric over `SP1MachineModel` + `UsesOrdinarySchedule`, and no instance is constructed
+  in-repo yet (§7.2).
 - **C1 — Preprocessed commitment binding** (`PreprocessedBinding`) — to be discharged at the
   PCS/ArkLib layer.
 - **C2 — Exact natural balance.** The exact-AIR relation's `Balance.Valid` is a natural-number

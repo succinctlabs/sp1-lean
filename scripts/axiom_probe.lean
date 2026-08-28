@@ -469,7 +469,7 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Composition.exactNativeEnsembleWitness_preprocessedIntegerBalance
 #print axioms SP1Clean.Composition.exactNativeEnsembleWitness_balancedChannels
 #print axioms SP1Clean.Composition.exactNativeArtifact_supportedCoreNativeRelation
-#print axioms SP1Clean.Composition.exactNativeArtifact_localExecution
+#print axioms SP1Clean.Composition.exactNativeArtifact_sailExecution
 #print axioms SP1Clean.Soundness.nativeTrace_stateAgreement
 #print axioms SP1Clean.Soundness.NativeTraceReady.stateLedgerPerm
 #print axioms SP1Clean.Soundness.nativeTrace_memoryLedgerPermHandoffChains
@@ -733,6 +733,7 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Soundness.supported_core_witness_grounding
 #print axioms SP1Clean.Soundness.supported_core_native_grounding
 #print axioms SP1Clean.Soundness.supported_core_native_sound
+#print axioms SP1Clean.Soundness.supported_core_native_sound_scheduled
 #print axioms SP1Clean.Soundness.supported_core_native_shard_execution
 #print axioms SP1Clean.Soundness.supported_core_native_shard_sound
 #print axioms SP1Clean.CoreProfile.checkedIn_semanticRevision

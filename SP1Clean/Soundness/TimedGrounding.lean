@@ -748,7 +748,9 @@ omit [Fact (2 ^ 17 < p)] in
 frontier (`LiveOK` — the genesis pushes at the top level), and the state/memory multiset balances,
 **every pull's guarantee holds**: each row is `Grounded` (its state pull's `LocalStateTruth`, its
 memory pulls' `LocalMemTruth`s, and its read-time currencies), the final state pull `fin` is true, and
-each key's finalize pull `finM loc` (where present) is true.
+each key's finalize pull `finM loc` (where present) sits at its key, is true, holds the
+execution's **current value at the final time** (`LocalValueAt` at `fin`'s time — the invariant's
+value currency, previously discarded at the end of the walk), and carries a time at most `fin`'s.
 
 Strong induction on the batch size: pop the row with minimal state-pull time; state balance + time
 discipline force it to pull `head`, and `stateBalance_remaining_ge_eight` gives every remaining row
@@ -776,14 +778,18 @@ theorem walk (program : GuestProgram) (initial : SailState) (initialClock : ℕ)
       (∀ r ∈ rows, Grounded program initial initialClock r) ∧
         LocalStateTruth program initial initialClock fin ∧
         ∀ (loc : MemLoc) (m : MemoryMsg (ZMod p)), finM loc = some m →
-          LocalMemTruth initial initialClock m := by
+          MemoryMsg.locOf m = loc ∧
+          LocalMemTruth initial initialClock m ∧
+          LocalValueAt initial initialClock loc (StateMsg.timeNat fin) m.value ∧
+          MemoryMsg.timeNat m ≤ StateMsg.timeNat fin := by
   intro N
   induction N with
   | zero =>
     intro rows head live hlen _ _ _ h_head h_live h_sbal h_mbal
     obtain rfl : rows = [] := List.length_eq_zero_iff.mp hlen
     have h_fin : head = fin := by simpa using h_sbal
-    refine ⟨by simp, h_fin ▸ h_head, fun loc m hm => ?_⟩
+    subst h_fin
+    refine ⟨by simp, h_head, fun loc m hm => ?_⟩
     have h_fm : optMS (live loc) = optMS (finM loc) := by
       simpa [pullsAt, pushesAt] using h_mbal loc
     rw [hm, optMS_some] at h_fm
@@ -791,7 +797,8 @@ theorem walk (program : GuestProgram) (initial : SailState) (initialClock : ℕ)
     | none => rw [hlv, optMS_none] at h_fm; simp at h_fm
     | some m' =>
       rw [hlv, optMS_some, Multiset.singleton_inj] at h_fm
-      exact h_fm ▸ (h_live loc m' hlv).2.1
+      subst h_fm
+      exact h_live loc m' hlv
   | succ N ih =>
     intro rows head live hlen h_step h_frame h_ok h_head h_live h_sbal h_mbal
     have hne : rows ≠ [] := fun h => by simp [h] at hlen

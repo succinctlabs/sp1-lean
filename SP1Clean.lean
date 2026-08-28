@@ -454,12 +454,14 @@ import SP1Clean.Soundness.TypedProgram
 import SP1Clean.Soundness.TypedMemory
 import SP1Clean.Soundness.TypedMemorySelectors
 import SP1Clean.Soundness.TypedMemoryBalance
+import SP1Clean.Soundness.MemoryBoundaryTruth
 import SP1Clean.Soundness.MemoryFrontier
 import SP1Clean.Proofs.Chips.AddChip.Contracts
 import SP1Clean.Soundness.LocalExecution
 import SP1Clean.Soundness.RowSoundness
 import SP1Clean.Soundness.RowEffectDefs
 import SP1Clean.Soundness.GroundingAdapter
+import SP1Clean.Soundness.GroundingInternal
 import SP1Clean.Soundness.Grounding.RTypeChips
 import SP1Clean.Soundness.Grounding.ITypeChips
 import SP1Clean.Soundness.Grounding.ALUTypeChips
