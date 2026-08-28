@@ -274,4 +274,110 @@ noncomputable def microValue (s0 : SailState) (c0 : ℕ) (loc : MemLoc) (τ : �
       | .ram _ => ramEffectOffset ≤ δ
     (chainState s0 (if takePost then k + 1 else k)).bind (locContent · loc)
 
+/-! ## Timelines — the row-dependent step clock
+
+`microValue` above hardwires the uniform eight-tick window.  A `Timeline` generalizes the step ↔
+bus-clock mapping to row-dependent window widths (SP1's syscall rows occupy `264 = 8 · 33` ticks
+while ordinary instruction rows occupy `8`): `start n` is the bus clock at which semantic step `n`
+begins, and consecutive steps are at least the ordinary window apart.  The uniform timeline
+recovers today's model (`Timeline.ordinary`, with `microValueT_ordinary` the reader bridge), and
+the timed grounding walk is stated over an arbitrary timeline so mixed-duration shards are
+expressible. -/
+
+/-- The bus clock at the start of each semantic step: at least `ordinaryClkInc` apart. -/
+structure Timeline where
+  start : ℕ → ℕ
+  gap : ∀ n, start n + 8 ≤ start (n + 1)
+
+namespace Timeline
+
+/-- The uniform eight-tick timeline of the ordinary instruction profile. -/
+def ordinary (c0 : ℕ) : Timeline where
+  start := fun n => c0 + 8 * n
+  gap := fun n => by omega
+
+@[simp] lemma ordinary_start (c0 n : ℕ) : (ordinary c0).start n = c0 + 8 * n := rfl
+
+lemma start_add_le (tl : Timeline) (n k : ℕ) : tl.start n + 8 * k ≤ tl.start (n + k) := by
+  induction k with
+  | zero => simp
+  | succ k ih =>
+    have := tl.gap (n + k)
+    show tl.start n + 8 * (k + 1) ≤ tl.start (n + k + 1)
+    omega
+
+lemma start_le_of_le (tl : Timeline) {n m : ℕ} (h : n ≤ m) : tl.start n ≤ tl.start m := by
+  have hs := tl.start_add_le n (m - n)
+  rw [show n + (m - n) = m by omega] at hs
+  omega
+
+lemma start_lt_of_lt (tl : Timeline) {n m : ℕ} (h : n < m) : tl.start n < tl.start m := by
+  have hs := tl.start_add_le n (m - n)
+  rw [show n + (m - n) = m by omega] at hs
+  have h1 : 1 ≤ m - n := by omega
+  omega
+
+lemma start_zero_add_le (tl : Timeline) (n : ℕ) : tl.start 0 + 8 * n ≤ tl.start n := by
+  simpa using tl.start_add_le 0 n
+
+/-- The semantic step active at bus time `τ`: the greatest `n` with `start n ≤ τ`. -/
+noncomputable def stepOf (tl : Timeline) (τ : ℕ) : ℕ :=
+  Nat.findGreatest (fun n => tl.start n ≤ τ) τ
+
+lemma stepOf_le_self (tl : Timeline) (τ : ℕ) : tl.stepOf τ ≤ τ :=
+  Nat.findGreatest_le τ
+
+/-- Characterization: `stepOf τ = n` exactly on `[start n, start (n + 1))`. -/
+lemma stepOf_eq (tl : Timeline) {τ n : ℕ} (hlo : tl.start n ≤ τ) (hhi : τ < tl.start (n + 1)) :
+    tl.stepOf τ = n := by
+  have hn_le : n ≤ τ := by
+    have := tl.start_zero_add_le n
+    omega
+  refine Nat.le_antisymm ?_ (Nat.le_findGreatest hn_le hlo)
+  rcases Nat.lt_or_ge n (tl.stepOf τ) with hgt | hle
+  · exfalso
+    have hspec : tl.start (tl.stepOf τ) ≤ τ := by
+      unfold stepOf
+      exact Nat.findGreatest_spec (P := fun m => tl.start m ≤ τ) hn_le hlo
+    have hmono : tl.start (n + 1) ≤ tl.start (tl.stepOf τ) := tl.start_le_of_le (by omega)
+    omega
+  · exact hle
+
+@[simp] lemma stepOf_ordinary (c0 τ : ℕ) (h : c0 ≤ τ) :
+    (ordinary c0).stepOf τ = (τ - c0) / 8 := by
+  refine stepOf_eq _ ?_ ?_ <;> simp only [ordinary_start] <;> omega
+
+end Timeline
+
+/-- **The timeline reader**: `microValue` generalized to row-dependent window widths.  Within step
+`n`'s window `[start n, start (n + 1))`, the step's effect is visible from the location's effect
+offset onward; pre-genesis times read the initial state.  `microValueT_ordinary` recovers the
+uniform reader. -/
+noncomputable def microValueT (s0 : SailState) (tl : Timeline) (loc : MemLoc) (τ : ℕ) :
+    Option (BitVec 64) :=
+  if τ < tl.start 0 then
+    locContent s0 loc
+  else
+    let k := tl.stepOf τ
+    let δ := τ - tl.start k
+    let takePost : Bool := match loc with
+      | .reg _ => regEffectOffset ≤ δ
+      | .ram _ => ramEffectOffset ≤ δ
+    (chainState s0 (if takePost then k + 1 else k)).bind (locContent · loc)
+
+/-- The uniform timeline recovers the eight-tick reader. -/
+lemma microValueT_ordinary (s0 : SailState) (c0 : ℕ) (loc : MemLoc) (τ : ℕ) :
+    microValueT s0 (Timeline.ordinary c0) loc τ = microValue s0 c0 loc τ := by
+  by_cases h : τ < c0
+  · unfold microValueT microValue
+    rw [if_pos (show τ < (Timeline.ordinary c0).start 0 by
+        simp only [Timeline.ordinary_start]; omega), if_pos h]
+  · unfold microValueT microValue
+    rw [if_neg (show ¬ τ < (Timeline.ordinary c0).start 0 by
+        simp only [Timeline.ordinary_start]; omega), if_neg h]
+    have hstep := Timeline.stepOf_ordinary c0 τ (by omega)
+    simp only [hstep, Timeline.ordinary_start]
+    have hδ : τ - (c0 + 8 * ((τ - c0) / 8)) = (τ - c0) % 8 := by omega
+    rw [hδ]
+
 end SP1Clean.Semantics

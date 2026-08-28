@@ -99,14 +99,18 @@ auditor should expect exactly these:
    one of the two structural reasons stated in that file's module docstring (hint/helper-dependent
    preconditions, or a Native-resident contract block per item 2).
 
-4. **Two live time models.** The fixed eight-tick micro-time layer
+4. **Two time vocabularies, one engine.** The timed grounding walk is duration-generic
+   (`TimedGrounding.walkT` over a `Semantics.Timeline` — the bus clock at the start of each
+   semantic step, windows at least eight ticks wide), so mixed ordinary/syscall (8/264-tick)
+   walks are expressible; the ordinary walk is literally its `Timeline.ordinary` instantiation
+   through the `…_ordinary` bridges (`microValueT_ordinary` down to `groundedT_ordinary`).  What
+   remains deliberately dual is the *vocabulary*: the fixed eight-tick micro-time layer
    (`Model/Semantics/MicroTime.lean` — `ordinaryClkInc`/`ramEffectOffset`/`regEffectOffset`, the
-   Rust `CLK_INC`/`MemoryAccessPosition` constants) coexists with the general
-   `Machine.SP1MachineModel.schedule` event model (`Model/Machine/Schedule.lean`). The capstone
-   bridges them through its `UsesOrdinarySchedule` hypothesis rather than by retiring either:
-   the schedule model is what the syscall (264-tick) rows need, while the micro-time layer is the
-   proved register/RAM interpretation the ordinary-row grounding engine consumes. Unifying them is
-   roadmap work, not release polish.
+   Rust `CLK_INC`/`MemoryAccessPosition` constants) is what the per-chip layers speak and prove,
+   and the `Machine.SP1MachineModel.schedule` event model (`Model/Machine/Schedule.lean`) is what
+   the shard-event semantics speaks; the scheduled corollary's `UsesOrdinarySchedule` hypothesis
+   bridges the statement level.  The constructive `Timeline` ↔ `Machine.clockAt` bridge lands
+   with the halt-row work that first exercises a non-uniform timeline.
 
 ## One instruction chip
 

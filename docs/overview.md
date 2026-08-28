@@ -89,13 +89,14 @@ The machine-model-scheduled form of the conclusion is recovered by the corollary
 It does not say that the initial state is reachable from boot, that the final row halts, that shards
 compose, or that a cryptographic verifier accepted a proof. Those are deliberately separate claims.
 
-Two time views coexist under this statement by design. The general
-`Machine.SP1MachineModel.schedule` event model covers both the ordinary 8-tick and syscall 264-tick
-windows; the fixed eight-tick micro-time layer (`ordinaryClkInc`/`ramEffectOffset`/
-`regEffectOffset`, named for the Rust `CLK_INC` and `MemoryAccessPosition` constants they track) is
-the proved register/RAM interpretation the ordinary-row grounding engine consumes. The scheduled
-corollary's `UsesOrdinarySchedule` hypothesis is the explicit bridge (the headline states the
-eight-tick count directly); unifying the two models is roadmap work
+The timed grounding engine is duration-generic: the walk is stated over a `Timeline` (the bus
+clock at the start of each semantic step, windows at least eight ticks wide), so mixed
+ordinary/syscall (8/264-tick) shards are expressible, and the uniform eight-tick walk this
+statement uses is its `Timeline.ordinary` instantiation. The fixed micro-time constants
+(`ordinaryClkInc`/`ramEffectOffset`/`regEffectOffset`, named for the Rust `CLK_INC` and
+`MemoryAccessPosition` constants they track) remain the vocabulary the per-chip layers prove;
+the scheduled corollary's `UsesOrdinarySchedule` hypothesis bridges to the
+`Machine.SP1MachineModel.schedule` event model at the statement level
 (`architecture.md` § deliberate layering exceptions).
 
 ## Current coverage

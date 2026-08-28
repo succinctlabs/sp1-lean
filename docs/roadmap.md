@@ -446,10 +446,13 @@ are involved.
 - **Re-run `scripts/profile_compile.sh` after a suspected performance regression** — keep the
   generated report as a review artifact for the affected change; point-in-time timing output is not
   maintained as evergreen repository documentation.
-- **Unify the two time models** — retire the `MicroTime` compatibility layer into the
-  `Machine.SP1MachineModel.schedule` event model (or derive it as the ordinary-schedule instance),
-  discharging the capstone's `UsesOrdinarySchedule` bridging hypothesis structurally. Real
-  grounding-engine surgery; see `docs/architecture.md` § deliberate layering exceptions item 4.
+- **Unify the two time models** — the engine half is DONE (2026-08-28): the timed grounding walk
+  is duration-generic (`TimedGrounding.walkT` over `Semantics.Timeline`), mixed 8/264-tick walks
+  are expressible, and the ordinary walk is its `Timeline.ordinary` instantiation with every
+  carrier converted by a proved `…_ordinary` bridge — no chip or exported statement changed.
+  Remaining: the constructive `Timeline` ↔ `Machine.clockAt` bridge and a concrete non-uniform
+  (halt) timeline, which land with the HALT-row work; see `docs/architecture.md` § deliberate
+  layering exceptions item 4.
 - **Fold more platform facts into the generation config** — `memory.regions`,
   `htif_tohost_base`, and `memory.physaddr_bits` are also config-driven upstream, so the SP1 PMA
   region (base `2^16`, size `2^48 − 2^16`) and HTIF-off could become *generated* values instead

@@ -574,7 +574,7 @@ lemma mem_middle {α : Type} {l1 l2 : List α} (r₀ : α) {r : α} (h : r ∈ l
   List.mem_append.mpr ((List.mem_append.mp h).imp id (List.mem_cons_of_mem _))
 
 /-- **State-balance uniqueness of the minimal row** (proved, not assumed — SP-6 invariant 2). With
-the `+8` clock discipline and all pull times `≥ t`, once the popped row pulls the head record at
+the `≥ +8` clock discipline (row windows at least eight ticks wide) and all pull times `≥ t`, once the popped row pulls the head record at
 time `t`, every *other* row's state-pull time is strictly greater than `t`: a second pull at time
 `t` could match no push (times `≥ t + 8`), so it would equal `head` — but then the pulls contain
 two copies of `head`, and after cancelling the left `head` some push must equal `head`, impossible
@@ -582,7 +582,7 @@ by time. -/
 theorem stateBalance_unique_minimal {t : ℕ} {head fin : StateMsg (ZMod p)}
     {l1 l2 : List (RowFacts p)} {r₀ : RowFacts p}
     (htime8 : ∀ r ∈ l1 ++ r₀ :: l2,
-      StateMsg.timeNat r.statePush = StateMsg.timeNat r.statePull + 8)
+      StateMsg.timeNat r.statePull + 8 ≤ StateMsg.timeNat r.statePush)
     (hmin : ∀ r ∈ l1 ++ r₀ :: l2, t ≤ StateMsg.timeNat r.statePull)
     (hhead_t : StateMsg.timeNat head = t)
     (hr₀ : r₀.statePull = head)
@@ -632,7 +632,7 @@ every remaining push out of the popped row's window `[t, t + 4] ⊂ [t, t + 8)`.
 theorem stateBalance_remaining_ge_eight {t : ℕ} {head fin : StateMsg (ZMod p)}
     {l1 l2 : List (RowFacts p)} {r₀ : RowFacts p}
     (htime8 : ∀ r ∈ l1 ++ r₀ :: l2,
-      StateMsg.timeNat r.statePush = StateMsg.timeNat r.statePull + 8)
+      StateMsg.timeNat r.statePull + 8 ≤ StateMsg.timeNat r.statePush)
     (hmin : ∀ r ∈ l1 ++ r₀ :: l2, t ≤ StateMsg.timeNat r.statePull)
     (halign : ∀ r ∈ l1 ++ r₀ :: l2, StateMsg.timeNat r.statePull % 8 = t % 8)
     (hhead_t : StateMsg.timeNat head = t)
