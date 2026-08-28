@@ -43,6 +43,32 @@ abbrev SupportedCoreStatement (p : ℕ) :=
 def supportedPcBits {p : ℕ} (pc0 pc1 pc2 : ZMod p) : BitVec 64 :=
   SP1Clean.Semantics.pcBits pc0 pc1 pc2
 
+/-! ### Named statement projections
+
+Later relations read the four State-boundary endpoints only through these projections, so the
+public-values record can widen (exit code, shard flags, digests) without touching any statement
+that speaks only about pc and clock endpoints. -/
+
+/-- The committed initial pc of a supported-core statement. -/
+abbrev ProgramStatement.initPcBits {p : ℕ} (statement : SupportedCoreStatement p) : BitVec 64 :=
+  supportedPcBits statement.publicValues.init_pc0 statement.publicValues.init_pc1
+    statement.publicValues.init_pc2
+
+/-- The committed final pc of a supported-core statement. -/
+abbrev ProgramStatement.finalPcBits {p : ℕ} (statement : SupportedCoreStatement p) : BitVec 64 :=
+  supportedPcBits statement.publicValues.final_pc0 statement.publicValues.final_pc1
+    statement.publicValues.final_pc2
+
+/-- The committed initial bus clock of a supported-core statement. -/
+abbrev ProgramStatement.initClkNat {p : ℕ} (statement : SupportedCoreStatement p) : ℕ :=
+  SP1Clean.Semantics.clkNat statement.publicValues.init_clk_high
+    statement.publicValues.init_clk_low
+
+/-- The committed final bus clock of a supported-core statement. -/
+abbrev ProgramStatement.finalClkNat {p : ℕ} (statement : SupportedCoreStatement p) : ℕ :=
+  SP1Clean.Semantics.clkNat statement.publicValues.final_clk_high
+    statement.publicValues.final_clk_low
+
 /-- One execution segment agrees with decoded clock and pc endpoints. -/
 noncomputable def SegmentMatches {model : Machine.SP1MachineModel}
     {ctx : Machine.ExecutionCtx model} (initialClock : ℕ) (initialPc : BitVec 64)

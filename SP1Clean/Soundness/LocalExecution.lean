@@ -175,11 +175,11 @@ private theorem executePcWalkAux {Row : Type u}
     ∀ (done suffix : List Row) (current final : BitVec 64) (state : SailState),
       rows = done ++ suffix →
       PcWalk rowOf current final suffix →
-      SailChain done.length initial state →
+      SailRetireChain done.length initial state →
       state.regs.get? Register.PC = some current →
       RomLoaded program state → SailConfigured state →
       ∃ finalState,
-        SailChain rows.length initial finalState ∧
+        SailRetireChain rows.length initial finalState ∧
         finalState.regs.get? Register.PC = some final := by
   intro done suffix
   induction suffix generalizing done with
@@ -195,19 +195,21 @@ private theorem executePcWalkAux {Row : Type u}
           some (rcvPcOf (stateAccess (rowOf row).view)) := by
         rw [rowSource]
         exact pc
-      have rowGrounded := grounded.at done row suffix rows_eq state chain
+      have rowGrounded := grounded.at done row suffix rows_eq state chain.toSailChain
       obtain ⟨next, step, effect⟩ := rowGrounded.advance cfg rom pcRow
       have rows_eq' : rows = (done ++ [row]) ++ suffix := by
         simpa [List.append_assoc] using rows_eq
-      have chain' : SailChain (done ++ [row]).length initial next := by
-        simpa using chain.snoc step
+      have chain' : SailRetireChain (done ++ [row]).length initial next := by
+        simpa using chain.snoc effect.normal
       have nextRom : RomLoaded program next :=
-        codeMemoryCompatible chain step rom
+        codeMemoryCompatible chain.toSailChain step rom
       exact ih (done ++ [row]) (sndPcOf (stateAccess (rowOf row).view)) final next rows_eq'
         tailWalk chain' effect.pc nextRom (effect.cfg cfg)
 
-/-- A fully grounded, ordered row list constructs a genuine local official-Sail chain. -/
-theorem sailChain_of_groundedRows {Row : Type u} (rowOf : Row → ChipRow p)
+/-- A fully grounded, ordered row list constructs a genuine local official-Sail chain in which
+every step retires normally.  Downgrade with `SailRetireChain.toSailChain` where only step
+completion is needed. -/
+theorem sailRetireChain_of_groundedRows {Row : Type u} (rowOf : Row → ChipRow p)
     (data : ProverData (ZMod p)) (program : GuestProgram) (initial : SailState)
     (rows : List Row) (initialPc finalPc : BitVec 64)
     (walk : PcWalk rowOf initialPc finalPc rows)
@@ -216,7 +218,7 @@ theorem sailChain_of_groundedRows {Row : Type u} (rowOf : Row → ChipRow p)
     (pc : initial.regs.get? Register.PC = some initialPc)
     (rom : RomLoaded program initial) (cfg : SailConfigured initial) :
     ∃ finalState,
-      SailChain rows.length initial finalState ∧
+      SailRetireChain rows.length initial finalState ∧
       finalState.regs.get? Register.PC = some finalPc := by
   simpa using executePcWalkAux rowOf data program initial rows grounded codeMemoryCompatible
     [] rows initialPc finalPc initial (by simp) walk (.refl initial) pc rom cfg
@@ -363,14 +365,14 @@ theorem groundedRows_localExecution {Row : Type u}
         Semantics.clkNat statement.publicValues.final_clk_high statement.publicValues.final_clk_low) :
     ∃ witness, SupportedCoreLocalExecutionRelation model statement witness := by
   obtain ⟨finalState, chain, finalPc⟩ :=
-    sailChain_of_groundedRows rowOf data statement.program initial rows _ _ walk grounded
+    sailRetireChain_of_groundedRows rowOf data statement.program initial rows _ _ walk grounded
       codeMemoryCompatible pc rom cfg
   let context : Machine.LocalExecutionCtx model :=
     { program := statement.program, wellFormed, initial, romLoaded := rom, configured := cfg }
   let execution : Machine.LocalExecutionSegmentWitness context :=
     { steps := rows.length
       finalState := finalState
-      reached := Semantics.chainState_of_sailChain chain }
+      reached := Semantics.chainState_of_sailChain chain.toSailChain }
   exact ⟨⟨context, execution⟩, wellFormed, rfl, pc, finalPc, clockMatches⟩
 
 end SP1Clean.Soundness

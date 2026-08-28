@@ -93,6 +93,7 @@ granularity gap is recorded on the definitions themselves.
 | `SailStep` | `SP1Clean/Model/Semantics/GuestProgram.lean` | One step of the real generated interpreter |
 | `SailRetiresNormally` | `SP1Clean/Model/Semantics/GuestProgram.lean` | Excludes trap/illegal/wait exits by recording the official `Retire_Success` branch |
 | `SailChain` | `SP1Clean/Model/Semantics/GuestProgram.lean` | A multi-step run |
+| `SailRetireChain` | `SP1Clean/Model/Semantics/GuestProgram.lean` | A multi-step run in which every step retires normally; downgrades via `toSailChain` |
 | `SailConfigured` | `SP1Clean/Model/Semantics/GuestProgram.lean` | Which platform state is assumed (incl. the single RWX PMA region) |
 | `ConfiguredDecode` | `SP1Clean/Model/Semantics/GuestProgram.lean` | The one word/instruction decode fact shared by Program truth and shard semantics |
 | `SailCodeMemoryCompatible` | `SP1Clean/Model/Semantics/GuestProgram.lean` | The code/data separation contract — self-modifying code excluded by assumption |
