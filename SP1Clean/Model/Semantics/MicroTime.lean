@@ -298,6 +298,22 @@ def ordinary (c0 : ℕ) : Timeline where
 
 @[simp] lemma ordinary_start (c0 n : ℕ) : (ordinary c0).start n = c0 + 8 * n := rfl
 
+/-- The terminal-wide-row timeline: `N` ordinary eight-tick windows, one window of width
+`D ≥ 8` (SP1's syscall/HALT window is `264 = 8 · 33`), then ordinary windows again (the tail
+totalizes the function; a halting shard has no rows there).  This is the shape the halt-shard
+grounding walks. -/
+def terminal (c0 N D : ℕ) (hD : 8 ≤ D) : Timeline where
+  start := fun n => if n ≤ N then c0 + 8 * n else c0 + 8 * N + D + 8 * (n - N - 1)
+  gap := fun n => by split_ifs <;> omega
+
+@[simp] lemma terminal_start_le {c0 N D : ℕ} (hD : 8 ≤ D) {n : ℕ} (h : n ≤ N) :
+    (terminal c0 N D hD).start n = c0 + 8 * n := by
+  simp [terminal, h]
+
+@[simp] lemma terminal_start_succ {c0 N D : ℕ} (hD : 8 ≤ D) :
+    (terminal c0 N D hD).start (N + 1) = c0 + 8 * N + D := by
+  simp [terminal]
+
 lemma start_add_le (tl : Timeline) (n k : ℕ) : tl.start n + 8 * k ≤ tl.start (n + k) := by
   induction k with
   | zero => simp
