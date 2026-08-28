@@ -990,6 +990,23 @@ theorem supported_core_native_sound (model : Machine.SP1MachineModel)
   rw [Machine.localExecutionClock_eq_ordinary ordinary]
   exact grounding.clockCount
 
+/-- **Supported native-Clean soundness, plain-Sail form.**  The same two-conjunct premise as
+`supported_core_native_sound`, with the conclusion stated directly on the official Sail machine:
+a normally-retiring interpreter run between the committed public pc endpoints, taking exactly the
+committed number of eight-tick instructions.  No machine-model parameter and no schedule
+hypothesis — the model-scheduled form is recovered by
+`supportedCoreLocalExecution_of_sailRelation`. -/
+theorem supported_core_native_sail_sound :
+    WitnessRelation.Sound (SupportedCoreNativeRelation (p := p))
+      (SupportedCoreSailRelation (p := p)) := by
+  intro statement witness valid
+  obtain ⟨initial, rows, boundary, grounding⟩ :=
+    supported_core_native_grounding statement witness valid
+  exact groundedRows_sailRelation statement witness.data initial
+    (fun decoded : DecodedInstructionRow p => decoded.toChipRow witness.data) rows
+    boundary.programWellFormed boundary.initialPc boundary.romLoaded boundary.configured
+    boundary.codeMemoryCompatible grounding.walk grounding.grounded grounding.clockCount
+
 /-- Construct the common semantic witness while retaining its exact active-row count.
 
 The witness stores only the grounded initial state and ordinary event transcript.  Its transition

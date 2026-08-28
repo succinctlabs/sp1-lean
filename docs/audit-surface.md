@@ -39,8 +39,13 @@ kernel, each with the question it decides. Reading these, plus `FormalModel/Cont
 | `SupportedCoreNativeRelation` | `SP1Clean/Soundness/AIR.lean` | The hypothesis side: exactly two conjuncts |
 | `SupportedCoreNativeShardRelation` | `SP1Clean/Soundness/AIR.lean` | The same native relation restricted to the pinned active-row budget |
 | `supported_core_native_sound` | `SP1Clean/Soundness/AIR.lean` | The headline theorem |
+| `supported_core_native_sail_sound` | `SP1Clean/Soundness/AIR.lean` | The same premise concluded directly on the official Sail machine: no model parameter, no schedule hypothesis |
 | `supported_core_native_shard_sound` | `SP1Clean/Soundness/AIR.lean` | Capacity-aligned soundness into the one canonical semantic relation |
-| `SupportedCoreLocalExecutionRelation` | `SP1Clean/FormalModel/Execution.lean` | What the conclusion actually says |
+| `SupportedCoreLocalExecutionRelation` | `SP1Clean/FormalModel/Execution.lean` | What the model-scheduled conclusion actually says |
+| `SupportedCoreSailRelation` | `SP1Clean/FormalModel/Execution.lean` | The plain-Sail conclusion: a normally-retiring run between the committed endpoints at eight ticks per step |
+| `SailSegmentWitness` | `SP1Clean/FormalModel/Execution.lean` | The proof-free run/boundary carrier of the plain-Sail conclusion |
+| `ShardStartState` | `SP1Clean/FormalModel/Execution.lean` | What the conclusion pins about the shard's start state (public pc, ROM, configuration) |
+| `supportedCoreLocalExecution_of_sailRelation` | `SP1Clean/FormalModel/Execution.lean` | The no-strength-lost adapter from the plain-Sail form back to the model-scheduled form |
 | `Machine.CoreShardSemanticWitness` | `SP1Clean/Model/Machine/Shard.lean` | The one proof-free program/Memory-boundary/initial-state/event carrier shared by native and exact Core |
 | `CoreShardSemanticWitness.evaluatedTrace` | `SP1Clean/Model/Machine/Shard.lean` | The total proof-independent evaluator consumed by the trace compiler |
 | `CoreShardExecutionRelation` | `SP1Clean/FormalModel/CoreShard.lean` | The one semantic relation skeleton specialized by native and exact Core |

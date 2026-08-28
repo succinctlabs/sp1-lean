@@ -69,6 +69,51 @@ abbrev ProgramStatement.finalClkNat {p : ℕ} (statement : SupportedCoreStatemen
   SP1Clean.Semantics.clkNat statement.publicValues.final_clk_high
     statement.publicValues.final_clk_low
 
+/-! ### The plain-Sail conclusion -/
+
+/-- Proof-free carrier of the plain-Sail conclusion: one finite segment of the official Sail run
+plus the finite Memory boundary it certifies.  The `memory` field is currently unconstrained by
+`SupportedCoreSailRelation`; it becomes load-bearing when the native memory boundary is populated
+from the proved finalize truth (semantics-gap campaign PR 1.5). -/
+structure SailSegmentWitness where
+  initial : SailState
+  steps : ℕ
+  final : SailState
+  memory : Machine.CoreMemoryBoundary
+
+/-- The committed start state of one shard: the public initial pc, the committed ROM loaded, and
+the platform configuration pinned.  For a first shard whose public initial pc is the program entry
+point, a booted `IsInitialState` refines this via `ShardStartState.of_isInitialState`. -/
+structure ShardStartState {p : ℕ} (statement : SupportedCoreStatement p) (s : SailState) :
+    Prop where
+  pc : s.regs.get? Register.PC = some statement.initPcBits
+  romLoaded : RomLoaded statement.program s
+  configured : SailConfigured s
+
+/-- A booted initial state is a valid shard start whenever the statement's public initial pc is
+the program entry point. -/
+theorem ShardStartState.of_isInitialState {p : ℕ} {statement : SupportedCoreStatement p}
+    {s : SailState} (boot : IsInitialState statement.program s)
+    (entry : statement.initPcBits = statement.program.pc_start) :
+    ShardStartState statement s :=
+  { pc := by rw [entry]; exact boot.pc
+    romLoaded := boot.romLoaded
+    configured := boot.configured }
+
+/-- **The plain-Sail relation.**  What the native ensemble certifies about the official Sail
+machine, with no machine-model parameter: a normally-retiring official-interpreter run between the
+committed public pc endpoints, taking exactly the committed number of eight-tick instructions.
+Memory-boundary conjuncts over the witness's `memory` field join when the native boundary is
+populated (semantics-gap campaign PR 1.5). -/
+def SupportedCoreSailRelation {p : ℕ} :
+    WitnessRelation.Relation (SupportedCoreStatement p) SailSegmentWitness :=
+  fun statement w =>
+    statement.program.WellFormed ∧
+    ShardStartState statement w.initial ∧
+    SailRetireChain w.steps w.initial w.final ∧
+    w.final.regs.get? Register.PC = some statement.finalPcBits ∧
+    statement.finalClkNat = statement.initClkNat + 8 * w.steps
+
 /-- One execution segment agrees with decoded clock and pc endpoints. -/
 noncomputable def SegmentMatches {model : Machine.SP1MachineModel}
     {ctx : Machine.ExecutionCtx model} (initialClock : ℕ) (initialPc : BitVec 64)
@@ -123,6 +168,28 @@ noncomputable def SupportedCoreLocalExecutionRelation {p : ℕ} (model : Machine
     statement.program.WellFormed ∧
     witness.context.program = statement.program ∧
     LocalSegmentMatchesBoundary statement.publicValues witness.execution
+
+/-- Every plain-Sail conclusion yields the model-scheduled local-execution form, for any machine
+model implementing the ordinary eight-tick schedule.  This is the no-strength-lost adapter: the
+model parameter and schedule hypothesis of the older statement are recoverable from the
+model-free `SupportedCoreSailRelation`. -/
+theorem supportedCoreLocalExecution_of_sailRelation {p : ℕ}
+    (model : Machine.SP1MachineModel) (ordinary : model.UsesOrdinarySchedule)
+    {statement : SupportedCoreStatement p} {w : SailSegmentWitness}
+    (valid : SupportedCoreSailRelation statement w) :
+    ∃ witness, SupportedCoreLocalExecutionRelation model statement witness := by
+  obtain ⟨wellFormed, start, chain, finalPc, clock⟩ := valid
+  let context : Machine.LocalExecutionCtx model :=
+    { program := statement.program, wellFormed, initial := w.initial
+      romLoaded := start.romLoaded, configured := start.configured }
+  let execution : Machine.LocalExecutionSegmentWitness context :=
+    { steps := w.steps
+      finalState := w.final
+      reached := SP1Clean.Semantics.chainState_of_sailChain chain.toSailChain }
+  refine ⟨⟨context, execution⟩, wellFormed, rfl, start.pc, finalPc, ?_⟩
+  show Machine.localExecutionClock context _ _ = _
+  rw [Machine.localExecutionClock_eq_ordinary ordinary]
+  exact clock.symm
 
 /-- Semantic execution for the currently wired 25-chip slice.
 
