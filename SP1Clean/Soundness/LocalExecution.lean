@@ -338,43 +338,6 @@ theorem eventExecution_of_groundedRows {Row : Type u}
   change execution.transitions.length = rows.length at stepsEq
   rw [stepsEq]
 
-/-- Package the grounded-row engine as the honest local execution relation.  Schedule/clock equality
-is kept as a structural grounding premise because it comes from decoded State rows, not Sail steps. -/
-theorem groundedRows_localExecution {Row : Type u}
-    (model : Machine.SP1MachineModel)
-    (statement : ProgramStatement (SupportedCorePrefixPublicValues (ZMod p)))
-    (data : ProverData (ZMod p)) (initial : SailState)
-    (rowOf : Row → ChipRow p) (rows : List Row)
-    (wellFormed : statement.program.WellFormed)
-    (pc : initial.regs.get? Register.PC = some
-      (supportedPcBits statement.publicValues.init_pc0 statement.publicValues.init_pc1
-        statement.publicValues.init_pc2))
-    (rom : RomLoaded statement.program initial) (cfg : SailConfigured initial)
-    (codeMemoryCompatible : SailCodeMemoryCompatible statement.program initial)
-    (walk : PcWalk rowOf
-      (supportedPcBits statement.publicValues.init_pc0 statement.publicValues.init_pc1
-        statement.publicValues.init_pc2)
-      (supportedPcBits statement.publicValues.final_pc0 statement.publicValues.final_pc1
-        statement.publicValues.final_pc2) rows)
-    (grounded : RowsGrounded rowOf data statement.program initial rows)
-    (clockMatches : Machine.localExecutionClock
-      ({ program := statement.program, wellFormed, initial, romLoaded := rom, configured := cfg } :
-        Machine.LocalExecutionCtx model)
-      (Semantics.clkNat statement.publicValues.init_clk_high statement.publicValues.init_clk_low)
-      rows.length =
-        Semantics.clkNat statement.publicValues.final_clk_high statement.publicValues.final_clk_low) :
-    ∃ witness, SupportedCoreLocalExecutionRelation model statement witness := by
-  obtain ⟨finalState, chain, finalPc⟩ :=
-    sailRetireChain_of_groundedRows rowOf data statement.program initial rows _ _ walk grounded
-      codeMemoryCompatible pc rom cfg
-  let context : Machine.LocalExecutionCtx model :=
-    { program := statement.program, wellFormed, initial, romLoaded := rom, configured := cfg }
-  let execution : Machine.LocalExecutionSegmentWitness context :=
-    { steps := rows.length
-      finalState := finalState
-      reached := Semantics.chainState_of_sailChain chain.toSailChain }
-  exact ⟨⟨context, execution⟩, wellFormed, rfl, pc, finalPc, clockMatches⟩
-
 /-- Package the grounded-row engine as the plain-Sail relation: no machine-model parameter, and
 the clock claim is the literal eight-tick count the 25-chip slice implements.  The witness's
 Memory boundary is the empty placeholder until the native boundary is populated from the proved

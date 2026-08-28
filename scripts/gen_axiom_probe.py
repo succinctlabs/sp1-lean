@@ -121,7 +121,7 @@ EXACT_REQUIRED_THEOREMS = [
     ("SP1Clean/Composition/CoreArtifact.lean", "exactNativeEnsembleWitness_balancedChannels"),
     ("SP1Clean/Composition/CoreArtifact.lean",
      "exactNativeArtifact_supportedCoreNativeRelation"),
-    ("SP1Clean/Composition/CoreArtifact.lean", "exactNativeArtifact_localExecution"),
+    ("SP1Clean/Composition/CoreArtifact.lean", "exactNativeArtifact_sailExecution"),
     # The representation and semantic agreement seams used by the deterministic native compiler.
     # Keep these exact (rather than one alternation per file): deleting one side of an agreement
     # layer must fail generation even when a sibling theorem survives.
@@ -265,7 +265,7 @@ TARGETS = [
      r"verifierBytePulls_asymmetricClockOrder|"
      r"active_instruction_count|active_decoded_instruction_row_count|"
      r"active_real_decoded_instruction_row_count|"
-     r"activeTrace_yields_airWitness|activeTrace_yields_localExecution|"
+     r"activeTrace_yields_airWitness|activeTrace_yields_sailExecution|"
      r"activeTrace_suppliesDemand|activeTrace_stateHandoff|activeTrace_memoryHandoff|"
      r"activePaddedTrace_stateHandoff|activePaddedTrace_stateHandoff_raw_false)\b"),
     # The W4 completeness layer's provider/ledger half: the built provider and verifier tables'
@@ -408,6 +408,7 @@ TARGETS = [
      r"supportedCore_orderedRows_dynamic_of_obligations|"
      r"supportedCore_orderedRows_dynamic|supported_core_witness_grounding|"
      r"supported_core_native_grounding|supported_core_native_sound|"
+     r"supported_core_native_sound_scheduled|"
      r"supported_core_native_shard_execution|supported_core_native_shard_sound)\b"),
     # Exact v6.4.0 table/profile guards and the public ArkLib-facing Core AIR capstone.  These are
     # release headlines: adding a new capstone file must not silently leave it outside the census.

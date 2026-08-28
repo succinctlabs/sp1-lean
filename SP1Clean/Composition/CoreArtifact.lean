@@ -22,8 +22,9 @@ loader/platform/program/memory-boundary contracts to supply that global contract
 kernel-checked plumbing:
 integer balance is converted to Clean's field-valued `BalancedChannels`, the already-proved local
 constraints and semantic binding assemble `SupportedCoreNativeRelation`, and
-`supported_core_native_sound` yields an official-Sail local execution segment.  No boot
-reachability, shard composition, or cryptographic verifier theorem is asserted here.
+`supported_core_native_sound` yields a normally-retiring official-Sail run between the committed
+public endpoints.  No boot reachability, shard composition, or cryptographic verifier theorem is
+asserted here.
 -/
 
 set_option autoImplicit false
@@ -377,11 +378,11 @@ theorem exactNativeArtifact_supportedCoreNativeRelation {Digest : Type}
 
 /-- **Official-Sail consequence given the explicit exact/native global contract.**
 
-This is deliberately shard-local.  It inherits the native capstone's ordinary eight-tick schedule
-premise and does not assert boot reachability, halting, or cryptographic proof-system soundness. -/
-theorem exactNativeArtifact_localExecution {Digest : Type}
+This is deliberately shard-local: a normally-retiring official-Sail run between the committed
+public endpoints, with no machine-model parameter or schedule hypothesis.  It does not assert
+boot reachability, halting, or cryptographic proof-system soundness. -/
+theorem exactNativeArtifact_sailExecution {Digest : Type}
     {binds : CoreAIR.Current.PreprocessedBinding p Digest}
-    (model : Machine.SP1MachineModel) (ordinary : model.UsesOrdinarySchedule)
     (program : GuestProgram) (statement : SP1ShardStatement (ZMod p) Digest)
     (executionWitness memoryBoundaryWitness : CoreAIR.Witness (CoreAIR.Current.Row p))
     (inventory : CanonicalPreprocessedInventory executionWitness)
@@ -392,9 +393,9 @@ theorem exactNativeArtifact_localExecution {Digest : Type}
     (boundary : ExactNativeBoundaryContract statement.publicValues)
     (global : ExactNativeGlobalContract program statement executionWitness
       memoryBoundaryWitness inventory data hint) :
-    ∃ execution, SupportedCoreLocalExecutionRelation model
+    ∃ execution, SupportedCoreSailRelation
       (exactNativeStatement program statement) execution := by
-  exact Soundness.supported_core_native_sound model ordinary
+  exact Soundness.supported_core_native_sound
     (exactNativeStatement program statement)
     (exactNativeEnsembleWitness statement executionWitness memoryBoundaryWitness inventory data hint)
     (exactNativeArtifact_supportedCoreNativeRelation program statement executionWitness

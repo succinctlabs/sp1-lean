@@ -16,15 +16,16 @@ This is a Clean-native Lean 4 verification of SP1's Core RISC-V instruction chip
 The current closed capstone is:
 
 ```lean
-theorem supported_core_native_sound (model : Machine.SP1MachineModel)
-    (ordinary : model.UsesOrdinarySchedule) :
+theorem supported_core_native_sound :
     WitnessRelation.Sound (SupportedCoreNativeRelation (p := p))
-      (SupportedCoreLocalExecutionRelation model)
+      (SupportedCoreSailRelation (p := p))
 ```
 
 It proves that a valid, balanced witness for the 25-chip native Clean machine, with an explicit
-program/provider binding, yields a genuine shard-local execution of the generated RISC-V Sail model
-between the public PC and clock endpoints.
+program/provider binding, yields a genuine shard-local execution of the generated RISC-V Sail
+model: a normally-retiring interpreter run between the public PC endpoints, taking exactly the
+committed number of eight-tick instructions.  The machine-model-scheduled form is the corollary
+`supported_core_native_sound_scheduled`.
 
 All 25 supported instruction chips have:
 

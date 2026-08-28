@@ -34,10 +34,9 @@ represented by theorem premises or by theorem names that are intentionally not d
 The current semantic capstone is:
 
 ```lean
-theorem supported_core_native_sound (model : Machine.SP1MachineModel)
-    (ordinary : model.UsesOrdinarySchedule) :
+theorem supported_core_native_sound :
     WitnessRelation.Sound (SupportedCoreNativeRelation (p := p))
-      (SupportedCoreLocalExecutionRelation model)
+      (SupportedCoreSailRelation (p := p))
 ```
 
 Its source relation has two visible parts:
@@ -67,13 +66,21 @@ MemoryBump rows range-check it in-circuit), so every pulled record does too.
 
 From those facts the proof deterministically decodes the physical rows, obtains an exhaustive
 State-bus order, grounds Program and Memory accesses at every position, applies the registered chip
-contract, and constructs a successful Sail chain. The resulting local segment:
+contract, and constructs a successful Sail chain. The conclusion (`SupportedCoreSailRelation`) is
+stated directly on the official Sail machine, with no machine-model parameter or schedule
+hypothesis. The resulting run:
 
 - uses the statement's program;
-- starts and ends at the public PC and clock boundaries; and
+- starts from a `ShardStartState` (public initial PC, committed ROM loaded, platform configured);
+- retires normally at every step (`SailRetireChain` — the trap, illegal-instruction, wait, and
+  extension-failure exits are excluded, not merely unobserved);
+- ends at the public final PC, taking exactly `(finalClk − initClk)/8` instructions; and
 - is constructed by the proof from exactly the active physical instruction rows (the exported
   relation states the endpoint facts; row exactness lives in the intermediate grounding
   theorem).
+
+The machine-model-scheduled form of the conclusion is recovered by the corollary
+`supported_core_native_sound_scheduled`, the seam later shard composition consumes.
 
 It does not say that the initial state is reachable from boot, that the final row halts, that shards
 compose, or that a cryptographic verifier accepted a proof. Those are deliberately separate claims.
@@ -82,8 +89,9 @@ Two time views coexist under this statement by design. The general
 `Machine.SP1MachineModel.schedule` event model covers both the ordinary 8-tick and syscall 264-tick
 windows; the fixed eight-tick micro-time layer (`ordinaryClkInc`/`ramEffectOffset`/
 `regEffectOffset`, named for the Rust `CLK_INC` and `MemoryAccessPosition` constants they track) is
-the proved register/RAM interpretation the ordinary-row grounding engine consumes. The theorem's
-`UsesOrdinarySchedule` hypothesis is the explicit bridge; unifying the two models is roadmap work
+the proved register/RAM interpretation the ordinary-row grounding engine consumes. The scheduled
+corollary's `UsesOrdinarySchedule` hypothesis is the explicit bridge (the headline states the
+eight-tick count directly); unifying the two models is roadmap work
 (`architecture.md` § deliberate layering exceptions).
 
 ## Current coverage
@@ -287,8 +295,7 @@ impossible.
 
 The former standalone per-bus `Trace*Link` predicates and integer `*Lookups` shadows have been
 retired. The capstone reads typed Clean interactions directly through `TypedState`, `TypedProgram`,
-and `TypedMemory`; its premise surface remains the two relation conjuncts above plus the
-`UsesOrdinarySchedule` schedule hypothesis.
+and `TypedMemory`; its premise surface is exactly the two relation conjuncts above.
 
 ## Reproduce the current checkpoint
 

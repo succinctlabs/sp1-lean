@@ -971,32 +971,16 @@ theorem supported_core_native_grounding
   exact ⟨initial, orderedRows, boundary, grounding⟩
 
 /-- **Supported native-Clean soundness.** A satisfying, channel-balanced witness whose provider
-tables are semantically bound produces a genuine local official-Sail execution between its public
-endpoints.  Those two conjuncts are the *whole* premise: the RAM access-timestamp range fact the
-generic underflow argument needs is derived inside the capstone from the per-location Memory
-balance, not assumed here.  This deliberately concludes a shard-local segment; boot reachability is
-supplied later by `supportedCoreLocalExecution_anchors` when consecutive shards are composed. -/
-theorem supported_core_native_sound (model : Machine.SP1MachineModel)
-    (ordinary : model.UsesOrdinarySchedule) :
-    WitnessRelation.Sound (SupportedCoreNativeRelation (p := p))
-      (SupportedCoreLocalExecutionRelation model) := by
-  intro statement witness valid
-  obtain ⟨initial, rows, boundary, grounding⟩ :=
-    supported_core_native_grounding statement witness valid
-  apply groundedRows_localExecution model statement witness.data initial
-    (fun decoded : DecodedInstructionRow p => decoded.toChipRow witness.data) rows
-    boundary.programWellFormed boundary.initialPc boundary.romLoaded boundary.configured
-    boundary.codeMemoryCompatible grounding.walk grounding.grounded
-  rw [Machine.localExecutionClock_eq_ordinary ordinary]
-  exact grounding.clockCount
-
-/-- **Supported native-Clean soundness, plain-Sail form.**  The same two-conjunct premise as
-`supported_core_native_sound`, with the conclusion stated directly on the official Sail machine:
-a normally-retiring interpreter run between the committed public pc endpoints, taking exactly the
-committed number of eight-tick instructions.  No machine-model parameter and no schedule
-hypothesis — the model-scheduled form is recovered by
-`supportedCoreLocalExecution_of_sailRelation`. -/
-theorem supported_core_native_sail_sound :
+tables are semantically bound produces a genuine shard-local official-Sail execution: a
+normally-retiring interpreter run between the committed public pc endpoints, taking exactly the
+committed number of eight-tick instructions.  Those two conjuncts are the *whole* premise: the
+RAM access-timestamp range fact the generic underflow argument needs is derived inside the
+capstone from the per-location Memory balance, not assumed here.  No machine-model parameter and
+no schedule hypothesis appear; the model-scheduled form is
+`supported_core_native_sound_scheduled` below.  This deliberately concludes a shard-local
+segment; boot reachability is supplied later by `supportedCoreLocalExecution_anchors` when
+consecutive shards are composed. -/
+theorem supported_core_native_sound :
     WitnessRelation.Sound (SupportedCoreNativeRelation (p := p))
       (SupportedCoreSailRelation (p := p)) := by
   intro statement witness valid
@@ -1006,6 +990,18 @@ theorem supported_core_native_sail_sound :
     (fun decoded : DecodedInstructionRow p => decoded.toChipRow witness.data) rows
     boundary.programWellFormed boundary.initialPc boundary.romLoaded boundary.configured
     boundary.codeMemoryCompatible grounding.walk grounding.grounded grounding.clockCount
+
+/-- The model-scheduled corollary of `supported_core_native_sound`: any machine model
+implementing SP1's ordinary eight-tick schedule recovers the local-execution-witness form.  This
+is the composition seam consumed by `supportedCoreLocalExecution_anchors` when shards are
+composed along a model-selected boot trajectory. -/
+theorem supported_core_native_sound_scheduled (model : Machine.SP1MachineModel)
+    (ordinary : model.UsesOrdinarySchedule) :
+    WitnessRelation.Sound (SupportedCoreNativeRelation (p := p))
+      (SupportedCoreLocalExecutionRelation model) := by
+  intro statement witness valid
+  obtain ⟨w, sailValid⟩ := supported_core_native_sound statement witness valid
+  exact supportedCoreLocalExecution_of_sailRelation model ordinary sailValid
 
 /-- Construct the common semantic witness while retaining its exact active-row count.
 

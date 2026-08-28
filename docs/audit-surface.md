@@ -14,7 +14,8 @@ rejected `T`. The entire risk of *proving the wrong thing* lives in `Stmt(T)` an
 instance context.
 
 That is what makes auditing this repository tractable. The review measured the split for
-`supported_core_native_sound`: 13,943 constants in the proof closure, 10,665 in the statement
+the then-current (model-scheduled) `supported_core_native_sound` — the headline has since moved
+to the plain-Sail statement, which only shrinks the statement closure: 13,943 constants in the proof closure, 10,665 in the statement
 closure, of which 7,487 are proof-typed (inert for meaning) — leaving **3,178 data/definition-typed
 constants across 243 modules** as the real surface, and confirming the repository's own claim that
 `FormalModel/Contracts/` is where it concentrates.
@@ -38,8 +39,8 @@ kernel, each with the question it decides. Reading these, plus `FormalModel/Cont
 | `CoreProfile.WithinOrdinaryRowLimit` | `SP1Clean/FormalModel/CoreProfile.lean` | The one numeric Core row-budget policy used by both witness representations |
 | `SupportedCoreNativeRelation` | `SP1Clean/Soundness/AIR.lean` | The hypothesis side: exactly two conjuncts |
 | `SupportedCoreNativeShardRelation` | `SP1Clean/Soundness/AIR.lean` | The same native relation restricted to the pinned active-row budget |
-| `supported_core_native_sound` | `SP1Clean/Soundness/AIR.lean` | The headline theorem |
-| `supported_core_native_sail_sound` | `SP1Clean/Soundness/AIR.lean` | The same premise concluded directly on the official Sail machine: no model parameter, no schedule hypothesis |
+| `supported_core_native_sound` | `SP1Clean/Soundness/AIR.lean` | The headline theorem: the plain-Sail conclusion, no model parameter, no schedule hypothesis |
+| `supported_core_native_sound_scheduled` | `SP1Clean/Soundness/AIR.lean` | The model-scheduled corollary — the shard-composition seam |
 | `supported_core_native_shard_sound` | `SP1Clean/Soundness/AIR.lean` | Capacity-aligned soundness into the one canonical semantic relation |
 | `SupportedCoreLocalExecutionRelation` | `SP1Clean/FormalModel/Execution.lean` | What the model-scheduled conclusion actually says |
 | `SupportedCoreSailRelation` | `SP1Clean/FormalModel/Execution.lean` | The plain-Sail conclusion: a normally-retiring run between the committed endpoints at eight ticks per step |

@@ -230,8 +230,9 @@ they must track (at the pinned semantic revision, `FormalModel/CoreProfile.lean`
 `Machine.ordinarySchedule` (`Model/Machine/Schedule.lean`) carries the same numbers structurally
 as its `accesses` phase list; the timed grounding engine consumes only the schedule's `duration`
 (the `accesses` phase list is descriptive), and
-`supported_core_native_sound`'s `UsesOrdinarySchedule` hypothesis is what pins a machine model to
-this window shape. `microValue` uses the constants directly in its window arithmetic. -/
+`supported_core_native_sound_scheduled`'s `UsesOrdinarySchedule` hypothesis is what pins a
+machine model to this window shape; the plain-Sail capstone states the eight-tick count directly.
+`microValue` uses the constants directly in its window arithmetic. -/
 
 /-- SP1's ordinary clock increment (Rust `CLK_INC = 8`): the width of one ordinary execution
 window, and the modulus of the intra-window offset arithmetic below. Structurally this is
