@@ -442,7 +442,7 @@ theorem generatedTraceRelation_nonvacuous :
     SupportedCoreGeneratedTraceRelation (p := SP1Prime) stmt anchorTrace :=
   ⟨anchorTrace_wellFormed, anchorTrace.witness_balancedChannels anchorTrace_balanced,
    anchorTrace_publicValues,
-   ⟨anchorState, anchorTrace_boundaryFacts⟩⟩
+   anchorTrace_boundaryFacts.binding⟩
 
 /-- The completeness capstone applied to the generated shard: a valid AIR witness exists. -/
 theorem anchorTrace_yields_airWitness :

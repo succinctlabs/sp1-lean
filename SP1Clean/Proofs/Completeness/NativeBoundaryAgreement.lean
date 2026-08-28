@@ -47,7 +47,7 @@ theorem NativeTraceReady.semanticBoundary
   have clockEncodable := nativeInitialClock_encodable statement publicWellFormed
   have programProvider := nativeTrace_programProviderBound semantic rfl ready.compiler
     ready.demandServable ready.programProjection
-  refine ⟨semanticWitness.initialState, {
+  refine InitialBoundaryFacts.binding (initial := semanticWitness.initialState) {
     programWellFormed := programWellFormed
     programCommitted := ?_
     initialPc := ?_
@@ -60,7 +60,7 @@ theorem NativeTraceReady.semanticBoundary
     memoryProviderUnique := nativeTrace_memoryInitProviderUnique statement execution
       ready.memoryAddresses
     memoryFinalizeProviderUnique := nativeTrace_memoryFinalizeProviderUnique statement execution
-      ready.memoryAddresses }⟩
+      ready.memoryAddresses }
   · change Commit.StatementFor
       (Commit.dataOfAt statement.program (nativeInitialClock statement)) statement.program
     exact Commit.dataOfAt_statementFor (p := p) statement.program (nativeInitialClock statement)

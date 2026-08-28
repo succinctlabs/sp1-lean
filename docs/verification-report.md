@@ -685,11 +685,15 @@ def SupportedCoreNativeRelation :
   **all** 53 tables (+ the state-boundary verifier), and **all** channels balance — verified for
   this report quantifier-by-quantifier down into Clean's `FlatEnsemble` (∀-tables, ∀-rows;
   no existential slips).
-- `SP1SemanticBoundaryRelation`: there is an initial Sail state bound to the committed program
-  and the provider tables' boundary facts (`RomLoaded`, `SailConfigured`, initial PC/clock,
-  provider bounds, the per-location init/finalize *uniqueness* facts, and the
-  `SailCodeMemoryCompatible` code-memory contract — 11 fields in all,
-  `InitialBoundaryFacts` in `SP1Clean/Soundness/ProviderBindings.lean`). This is an explicit
+- `SP1SemanticBoundaryRelation` (= `SemanticBoundaryBinding`): there is an initial Sail state
+  bound to the committed program and the provider tables' boundary facts, regrouped for reading
+  as three commitment facts (program well-formedness, `Commit.StatementFor`, the committed
+  initial clock), the 3-field `ShardStartState` (public initial PC, `RomLoaded`,
+  `SailConfigured`), the `SailCodeMemoryCompatible` code-memory contract, and the 4-field
+  assumed core `ProviderBindingContracts` (Program/Memory-init provider content and the two
+  per-location uniqueness facts). The flat 11-field `InitialBoundaryFacts` remains the
+  proof-layer carrier, with `semanticBoundaryBinding_iff` the kernel-checked equivalence
+  (`SP1Clean/Soundness/ProviderBindings.lean`). This is an explicit
   companion *premise* — provider tables mean what they say — not something derivable from
   balance alone.
 

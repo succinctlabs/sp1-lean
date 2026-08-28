@@ -1070,7 +1070,7 @@ theorem activeTrace_public_eq : activeTrace.publicValues = activeStatement.publi
 /-- The active providers bind the trace to the committed program and concrete initial Sail state. -/
 theorem activeTrace_semanticBoundaryBinding :
     SemanticBoundaryBinding activeStatement activeTrace.witness :=
-  ⟨anchorState, activeTrace_boundaryFacts⟩
+  activeTrace_boundaryFacts.binding
 
 /-! ## Active relation and AIR witness -/
 

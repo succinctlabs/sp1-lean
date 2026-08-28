@@ -71,22 +71,29 @@ kernel, each with the question it decides. Reading these, plus `FormalModel/Cont
 
 ## The assumed semantic boundary
 
-`InitialBoundaryFacts` has **eleven** fields. The PR #110 review tabulated twelve named premises;
-the twelfth, `MemoryPullTimestampHighBound`, is now *derived* from the produced side of the
-capstone's own per-location Memory balance and no longer exists as a declaration.
+The public premise `SemanticBoundaryBinding` is regrouped for reading: three commitment facts
+(program well-formedness, `Commit.StatementFor`, the committed initial clock), the 3-field
+`ShardStartState`, the code/data-separation contract, and the 4-field external bundle
+`ProviderBindingContracts`. The commitment/start-state conjuncts follow from a configured initial
+state, a committed program, and a canonical `ProverData` choice; the bundle is the assumed core.
+`InitialBoundaryFacts` is the equivalent flat proof-layer carrier the timed-grounding engine
+consumes — `semanticBoundaryBinding_iff` is the kernel-checked equivalence, superseding the
+earlier prose observation that "seven of eleven fields are derivable". (The PR #110 review
+tabulated a twelfth premise, `MemoryPullTimestampHighBound`; it is *derived* from the produced
+side of the capstone's own per-location Memory balance and no longer exists as a declaration.)
 
 | Declaration | File | Question it decides |
 |---|---|---|
-| `InitialBoundaryFacts` | `SP1Clean/Soundness/ProviderBindings.lean` | The eleven-field assumed boundary |
-| `SemanticBoundaryBinding` | `SP1Clean/Soundness/ProviderBindings.lean` | How the boundary attaches to a witness |
+| `SemanticBoundaryBinding` | `SP1Clean/Soundness/ProviderBindings.lean` | The regrouped public boundary premise |
+| `ProviderBindingContracts` | `SP1Clean/Soundness/ProviderBindings.lean` | The four-field assumed core: provider content + uniqueness |
+| `InitialBoundaryFacts` | `SP1Clean/Soundness/ProviderBindings.lean` | The equivalent flat proof-layer carrier |
+| `semanticBoundaryBinding_iff` | `SP1Clean/Soundness/ProviderBindings.lean` | The recorded equivalence between the two |
 | `ProgramProviderBound` | `SP1Clean/Soundness/ProviderBindings.lean` | Program-table content (assumed; §7.3 — needs C1) |
 | `MemoryInitProviderBound` | `SP1Clean/Soundness/ProviderBindings.lean` | Memory-init content at the boundary |
 | `MemoryInitProviderUnique` | `SP1Clean/Soundness/ProviderBindings.lean` | One init record per location — not derivable from balance |
 | `MemoryFinalizeProviderUnique` | `SP1Clean/Soundness/ProviderBindings.lean` | One finalize pull per location — likewise |
 
-Seven of the eleven follow from a configured initial state, a committed program, and a canonical
-`ProverData` choice. Four need real construction: `programProvider`, `memoryProvider`, and the two
-uniqueness fields. The uniqueness pair is the sharpest residual — Clean balance cannot force it,
+The uniqueness pair is the sharpest residual — Clean balance cannot force it,
 upstream's mechanism is the MemoryGlobal strictly-increasing-address chain this ensemble omits, and
 the premise is stated per `locOf` (8-byte cell) while that chain orders exact byte addresses. That
 granularity gap is recorded on the definitions themselves.

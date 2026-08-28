@@ -48,14 +48,15 @@ Its source relation has two visible parts:
      width `0..16`, the Program-ROM provider, the two Memory init/finalize boundary tables, and the
      two SP1 system tables MemoryBump and StateBump); and
    - all four Clean channels balance.
-2. `SP1SemanticBoundaryRelation`
-   - the program is well formed and bound to the shared prover data;
-   - a concrete initial Sail state has the public PC, and the committed prover data carries the
-     public initial clock;
-   - ROM is loaded, the Sail configuration is valid, and code memory is compatible;
-   - Program-provider rows describe that program; and
-   - Memory-init and Memory-finalize provider rows have the required meaning and per-location
-     uniqueness.
+2. `SP1SemanticBoundaryRelation`, regrouped for reading:
+   - three commitment facts — the program is well formed, bound to the shared prover data, and
+     the committed prover data carries the public initial clock;
+   - a `ShardStartState` — a concrete initial Sail state has the public PC, ROM loaded, and the
+     platform configuration pinned;
+   - the code/data-separation contract (`SailCodeMemoryCompatible`); and
+   - the four-field assumed core (`ProviderBindingContracts`) — Program-provider rows describe
+     that program, Memory-init rows have the required meaning, and init/finalize records are
+     per-location unique.
 
 Those two conjuncts are the whole hypothesis. In particular the 24-bit range fact on each pulled
 memory timestamp — needed by SP1's timestamp-difference argument, and formerly a third companion

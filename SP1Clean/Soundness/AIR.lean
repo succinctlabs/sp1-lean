@@ -964,7 +964,8 @@ theorem supported_core_native_grounding
     (valid : SupportedCoreNativeRelation statement witness) :
     ∃ initial orderedRows, InitialBoundaryFacts statement witness initial ∧
       SupportedCoreGrounding statement witness initial orderedRows := by
-  obtain ⟨⟨publicInputEq, constraints, balanced⟩, ⟨initial, boundary⟩⟩ := valid
+  obtain ⟨⟨publicInputEq, constraints, balanced⟩, binding⟩ := valid
+  obtain ⟨initial, boundary⟩ := binding.boundaryFacts
   obtain ⟨orderedRows, grounding⟩ :=
     supported_core_witness_grounding statement witness initial publicInputEq constraints balanced
       boundary
@@ -1016,7 +1017,8 @@ theorem supported_core_native_shard_execution
         (semanticWitness.evaluatedTrace (supportedCoreShardModel (p := p))).steps =
           (realDecodedInstructionRows witness.data witness.tables).length := by
   obtain ⟨nativeValid, rowLimit⟩ := valid
-  obtain ⟨⟨publicInputEq, constraints, balanced⟩, ⟨initial, boundary⟩⟩ := nativeValid
+  obtain ⟨⟨publicInputEq, constraints, balanced⟩, binding⟩ := nativeValid
+  obtain ⟨initial, boundary⟩ := binding.boundaryFacts
   obtain ⟨rows, grounding⟩ :=
     supported_core_witness_grounding statement witness initial publicInputEq constraints balanced
       boundary
