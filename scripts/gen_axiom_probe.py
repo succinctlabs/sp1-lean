@@ -402,12 +402,13 @@ TARGETS = [
      r"theorem\s+(toAccess_pulledIfValue|toAccess_pushedIfValue)\b"),
     ("SP1Clean/Soundness/SP1Ensemble.lean",
      r"(?:theorem|def)\s+((?:sp1|balanced)\w*\??)(?=\s|\()"),
-    ("SP1Clean/Soundness/AIR.lean",
+    ("SP1Clean/Soundness/GroundingInternal.lean",
      r"theorem\s+(statePullAlign8_of_stateWalk|"
      r"supportedCore_groundingObligations_of_constraints|"
      r"supportedCore_orderedRows_dynamic_of_obligations|"
-     r"supportedCore_orderedRows_dynamic|supported_core_witness_grounding|"
-     r"supported_core_native_grounding|supported_core_native_sound|"
+     r"supportedCore_orderedRows_dynamic|supported_core_witness_grounding)\b"),
+    ("SP1Clean/Soundness/AIR.lean",
+     r"theorem\s+(supported_core_native_grounding|supported_core_native_sound|"
      r"supported_core_native_sound_scheduled|"
      r"supported_core_native_shard_execution|supported_core_native_shard_sound)\b"),
     # Exact v6.4.0 table/profile guards and the public ArkLib-facing Core AIR capstone.  These are

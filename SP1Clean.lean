@@ -461,6 +461,7 @@ import SP1Clean.Soundness.LocalExecution
 import SP1Clean.Soundness.RowSoundness
 import SP1Clean.Soundness.RowEffectDefs
 import SP1Clean.Soundness.GroundingAdapter
+import SP1Clean.Soundness.GroundingInternal
 import SP1Clean.Soundness.Grounding.RTypeChips
 import SP1Clean.Soundness.Grounding.ITypeChips
 import SP1Clean.Soundness.Grounding.ALUTypeChips

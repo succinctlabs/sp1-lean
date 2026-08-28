@@ -516,7 +516,7 @@ grounding engine (`Soundness/TimedGrounding.lean`, `RankedGrounding.lean`,
 The payoff theorem of this layer:
 
 ```lean
--- SP1Clean/Soundness/AIR.lean
+-- SP1Clean/Soundness/GroundingInternal.lean
 theorem supported_core_witness_grounding ... :
     ∃ orderedRows, SupportedCoreGrounding statement witness initial orderedRows
 ```
@@ -709,7 +709,7 @@ from the init provider's `assertZero clk_high`/`assertZero clk_low`, each instru
 from its `TouchOK` window under the verifier row's range-checked `< 2^48` shard-time ceiling, and
 each MemoryBump refresh push from that chip's in-circuit range checks — so by balance every pulled
 record carries them too (`pushGood`/`pullGood` in
-`supportedCore_orderedRows_dynamic_of_obligations`, `SP1Clean/Soundness/AIR.lean`).
+`supportedCore_orderedRows_dynamic_of_obligations`, `SP1Clean/Soundness/GroundingInternal.lean`).
 
 ### 8.2 The theorem
 

@@ -247,9 +247,6 @@ def ECALL_ENC : BitVec 32 := 0x00000073#32
 /-- `SyscallCode::HALT` (read from `t0`/x5). -/
 def HALT_SYSCALL : BitVec 64 := 0
 
-/-- The committed exit code as the 64-bit value SP1 reads from `a0`/x10. -/
-def exitOf (exit_code : ZMod p) : BitVec 64 := BitVec.ofNat 64 exit_code.val
-
 /-- "About to execute the halting ECALL": the PC points at an `ECALL` encoding in the program ROM,
 `t0` holds `HALT`, and `a0` holds the exit code. -/
 def SP1Halted (prog : GuestProgram) (exit : BitVec 64) (s : SailState) : Prop :=

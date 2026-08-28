@@ -34,7 +34,7 @@ check_decl() { # file decl
   fi
 }
 check_decl SP1Clean/Soundness/AIR.lean "supported_core_native_sound"
-check_decl SP1Clean/Soundness/AIR.lean "supported_core_witness_grounding"
+check_decl SP1Clean/Soundness/GroundingInternal.lean "supported_core_witness_grounding"
 check_decl SP1Clean/Soundness/AIR.lean "SupportedCoreNativeRelation"
 check_decl SP1Clean/Soundness/CoreAIR.lean "sp1_air_sound_of_obligations"
 check_decl SP1Clean/Soundness/CoreAIR.lean "CoreAIRRefinementObligations"
