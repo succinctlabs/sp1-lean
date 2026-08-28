@@ -72,9 +72,7 @@ abbrev ProgramStatement.finalClkNat {p : ℕ} (statement : SupportedCoreStatemen
 /-! ### The plain-Sail conclusion -/
 
 /-- Proof-free carrier of the plain-Sail conclusion: one finite segment of the official Sail run
-plus the finite Memory boundary it certifies.  The `memory` field is currently unconstrained by
-`SupportedCoreSailRelation`; it becomes load-bearing when the native memory boundary is populated
-from the proved finalize truth (semantics-gap campaign PR 1.5). -/
+plus the finite Memory boundary it certifies. -/
 structure SailSegmentWitness where
   initial : SailState
   steps : ℕ
@@ -102,9 +100,9 @@ theorem ShardStartState.of_isInitialState {p : ℕ} {statement : SupportedCoreSt
 
 /-- **The plain-Sail relation.**  What the native ensemble certifies about the official Sail
 machine, with no machine-model parameter: a normally-retiring official-interpreter run between the
-committed public pc endpoints, taking exactly the committed number of eight-tick instructions.
-Memory-boundary conjuncts over the witness's `memory` field join when the native boundary is
-populated (semantics-gap campaign PR 1.5). -/
+committed public pc endpoints, taking exactly the committed number of eight-tick instructions,
+whose Memory boundary is well formed at the committed final clock and agrees with real location
+content at both ends of the run. -/
 def SupportedCoreSailRelation {p : ℕ} :
     WitnessRelation.Relation (SupportedCoreStatement p) SailSegmentWitness :=
   fun statement w =>
@@ -112,7 +110,9 @@ def SupportedCoreSailRelation {p : ℕ} :
     ShardStartState statement w.initial ∧
     SailRetireChain w.steps w.initial w.final ∧
     w.final.regs.get? Register.PC = some statement.finalPcBits ∧
-    statement.finalClkNat = statement.initClkNat + 8 * w.steps
+    statement.finalClkNat = statement.initClkNat + 8 * w.steps ∧
+    w.memory.WellFormed statement.finalClkNat ∧
+    w.memory.AgreesWith w.initial w.final
 
 /-- One execution segment agrees with decoded clock and pc endpoints. -/
 noncomputable def SegmentMatches {model : Machine.SP1MachineModel}
@@ -178,7 +178,7 @@ theorem supportedCoreLocalExecution_of_sailRelation {p : ℕ}
     {statement : SupportedCoreStatement p} {w : SailSegmentWitness}
     (valid : SupportedCoreSailRelation statement w) :
     ∃ witness, SupportedCoreLocalExecutionRelation model statement witness := by
-  obtain ⟨wellFormed, start, chain, finalPc, clock⟩ := valid
+  obtain ⟨wellFormed, start, chain, finalPc, clock, -, -⟩ := valid
   let context : Machine.LocalExecutionCtx model :=
     { program := statement.program, wellFormed, initial := w.initial
       romLoaded := start.romLoaded, configured := start.configured }

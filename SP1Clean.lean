@@ -454,6 +454,7 @@ import SP1Clean.Soundness.TypedProgram
 import SP1Clean.Soundness.TypedMemory
 import SP1Clean.Soundness.TypedMemorySelectors
 import SP1Clean.Soundness.TypedMemoryBalance
+import SP1Clean.Soundness.MemoryBoundaryTruth
 import SP1Clean.Soundness.MemoryFrontier
 import SP1Clean.Proofs.Chips.AddChip.Contracts
 import SP1Clean.Soundness.LocalExecution

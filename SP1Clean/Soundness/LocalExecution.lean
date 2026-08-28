@@ -339,25 +339,30 @@ theorem eventExecution_of_groundedRows {Row : Type u}
   rw [stepsEq]
 
 /-- Package the grounded-row engine as the plain-Sail relation: no machine-model parameter, and
-the clock claim is the literal eight-tick count the 25-chip slice implements.  The witness's
-Memory boundary is the empty placeholder until the native boundary is populated from the proved
-finalize truth (semantics-gap campaign PR 1.5). -/
+the clock claim is the literal eight-tick count the 25-chip slice implements.  The caller
+supplies the populated Memory boundary and its two validity facts; agreement with the final
+state is taken conditionally on the constructed chain endpoint, which this theorem produces. -/
 theorem groundedRows_sailRelation {Row : Type u}
     (statement : ProgramStatement (SupportedCorePrefixPublicValues (ZMod p)))
     (data : ProverData (ZMod p)) (initial : SailState)
     (rowOf : Row → ChipRow p) (rows : List Row)
+    (memory : Machine.CoreMemoryBoundary)
     (wellFormed : statement.program.WellFormed)
     (pc : initial.regs.get? Register.PC = some statement.initPcBits)
     (rom : RomLoaded statement.program initial) (cfg : SailConfigured initial)
     (codeMemoryCompatible : SailCodeMemoryCompatible statement.program initial)
     (walk : PcWalk rowOf statement.initPcBits statement.finalPcBits rows)
     (grounded : RowsGrounded rowOf data statement.program initial rows)
-    (clockCount : statement.initClkNat + 8 * rows.length = statement.finalClkNat) :
+    (clockCount : statement.initClkNat + 8 * rows.length = statement.finalClkNat)
+    (memoryWellFormed : memory.WellFormed statement.finalClkNat)
+    (memoryAgrees : ∀ final, Semantics.chainState initial rows.length = some final →
+      memory.AgreesWith initial final) :
     ∃ w, SupportedCoreSailRelation statement w := by
   obtain ⟨finalState, chain, finalPc⟩ :=
     sailRetireChain_of_groundedRows rowOf data statement.program initial rows _ _ walk grounded
       codeMemoryCompatible pc rom cfg
-  exact ⟨⟨initial, rows.length, finalState, ⟨[]⟩⟩,
-    wellFormed, ⟨pc, rom, cfg⟩, chain, finalPc, clockCount.symm⟩
+  exact ⟨⟨initial, rows.length, finalState, memory⟩,
+    wellFormed, ⟨pc, rom, cfg⟩, chain, finalPc, clockCount.symm, memoryWellFormed,
+    memoryAgrees finalState (Semantics.chainState_of_sailChain chain.toSailChain)⟩
 
 end SP1Clean.Soundness

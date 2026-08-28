@@ -43,8 +43,9 @@ kernel, each with the question it decides. Reading these, plus `FormalModel/Cont
 | `supported_core_native_sound_scheduled` | `SP1Clean/Soundness/AIR.lean` | The model-scheduled corollary — the shard-composition seam |
 | `supported_core_native_shard_sound` | `SP1Clean/Soundness/AIR.lean` | Capacity-aligned soundness into the one canonical semantic relation |
 | `SupportedCoreLocalExecutionRelation` | `SP1Clean/FormalModel/Execution.lean` | What the model-scheduled conclusion actually says |
-| `SupportedCoreSailRelation` | `SP1Clean/FormalModel/Execution.lean` | The plain-Sail conclusion: a normally-retiring run between the committed endpoints at eight ticks per step |
+| `SupportedCoreSailRelation` | `SP1Clean/FormalModel/Execution.lean` | The plain-Sail conclusion: a normally-retiring run between the committed endpoints at eight ticks per step, with a well-formed Memory boundary agreeing with real location content at both ends |
 | `SailSegmentWitness` | `SP1Clean/FormalModel/Execution.lean` | The proof-free run/boundary carrier of the plain-Sail conclusion |
+| `exists_populated_memoryBoundary` | `SP1Clean/Soundness/MemoryBoundaryTruth.lean` | How the boundary is populated: per canonically-addressed, genesis-backed committed finalize record — the two population filters are named follow-up, not soundness gaps |
 | `ShardStartState` | `SP1Clean/FormalModel/Execution.lean` | What the conclusion pins about the shard's start state (public pc, ROM, configuration) |
 | `supportedCoreLocalExecution_of_sailRelation` | `SP1Clean/FormalModel/Execution.lean` | The no-strength-lost adapter from the plain-Sail form back to the model-scheduled form |
 | `Machine.CoreShardSemanticWitness` | `SP1Clean/Model/Machine/Shard.lean` | The one proof-free program/Memory-boundary/initial-state/event carrier shared by native and exact Core |

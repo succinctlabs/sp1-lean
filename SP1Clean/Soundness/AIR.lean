@@ -5,6 +5,7 @@ import SP1Clean.Soundness.SP1Ensemble
 import SP1Clean.Soundness.ProviderBindings
 import SP1Clean.Soundness.TimedGrounding
 import SP1Clean.Soundness.LocalExecution
+import SP1Clean.Soundness.MemoryBoundaryTruth
 import SP1Clean.Soundness.RowSoundness
 import SP1Clean.Soundness.TypedProgram
 import SP1Clean.Soundness.TypedTimeContracts
@@ -169,16 +170,25 @@ structure SupportedCoreGrounding
   finalStateTruth :
     Semantics.LocalStateTruth statement.program initial (Commit.initClkNat witness.data)
       (finalBoundaryStateMessage statement.publicValues)
-  /-- Every memory-finalize provider record is true of the constructed run: some record at the same
-  location with the same value and a no-later timestamp is genuinely the content of that location at
-  its time (`TimedGrounding.walk`'s third conclusion, previously discarded — Finding 4).  Stated in
-  the ∃-witness form deliberately: with MemoryBump timestamp-refresh rows in the ensemble the walk
-  concludes truth for the *refresh-eliminated* record (same location and value, earlier time), and
-  this statement absorbs that without changing shape.  On a shard with no active refresh row the
-  witness is the record itself. -/
+  /-- Every memory-finalize provider record is true of the constructed run.  The two direct
+  conjuncts are the boundary-facing content: the record sits at its key, and its committed value is
+  the execution's **current content of that location at the committed final clock**
+  (`Semantics.LocalValueAt` at the final State time — the walk invariant's value currency,
+  previously discarded at the end of the walk).  The ∃-witness tail is the timed form: with
+  MemoryBump timestamp-refresh rows in the ensemble the walk concludes record-level truth for the
+  *refresh-eliminated* record (same location and value, earlier time, bounded by the committed
+  final clock); on a shard with no active refresh row the witness is the record itself.  The
+  committed record's own timestamp is deliberately **not** claimed to be shard-bounded — the
+  native MemoryBump table does not tie its refreshed clock to the public final clock, and the
+  populated memory boundary stores the refresh-eliminated time instead. -/
   memoryFinalizeTruth : ∀ loc m, memoryFinalizeFrontier witness loc = some m →
-    ∃ m', Semantics.MemoryMsg.locOf m' = Semantics.MemoryMsg.locOf m ∧
+    Semantics.MemoryMsg.locOf m = loc ∧
+    Semantics.LocalValueAt initial (Commit.initClkNat witness.data) loc
+      (Semantics.StateMsg.timeNat (finalBoundaryStateMessage statement.publicValues)) m.value ∧
+    ∃ m', Semantics.MemoryMsg.locOf m' = loc ∧
       m'.value = m.value ∧ Semantics.MemoryMsg.timeNat m' ≤ Semantics.MemoryMsg.timeNat m ∧
+      Semantics.MemoryMsg.timeNat m' ≤
+        Semantics.StateMsg.timeNat (finalBoundaryStateMessage statement.publicValues) ∧
       Semantics.LocalMemTruth initial (Commit.initClkNat witness.data) m'
 
 /-- The committed-decode field of every statically grounded ordered row is already discharged.
@@ -441,8 +451,13 @@ theorem supportedCore_orderedRows_dynamic_of_obligations
       Semantics.LocalStateTruth statement.program initial (Commit.initClkNat witness.data)
         (finalBoundaryStateMessage statement.publicValues) ∧
       (∀ loc m, memoryFinalizeFrontier witness loc = some m →
-        ∃ m', Semantics.MemoryMsg.locOf m' = Semantics.MemoryMsg.locOf m ∧
+        Semantics.MemoryMsg.locOf m = loc ∧
+        Semantics.LocalValueAt initial (Commit.initClkNat witness.data) loc
+          (Semantics.StateMsg.timeNat (finalBoundaryStateMessage statement.publicValues)) m.value ∧
+        ∃ m', Semantics.MemoryMsg.locOf m' = loc ∧
           m'.value = m.value ∧ Semantics.MemoryMsg.timeNat m' ≤ Semantics.MemoryMsg.timeNat m ∧
+          Semantics.MemoryMsg.timeNat m' ≤
+            Semantics.StateMsg.timeNat (finalBoundaryStateMessage statement.publicValues) ∧
           Semantics.LocalMemTruth initial (Commit.initClkNat witness.data) m') := by
   classical
   have sourceFacts : ∀ decoded ∈ orderedRows,
@@ -870,8 +885,10 @@ theorem supportedCore_orderedRows_dynamic_of_obligations
       (Commit.initClkNat witness.data) done.length (decodeAt q.1 decodedMem) weak.2 chain
       (sourceFacts q.1 decodedMem).2 rowTime
   · obtain ⟨m', frontierEq, valueEq, timeLe⟩ := finalRewrite loc m finEq
-    exact ⟨m', congrArg Prod.fst valueEq, congrArg Prod.snd valueEq, timeLe,
-      walked.2.2 loc m' frontierEq⟩
+    obtain ⟨locEq', truth', current', timeFin'⟩ := walked.2.2 loc m' frontierEq
+    have valueEq' : m'.value = m.value := congrArg Prod.snd valueEq
+    exact ⟨(congrArg Prod.fst valueEq).symm.trans locEq', valueEq' ▸ current',
+      m', locEq', valueEq', timeLe, timeFin', truth'⟩
 
 /-- Dynamic grounding over the exact ordered physical rows.
 
@@ -899,8 +916,13 @@ theorem supportedCore_orderedRows_dynamic
       Semantics.LocalStateTruth statement.program initial (Commit.initClkNat witness.data)
         (finalBoundaryStateMessage statement.publicValues) ∧
       (∀ loc m, memoryFinalizeFrontier witness loc = some m →
-        ∃ m', Semantics.MemoryMsg.locOf m' = Semantics.MemoryMsg.locOf m ∧
+        Semantics.MemoryMsg.locOf m = loc ∧
+        Semantics.LocalValueAt initial (Commit.initClkNat witness.data) loc
+          (Semantics.StateMsg.timeNat (finalBoundaryStateMessage statement.publicValues)) m.value ∧
+        ∃ m', Semantics.MemoryMsg.locOf m' = loc ∧
           m'.value = m.value ∧ Semantics.MemoryMsg.timeNat m' ≤ Semantics.MemoryMsg.timeNat m ∧
+          Semantics.MemoryMsg.timeNat m' ≤
+            Semantics.StateMsg.timeNat (finalBoundaryStateMessage statement.publicValues) ∧
           Semantics.LocalMemTruth initial (Commit.initClkNat witness.data) m') := by
   exact supportedCore_orderedRows_dynamic_of_obligations statement witness initial publicInputEq
     constraints balanced boundary
@@ -987,10 +1009,27 @@ theorem supported_core_native_sound :
   intro statement witness valid
   obtain ⟨initial, rows, boundary, grounding⟩ :=
     supported_core_native_grounding statement witness valid
-  exact groundedRows_sailRelation statement witness.data initial
-    (fun decoded : DecodedInstructionRow p => decoded.toChipRow witness.data) rows
+  obtain ⟨memBoundary, memWF, memContent⟩ :=
+    exists_populated_memoryBoundary witness initial
+      (Semantics.StateMsg.timeNat (finalBoundaryStateMessage statement.publicValues))
+      boundary.memoryFinalizeProviderUnique boundary.memoryProvider grounding.memoryFinalizeTruth
+  have timeEq : Semantics.StateMsg.timeNat (finalBoundaryStateMessage statement.publicValues) =
+      Commit.initClkNat witness.data + 8 * rows.length := by
+    have h1 := grounding.clockCount
+    have h2 := boundary.initialClock
+    change Semantics.clkNat statement.publicValues.final_clk_high
+      statement.publicValues.final_clk_low = _
+    omega
+  refine groundedRows_sailRelation statement witness.data initial
+    (fun decoded : DecodedInstructionRow p => decoded.toChipRow witness.data) rows memBoundary
     boundary.programWellFormed boundary.initialPc boundary.romLoaded boundary.configured
     boundary.codeMemoryCompatible grounding.walk grounding.grounded grounding.clockCount
+    memWF ?_
+  intro final chainEq cell member
+  obtain ⟨initContent, finalMicro⟩ := memContent cell member
+  refine ⟨initContent, ?_⟩
+  rw [timeEq] at finalMicro
+  exact locContent_final_of_microValue chainEq finalMicro
 
 /-- The model-scheduled corollary of `supported_core_native_sound`: any machine model
 implementing SP1's ordinary eight-tick schedule recovers the local-execution-witness form.  This
@@ -1006,9 +1045,12 @@ theorem supported_core_native_sound_scheduled (model : Machine.SP1MachineModel)
 
 /-- Construct the common semantic witness while retaining its exact active-row count.
 
-The witness stores only the grounded initial state and ordinary event transcript.  Its transition
-targets are recovered by the shared evaluator, so native soundness does not publish a second
-trace-shaped semantic relation. -/
+The witness stores the grounded initial state, the ordinary event transcript, and the **populated
+Memory boundary**: one cell per canonically-addressed, genesis-backed committed finalize record,
+agreeing with the selected initial state and the evaluated final state
+(`exists_populated_memoryBoundary` + `locContent_final_of_microValue`).  Transition targets are
+recovered by the shared evaluator, so native soundness does not publish a second trace-shaped
+semantic relation. -/
 theorem supported_core_native_shard_execution
     (statement : SupportedCoreStatement p) (witness : SupportedCoreNativeWitness p)
     (valid : SupportedCoreNativeShardRelation statement witness) :
@@ -1035,13 +1077,30 @@ theorem supported_core_native_shard_execution
       boundary.romLoaded boundary.configured
       (Semantics.clkNat statement.publicValues.init_clk_high
         statement.publicValues.init_clk_low)
+  -- The populated Memory boundary: real per-location init/final content instead of `⟨[]⟩`.
+  obtain ⟨memBoundary, memWF, memContent⟩ :=
+    exists_populated_memoryBoundary witness initial
+      (Semantics.StateMsg.timeNat (finalBoundaryStateMessage statement.publicValues))
+      boundary.memoryFinalizeProviderUnique boundary.memoryProvider grounding.memoryFinalizeTruth
   let semanticWitness := Machine.CoreShardSemanticWitness.ofOrdinaryTrace
-    statement.program ⟨[]⟩ execution
+    statement.program memBoundary execution
   have publicValuesWellFormed : statement.publicValues.LimbBounds := by
     rw [← publicInputEq]
     exact witness_publicInput_limbBounds witness constraints balanced
   have evaluated := Machine.CoreShardSemanticWitness.trace?_ofOrdinaryTrace
-    (supportedCoreShardModel (p := p)) statement.program ⟨[]⟩ execution executionValid ordinary
+    (supportedCoreShardModel (p := p)) statement.program memBoundary execution executionValid
+    ordinary
+  have timeEq : Semantics.StateMsg.timeNat (finalBoundaryStateMessage statement.publicValues) =
+      Commit.initClkNat witness.data + 8 * execution.steps := by
+    have h1 := grounding.clockCount
+    have h2 := boundary.initialClock
+    rw [stepsEq]
+    change Semantics.clkNat statement.publicValues.final_clk_high
+      statement.publicValues.final_clk_low = _
+    omega
+  have chain := Semantics.chainState_of_sailChain
+    (execution.sailChain executionValid ordinary)
+  rw [initialEq] at chain
   refine ⟨semanticWitness, {
     statementValid := publicValuesWellFormed
     programWellFormed := boundary.programWellFormed
@@ -1063,9 +1122,20 @@ theorem supported_core_native_shard_execution
   · change Target.SailCodeMemoryCompatible statement.program execution.initialState
     rw [initialEq]
     exact boundary.codeMemoryCompatible
-  · exact ⟨List.nodup_nil, fun cell member => absurd member List.not_mem_nil⟩
-  · intro cell member
-    exact absurd member List.not_mem_nil
+  · -- memoryWellFormed: the populated boundary's hygiene at the committed final clock.
+    change memBoundary.WellFormed (Semantics.clkNat statement.publicValues.final_clk_high
+      statement.publicValues.final_clk_low)
+    exact memWF
+  · -- memoryAgrees: genesis content at the initial state, walk value-currency at the final state.
+    intro cell member
+    obtain ⟨initContent, finalMicro⟩ := memContent cell member
+    refine ⟨?_, ?_⟩
+    · change Semantics.locContent execution.initialState cell.loc = some cell.initialValue
+      rw [initialEq]
+      exact initContent
+    · rw [Machine.CoreShardSemanticWitness.evaluatedTrace_eq_of_trace? evaluated]
+      rw [timeEq] at finalMicro
+      exact locContent_final_of_microValue chain finalMicro
   · refine .execution execution.events execution rfl rfl evaluated executionValid clocked
       (finalClock.trans grounding.clockCount) ?_ finalPc ?_
     · simpa only [initialEq, supportedCoreShardModel, supportedCoreShardBoundary] using
@@ -1080,8 +1150,9 @@ theorem supported_core_native_shard_execution
 
 The intermediate `EventExecutionTrace` is immediately embedded by its initial state and event
 transcript; its target states are then recovered by the shared evaluator.  The canonical witness's
-Memory boundary is empty on this projection because the native relation already carries its
-provider binding separately; exact Core fills the same field from the paired six-table cluster. -/
+Memory boundary is populated from the committed finalize records — real initial/final content per
+canonically-addressed, genesis-backed location; exact Core fills the same field from the paired
+six-table cluster. -/
 theorem supported_core_native_shard_sound :
     WitnessRelation.Sound (SupportedCoreNativeShardRelation (p := p))
       (SupportedCoreShardExecutionRelation (p := p)) := by

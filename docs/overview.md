@@ -75,7 +75,10 @@ hypothesis. The resulting run:
 - starts from a `ShardStartState` (public initial PC, committed ROM loaded, platform configured);
 - retires normally at every step (`SailRetireChain` — the trap, illegal-instruction, wait, and
   extension-failure exits are excluded, not merely unobserved);
-- ends at the public final PC, taking exactly `(finalClk − initClk)/8` instructions; and
+- ends at the public final PC, taking exactly `(finalClk − initClk)/8` instructions;
+- carries a well-formed Memory boundary — one cell per canonically-addressed, genesis-backed
+  committed finalize record — agreeing with real location content in the initial and final Sail
+  states; and
 - is constructed by the proof from exactly the active physical instruction rows (the exported
   relation states the endpoint facts; row exactness lives in the intermediate grounding
   theorem).

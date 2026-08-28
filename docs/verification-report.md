@@ -724,7 +724,11 @@ shard-local run witness — a genuine finite `try_step` run of the official Sail
 on the committed program, in which every step retires normally (`SailRetireChain` — the trap,
 illegal-instruction, wait, and extension-failure exits are excluded), starting from a
 `ShardStartState` (public initial PC, committed ROM loaded, platform configured), ending at the
-public final PC, and taking exactly `(finalClk − initClk)/8` instructions. There is no
+public final PC, and taking exactly `(finalClk − initClk)/8` instructions — together with a
+well-formed Memory boundary, populated per canonically-addressed, genesis-backed committed
+finalize record, whose cells agree with real location content in the initial and final Sail
+states (`exists_populated_memoryBoundary` from the walk's exported value currency at the
+committed final clock). There is no
 machine-model parameter and no schedule hypothesis; the model-scheduled form is the corollary
 `supported_core_native_sound_scheduled` via the no-strength-lost adapter
 `supportedCoreLocalExecution_of_sailRelation`. Axiom census: `propext`, `Classical.choice`,
