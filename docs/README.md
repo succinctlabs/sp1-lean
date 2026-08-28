@@ -22,6 +22,7 @@ Each document has one role:
 | [`rust-integration-memo.md`](rust-integration-memo.md) | SP1-side witness-generation integration memo |
 | [`audits/2026-08-independent-semantic-audit.md`](audits/2026-08-independent-semantic-audit.md) | retained independent semantic review |
 | [`audits/2026-08-pr110-external-report-disposition.md`](audits/2026-08-pr110-external-report-disposition.md) | retained finding-by-finding external-review disposition |
+| [`audits/2026-08-unification-target-architecture.md`](audits/2026-08-unification-target-architecture.md) | unification campaign's measured architecture baseline and pin decision |
 | [`agents/`](agents/README.md) | maintained contributor techniques and provenance procedures |
 | [`snapshots/axiom-ledger.md`](snapshots/axiom-ledger.md) | generated per-theorem axiom inventory |
 
@@ -51,5 +52,5 @@ paths, and requires module documentation on hand-written Lean modules.
 Superseded internal design proposals and campaign handoffs are deliberately not kept in the working
 tree. Durable conclusions were moved into `architecture.md`, `roadmap.md`, `AGENTS.md`, source
 docstrings, and `agents/proof-patterns.md`. Use git history when reconstructing an old decision.
-The two documents under `audits/` remain because they are external review records rather than live
+The documents under `audits/` remain because they are review/measurement records rather than live
 design instructions.

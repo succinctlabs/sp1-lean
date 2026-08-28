@@ -105,6 +105,19 @@ below.
 > treat the `Global`/syscall/page-prot grounding as pinned-to-v6.4.0 work that a future re-pin
 > will re-derive rather than reuse. Details and evidence:
 > `docs/agents/extraction.md` § "Upstream architecture drift".
+>
+> **Decision, 2026-08-28 (supersedes the 2026-08-20 "stay pinned, keep two layers" stance).** The
+> unification campaign targets the Merkle-tree architecture as the core semantics and retires the
+> native-vs-exact split; the grounding bullets below that aim at the retired
+> `Global`/syscall-transcript/page-prot tables are **not scheduled** — they are recorded for the
+> v6.4.0 claim only. Measured baseline, sequencing, and the open pin-base decision (the Merkle
+> architecture is still private-only; public `v6.5.0` carries no AIR change):
+> `docs/audits/2026-08-unification-target-architecture.md`. Statement-clarity and
+> model-expansion work (plain-Sail conclusion, boundary restructure, real memory boundary,
+> time-model unification, HALT handler, public-values widening by
+> `exit_code`/`is_execution_shard`/`committed_value_digest`) is architecture-stable and proceeds
+> immediately; the re-pin and the one-ensemble re-base execute when the Merkle architecture
+> reaches a public release, unless the owner opts to pin a committed `sp1-private` revision.
 
 Prove the semantic facts currently supplied to `SupportedCoreNativeRelation` from the exact upstream
 tables:
