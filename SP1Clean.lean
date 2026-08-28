@@ -347,6 +347,7 @@ import SP1Clean.Model.Machine.Execution
 import SP1Clean.Proofs.Sail.TryStepReduction
 import SP1Clean.Proofs.Sail.Advance
 import SP1Clean.Model.Semantics.GuestProgram
+import SP1Clean.Model.Semantics.ImageContent
 import SP1Clean.Model.Semantics.ProgramCommitment
 import SP1Clean.Model.Semantics.MicroTime
 import SP1Clean.Model.Semantics.AccessPlan

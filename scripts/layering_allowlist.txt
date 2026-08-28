@@ -41,6 +41,7 @@ namespace SP1Clean/Model/Opcode.lean
 namespace SP1Clean/Model/Machine/Boot.lean
 namespace SP1Clean/Model/Semantics/Decode.lean
 namespace SP1Clean/Model/Semantics/GuestProgram.lean
+namespace SP1Clean/Model/Semantics/ImageContent.lean
 namespace SP1Clean/FormalModel/OpcodeTable.lean
 namespace SP1Clean/FormalModel/Trace/Witness.lean
 

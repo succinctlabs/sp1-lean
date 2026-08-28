@@ -1,3 +1,4 @@
+import SP1Clean.Model.Semantics.ImageContent
 import SP1Clean.Soundness.MemoryFrontier
 
 /-! # The populated native Memory boundary
@@ -206,5 +207,27 @@ theorem exists_populated_memoryBoundary
     · -- Final content: the strengthened walk's value currency at the committed final clock.
       exact (finTruth (MemoryMsg.locOf m) m
         (memoryFinalizeFrontier_of_mem witness huniq (selectedFacts m hm).1)).2.1
+
+/-! ## The boot boundary's image binding -/
+
+/-- **The genesis provider cannot disagree with the committed ELF image on a boot shard**: every
+active Memory-init push at an image-covered location carries exactly the committed image's cell
+content.  The two content sources — the provider binding's `locContent` at the selected initial
+state, and the committed image read through `IsInitialState.imageLoaded` — meet at the same
+`locContent`, so the equality needs no uniqueness hypothesis. -/
+theorem BootBoundaryFacts.memoryInit_image_bound
+    {statement : ProgramStatement (SupportedCorePrefixPublicValues (ZMod p))}
+    {witness : EnsembleWitness (sp1Ensemble (p := p))} {initial : SailState}
+    (boot : BootBoundaryFacts statement witness initial) :
+    ∀ m ∈ producedMessages (typedTableInteractionsWith (memoryInitProviderTable witness)
+      memoryChannel), ∀ v,
+      statement.program.imageContent? (MemoryMsg.locOf m) = some v →
+      Word.toBitVec64 m.value = v := by
+  intro m hm v hv
+  have hbound := memoryInitMessageBound_of_mem_produced witness initial
+    (Commit.initClkNat witness.data) boot.base.memoryProvider m hm
+  have himg := GuestProgram.locContent_of_imageLoaded boot.isInitial.imageLoaded hv
+  rw [hbound.1] at himg
+  exact Option.some_injective _ himg
 
 end SP1Clean.Soundness

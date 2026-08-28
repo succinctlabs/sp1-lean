@@ -396,4 +396,39 @@ theorem semanticBoundaryBinding_iff
       ∃ initial, InitialBoundaryFacts statement witness initial :=
   ⟨SemanticBoundaryBinding.boundaryFacts, fun ⟨_, boundary⟩ => boundary.binding⟩
 
+/-! ## The boot boundary -/
+
+/-- **First-shard strengthening** of the flat boundary record: the selected initial state is a
+genuine boot state — `IsInitialState`, finally consuming the committed data image through its
+`imageLoaded` field, with SP1's zeroed integer register file — the committed initial clock is
+SP1's boot value `1`, and the public initial pc is the program entry point.
+
+Deliberately **additive** over `InitialBoundaryFacts`: `IsInitialState` pins the pc to
+`pc_start`, so this bundle is true only of a first shard; mid-run shards satisfy the base record
+with none of these fields, and the completeness constructor is untouched.  The redundancy is
+one-directional — `isInitial` + `entryPc` re-derive the base record's pc/ROM/configuration
+fields (`BootBoundaryFacts.shardStartState`); the base record is retained whole so every
+`InitialBoundaryFacts` consumer applies unchanged.
+
+Satisfiability status: `IsInitialState` is witnessed (`isInitialState_nonvacuous`,
+`FormalModel/Trace/Witness.lean`); the joint witness with `RegistersZero` and loaded ROM/image
+content is the named enrichment that file's header promises (per-x-register reasoning over the
+generated Sail register file), not yet constructed. -/
+structure BootBoundaryFacts
+    (statement : ProgramStatement (SupportedCorePrefixPublicValues (ZMod p)))
+    (witness : EnsembleWitness (sp1Ensemble (p := p))) (initial : SailState) : Prop where
+  base : InitialBoundaryFacts statement witness initial
+  isInitial : IsInitialState statement.program initial
+  registersZero : Machine.RegistersZero initial
+  clockOne : Commit.initClkNat witness.data = 1
+  entryPc : statement.initPcBits = statement.program.pc_start
+
+/-- The boot state is in particular a valid shard start state. -/
+theorem BootBoundaryFacts.shardStartState
+    {statement : ProgramStatement (SupportedCorePrefixPublicValues (ZMod p))}
+    {witness : EnsembleWitness (sp1Ensemble (p := p))} {initial : SailState}
+    (boot : BootBoundaryFacts statement witness initial) :
+    ShardStartState statement initial :=
+  ShardStartState.of_isInitialState boot.isInitial boot.entryPc
+
 end SP1Clean.Soundness
