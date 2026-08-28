@@ -78,7 +78,7 @@ theorem anchor_notAboutToExecuteEcall :
 
 /-- The proof-free transition list is authenticated by the official Sail step. -/
 theorem activeExecution_valid :
-    activeExecution.Valid Machine.ExecutableSyscallHandler.none.relation anchorProgram := by
+    activeExecution.Valid Machine.ExecutableSyscallHandler.haltOnly.relation anchorProgram := by
   exact .cons ⟨.ordinary, activeTarget⟩
     (.ordinary anchor_notAboutToExecuteEcall activeTarget_step) (.nil activeTarget)
 

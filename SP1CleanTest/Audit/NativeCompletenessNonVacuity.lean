@@ -438,6 +438,7 @@ theorem anchorExecution_footprintFits :
 /-- Every readiness field of the deterministic compiler is jointly inhabited on the same honest
 semantic execution. -/
 theorem anchorExecution_nativeTraceReady : NativeTraceReady stmt anchorExecution where
+  syscallFree := by intro transition transitionMem; simp [anchorExecution] at transitionMem
   compiler := by simpa only [stmt] using anchorExecution_compilerReady
   stateBumps := by simpa only [stmt] using anchorExecution_stateBumpsReady
   stateChronology := by simpa only [stmt] using anchorExecution_stateChronology

@@ -151,6 +151,7 @@ theorem supported_core_native_shard_execution
     (valid : SupportedCoreNativeShardRelation statement witness) :
     ∃ semanticWitness : Machine.CoreShardSemanticWitness,
       SupportedCoreShardExecutionRelation statement semanticWitness ∧
+        (semanticWitness.evaluatedTrace (supportedCoreShardModel (p := p))).AllOrdinary ∧
         (semanticWitness.evaluatedTrace (supportedCoreShardModel (p := p))).steps =
           (realDecodedInstructionRows witness.data witness.tables).length := by
   obtain ⟨nativeValid, rowLimit⟩ := valid
@@ -161,7 +162,7 @@ theorem supported_core_native_shard_execution
       boundary
   obtain ⟨execution, initialEq, stepsEq, finalPc, executionValid, clocked, finalClock,
       ordinary, supported⟩ :=
-    eventExecution_of_groundedRows Machine.ExecutableSyscallHandler.none.relation
+    eventExecution_of_groundedRows Machine.ExecutableSyscallHandler.haltOnly.relation
       (fun decoded : DecodedInstructionRow p => decoded.toChipRow witness.data)
       witness.data statement.program initial rows
       (supportedPcBits statement.publicValues.init_pc0 statement.publicValues.init_pc1
@@ -207,7 +208,7 @@ theorem supported_core_native_shard_execution
     codeMemoryCompatible := ?_
     memoryWellFormed := ?_
     memoryAgrees := ?_
-    shardCase := ?_ }, ?_⟩
+    shardCase := ?_ }, ?_, ?_⟩
   · change Target.RomLoaded statement.program execution.initialState
     rw [initialEq]
     exact boundary.romLoaded
@@ -238,6 +239,8 @@ theorem supported_core_native_shard_execution
     · refine ⟨ordinary, supported, ?_⟩
       rw [stepsEq, grounding.exhaustive.length_eq]
       exact rowLimit
+  · rw [Machine.CoreShardSemanticWitness.evaluatedTrace_eq_of_trace? evaluated]
+    exact ordinary
   · rw [Machine.CoreShardSemanticWitness.evaluatedTrace_eq_of_trace? evaluated]
     exact stepsEq.trans grounding.exhaustive.length_eq
 

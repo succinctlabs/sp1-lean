@@ -268,6 +268,11 @@ literal Clean skeleton.  Program and Memory semantic-boundary facts are derived 
 layer rather than stored here. -/
 structure NativeTraceReady (statement : SupportedCoreStatement p)
     (execution : Machine.EventExecutionTrace) : Prop where
+  /-- The compiler's syscall-free domain restriction: the deterministic instruction-event
+  compiler emits only ordinary rows, so halting shards (whose terminal transition is the
+  canonical HALT syscall) are outside this readiness bundle by construction.  Extending the
+  compiler with the terminal halt row lifts this field. -/
+  syscallFree : execution.AllOrdinary
   compiler : NativeCompilerReady statement.program execution (nativeInitialClock statement)
   stateBumps : StateBumpReady
     (TraceGen.compileExecution statement.program execution
@@ -404,10 +409,16 @@ noncomputable def SupportedCoreNativeAdmissibleShardRelation :
     WitnessRelation.Relation (SupportedCoreStatement p) Machine.CoreShardSemanticWitness :=
   (SupportedCoreShardExecutionRelation (p := p)).restrict NativeShardTraceAdmissible
 
-/-- Exact remaining domain-closure statement on the one public semantic relation. -/
+/-- Exact remaining domain-closure statement on the one public semantic relation, **restricted to
+syscall-free shards**: the semantic language now also contains halting shards (the shared
+`.halted` case), whose terminal transition is the canonical HALT syscall — outside the
+deterministic compiler's domain until it emits the terminal halt row
+(`NativeTraceReady.syscallFree`).  Quantifying over halting witnesses here would make the
+condition false by construction rather than open. -/
 noncomputable def NativeShardTraceTotal : Prop :=
   ∀ (statement : SupportedCoreStatement p) (witness : Machine.CoreShardSemanticWitness),
     SupportedCoreShardExecutionRelation statement witness →
+      (witness.evaluatedTrace (supportedCoreShardModel (p := p))).AllOrdinary →
       NativeShardTraceAdmissible statement witness
 
 end SP1Clean.Soundness

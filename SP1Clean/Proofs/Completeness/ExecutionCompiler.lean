@@ -276,6 +276,7 @@ theorem SupportedCoreShardExecutionValid.compileExecution?_exists_of_instruction
     {statement : SupportedCoreStatement p}
     {witness : Machine.CoreShardSemanticWitness} {initialClock : ℕ}
     (valid : SupportedCoreShardExecutionValid statement witness)
+    (ordinary : (witness.evaluatedTrace (supportedCoreShardModel (p := p))).AllOrdinary)
     (ready : ∀ located ∈
         (witness.evaluatedTrace (supportedCoreShardModel (p := p))).locatedTransitions,
       ∀ view : SP1Clean.Semantics.SP1TransitionView,
@@ -286,7 +287,7 @@ theorem SupportedCoreShardExecutionValid.compileExecution?_exists_of_instruction
         (witness.evaluatedTrace (supportedCoreShardModel (p := p))) initialClock =
           some compiled := by
   let execution := witness.evaluatedTrace (supportedCoreShardModel (p := p))
-  obtain ⟨-, -, -, -, -, -, supported, -⟩ := valid.evaluatedTrace_facts
+  obtain ⟨-, -, -, -, -, -, supported, -⟩ := valid.evaluatedTrace_facts ordinary
   have statementSupported : AllTransitionsSupported statement.program execution := by
     simpa only [valid.program_eq] using supported
   apply TraceGen.compileExecution?_exists_of_views

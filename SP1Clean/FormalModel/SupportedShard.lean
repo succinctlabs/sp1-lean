@@ -43,6 +43,18 @@ def AllTransitionsSupported (program : GuestProgram)
   ∀ located ∈ execution.locatedTransitions,
     SupportedSP1Transition program located
 
+/-- **The supported halting discipline**: every transition before the terminal halt is a
+supported ordinary instruction, and the ordinary prefix fits the Core row budget.  The terminal
+transition's own laws — the canonical HALT code, the exit-code binding, and the endpoint
+states — travel in the shared `.halted` constructor through `HaltsWith` and trace validity, so
+this predicate deliberately restates none of them. -/
+def SupportedHaltingTrace (program : GuestProgram)
+    (execution : Machine.EventExecutionTrace) : Prop :=
+  (∀ transition ∈ execution.transitions.dropLast, transition.event = .ordinary) ∧
+  (∀ located ∈ execution.locatedTransitions.dropLast,
+    SupportedSP1Transition program located) ∧
+  _root_.SP1Clean.CoreProfile.WithinOrdinaryRowLimit execution.transitions.dropLast.length
+
 /-- Eliminate one supported transition to the exact shared projection and stable decode evidence. -/
 theorem SupportedSP1Transition.view
     {program : GuestProgram} {located : Machine.LocatedTransition}
@@ -115,7 +127,7 @@ def supportedCoreShardModel {p : ℕ} [Fact p.Prime] :
     Machine.CoreShardModel (SupportedCoreStatement p) where
   boundary := supportedCoreShardBoundary
   programBound := fun statement program => program = statement.program
-  syscalls := .none
+  syscalls := .haltOnly
 
 /-- Profile-specific additions around the one common shard semantics. -/
 def supportedCoreShardContract {p : ℕ} [Fact p.Prime] :
@@ -125,6 +137,7 @@ def supportedCoreShardContract {p : ℕ} [Fact p.Prime] :
   -- Deliberately trivial: the native provider binding travels in
   -- `SupportedCoreNativeRelation`'s boundary conjunct, not in the shard contract.
   witnessValid := fun _ _ => True
+  haltValid := fun _ witness execution => SupportedHaltingTrace witness.program execution
   executionValid := fun _ witness execution =>
     execution.AllOrdinary ∧
       AllTransitionsSupported witness.program execution ∧
@@ -140,6 +153,16 @@ def SupportedCoreShardExecutionRelation {p : ℕ} [Fact p.Prime] :
     WitnessRelation.Relation (SupportedCoreStatement p) Machine.CoreShardSemanticWitness :=
   CoreShardExecutionRelation (supportedCoreShardModel (p := p))
     (supportedCoreShardContract (p := p))
+
+/-- The syscall-free (all-ordinary) sub-language of the canonical semantic shard relation: the
+set the deterministic native compiler currently targets.  Halting shards — the shared `.halted`
+case, whose terminal transition is the canonical HALT syscall — sit outside it; they rejoin when
+the compiler emits the terminal halt row. -/
+noncomputable def SupportedCoreOrdinaryShardExecutionRelation {p : ℕ} [Fact p.Prime] :
+    WitnessRelation.Relation (SupportedCoreStatement p) Machine.CoreShardSemanticWitness :=
+  (SupportedCoreShardExecutionRelation (p := p)).restrict
+    (fun _ witness =>
+      (witness.evaluatedTrace (supportedCoreShardModel (p := p))).AllOrdinary)
 
 namespace SupportedCoreShardExecutionValid
 
@@ -162,12 +185,15 @@ theorem programEncodable {p : ℕ} [Fact p.Prime]
   valid.programValid
 
 /-- The deterministic trace selected by a valid common witness, together with every native profile
-fact.  This is the sole trace-elimination rule used by the compiler. -/
+fact.  This is the sole trace-elimination rule used by the compiler; its `ordinary` premise is
+the compiler's syscall-free domain restriction (`NativeTraceReady.syscallFree`), which also
+refutes the `.halted` branch of the shared case. -/
 theorem evaluatedTrace_facts {p : ℕ} [Fact p.Prime]
     {statement : SupportedCoreStatement p} {witness : Machine.CoreShardSemanticWitness}
-    (valid : SupportedCoreShardExecutionValid statement witness) :
+    (valid : SupportedCoreShardExecutionValid statement witness)
+    (ordinary : (witness.evaluatedTrace (supportedCoreShardModel (p := p))).AllOrdinary) :
     let execution := witness.evaluatedTrace (supportedCoreShardModel (p := p))
-    execution.Valid Machine.ExecutableSyscallHandler.none.relation witness.program ∧
+    execution.Valid Machine.ExecutableSyscallHandler.haltOnly.relation witness.program ∧
       execution.Clocked (supportedCoreShardBoundary statement).initialClock ∧
       execution.finalClock (supportedCoreShardBoundary statement).initialClock =
         (supportedCoreShardBoundary statement).finalClock ∧
@@ -179,9 +205,41 @@ theorem evaluatedTrace_facts {p : ℕ} [Fact p.Prime]
       AllTransitionsSupported witness.program execution ∧
       _root_.SP1Clean.CoreProfile.WithinOrdinaryRowLimit execution.steps := by
   obtain ⟨events, trace, -, evaluated, traceValid, clocked, finalClock, initialPc, finalPc,
-      ordinary, supported, limit⟩ := valid.executionTrace rfl
+      supportedProfile⟩ := valid.executionTrace rfl ordinary
+  obtain ⟨-, supported, limit⟩ := supportedProfile
   rw [witness.evaluatedTrace_eq_of_trace? evaluated]
-  exact ⟨traceValid, clocked, finalClock, initialPc, finalPc, ordinary, supported, limit⟩
+  exact ⟨traceValid, clocked, finalClock, initialPc, finalPc,
+    by rwa [witness.evaluatedTrace_eq_of_trace? evaluated] at ordinary, supported, limit⟩
+
+/-- **Halting-shard elimination on the supported profile**: a valid witness whose evaluated trace
+is not all-ordinary is a halting shard — a supported ordinary prefix followed by the canonical
+HALT syscall carrying the committed exit-code cell, between the committed public endpoints. -/
+theorem halted_facts {p : ℕ} [Fact p.Prime]
+    {statement : SupportedCoreStatement p} {witness : Machine.CoreShardSemanticWitness}
+    (valid : SupportedCoreShardExecutionValid statement witness)
+    (notOrdinary :
+      ¬ (witness.evaluatedTrace (supportedCoreShardModel (p := p))).AllOrdinary) :
+    (witness.evaluatedTrace (supportedCoreShardModel (p := p))).Valid
+        Machine.ExecutableSyscallHandler.haltOnly.relation witness.program ∧
+      (witness.evaluatedTrace (supportedCoreShardModel (p := p))).Clocked
+        (supportedCoreShardBoundary statement).initialClock ∧
+      (witness.evaluatedTrace (supportedCoreShardModel (p := p))).finalClock
+          (supportedCoreShardBoundary statement).initialClock =
+        (supportedCoreShardBoundary statement).finalClock ∧
+      (witness.evaluatedTrace (supportedCoreShardModel (p := p))).initialState.regs.get?
+          Register.PC = some (supportedCoreShardBoundary statement).initialPc ∧
+      (witness.evaluatedTrace (supportedCoreShardModel (p := p))).finalState.regs.get?
+          Register.PC = some (supportedCoreShardBoundary statement).finalPc ∧
+      (witness.evaluatedTrace (supportedCoreShardModel (p := p))).HaltsWith witness.program
+        (supportedCoreShardBoundary statement).exit ∧
+      SupportedHaltingTrace witness.program
+        (witness.evaluatedTrace (supportedCoreShardModel (p := p))) := by
+  obtain ⟨events, trace, -, evaluated, traceValid, clocked, finalClock, initialPc, finalPc,
+      branch⟩ := valid.executionTrace_cases rfl
+  rw [witness.evaluatedTrace_eq_of_trace? evaluated] at notOrdinary ⊢
+  rcases branch with exec | ⟨halts, haltValid⟩
+  · exact absurd exec.1 notOrdinary
+  · exact ⟨traceValid, clocked, finalClock, initialPc, finalPc, halts, haltValid⟩
 
 end SupportedCoreShardExecutionValid
 

@@ -134,9 +134,17 @@ same native relation consumed by soundness on `SupportedCoreNativeAdmissibleShar
 That source restricts the common bounded shard relation by named residual semantic readiness facts
 and the physical `< p` footprint for the deterministic compiler output. Both
 directions use the same `CoreProfile.WithinOrdinaryRowLimit` policy, and
-`supported_core_native_shard_sound` targets that same bounded semantic relation. The remaining
+`supported_core_native_shard_sound` targets that same bounded semantic relation. The semantic
+shard language also contains **halting shards** — the shared case's third branch, a supported
+ordinary prefix ending in the canonical HALT syscall under the concrete
+`ExecutableSyscallHandler.haltOnly` host semantics, with `HaltsWith` binding the committed
+exit-code cell — which the deterministic compiler does not yet emit
+(`NativeTraceReady.syscallFree`); the totality-conditional correctness statements are therefore
+relative to the syscall-free sub-language
+(`SupportedCoreOrdinaryShardExecutionRelation`). Within that sub-language the remaining
 scope gap is exactly `NativeShardTraceTotal`, not missing tables, bump placement, provider
-closure, a second execution carrier, or an existential trace generator.
+closure, a second execution carrier, or an existential trace generator; halting shards
+additionally await the native terminal halt row.
 
 `ChipFaithful` is a whole-row statement. For every adversarial Rust row it proves equivalence between:
 

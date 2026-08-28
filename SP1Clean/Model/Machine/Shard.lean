@@ -83,6 +83,19 @@ def relation (handler : ExecutableSyscallHandler) : SyscallHandler :=
 def none : ExecutableSyscallHandler where
   run := fun _ _ _ => Option.none
 
+/-- **The canonical HALT arm of SP1's host semantics**, and nothing else: on the exact Rust
+`SyscallCode::HALT` code (`rawCode = 0`) the terminal transition parks the machine at the
+executor's `haltPc` and leaves every other register and all of memory untouched — matching
+`CoreSyscallEvent.PcLaw`/`MatchesStates` (the target's pc is `nextPc = haltPc`, `x5` keeps the
+zero result).  Every non-halt syscall evaluates to `Option.none`: outside the supported
+profile. -/
+def haltOnly : ExecutableSyscallHandler where
+  run := fun _ event source =>
+    if event.rawCode = 0 then
+      some { source with regs := source.regs.insert Register.PC haltPc }
+    else
+      Option.none
+
 end ExecutableSyscallHandler
 
 /-- Statement-dependent data needed to interpret the common shard witness.  Exact preprocessing

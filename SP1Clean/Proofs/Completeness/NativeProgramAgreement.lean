@@ -115,6 +115,7 @@ theorem nativeProgramKey_decodedInROM
     (semantic : SupportedCoreShardExecutionRelation statement semanticWitness)
     (executionEq : execution =
       semanticWitness.evaluatedTrace (supportedCoreShardModel (p := p)))
+    (ordinary : execution.AllOrdinary)
     (compiler : NativeCompilerReady statement.program execution (nativeInitialClock statement))
     (projection : NativeProgramRowProjection statement execution)
     {key : LookupKey}
@@ -124,7 +125,7 @@ theorem nativeProgramKey_decodedInROM
       key = ProgramChip.programRowKey row ∧ decodedInROM statement.program row := by
   subst execution
   obtain ⟨-, -, -, -, -, -, supported, -⟩ :=
-    Execution.SupportedCoreShardExecutionValid.evaluatedTrace_facts semantic
+    Execution.SupportedCoreShardExecutionValid.evaluatedTrace_facts semantic ordinary
   have semanticSupported : AllTransitionsSupported statement.program
       (semanticWitness.evaluatedTrace (supportedCoreShardModel (p := p))) := by
     simpa only [Execution.SupportedCoreShardExecutionValid.program_eq semantic] using supported
@@ -185,6 +186,7 @@ theorem nativeTrace_programProviderBound
     (semantic : SupportedCoreShardExecutionRelation statement semanticWitness)
     (executionEq : execution =
       semanticWitness.evaluatedTrace (supportedCoreShardModel (p := p)))
+    (ordinary : execution.AllOrdinary)
     (compiler : NativeCompilerReady statement.program execution (nativeInitialClock statement))
     (servable : (nativeBaseTrace statement execution).DemandServable)
     (projection : NativeProgramRowProjection statement execution) :
@@ -228,7 +230,7 @@ theorem nativeTrace_programProviderBound
     rw [program_round key _ selected keyServable]
     rfl
   obtain ⟨semanticRow, semanticKey, decoded⟩ :=
-    nativeProgramKey_decodedInROM semantic rfl compiler projection keyMem keyKind
+    nativeProgramKey_decodedInROM semantic rfl ordinary compiler projection keyMem keyKind
   have typedKey :
       ProgramChip.programRowKey (rowOfMsg typed.message) = key :=
     (keyOf_toAccess_typedProgram typed).symm.trans rawKeyEq
