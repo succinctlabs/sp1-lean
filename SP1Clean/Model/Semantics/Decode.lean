@@ -533,6 +533,11 @@ theorem opcodeCast_inj {o o' : Opcode} (h : (o.toNat : ZMod p) = (o'.toNat : ZMo
   have h2 := congrArg ZMod.val h
   rwa [ZMod.val_natCast_of_lt (by omega), ZMod.val_natCast_of_lt (by omega)] at h2
 
+/-- `ECALL` is the unique opcode with its discriminant (`50`). -/
+theorem opcode_eq_ecall_of_toNat (a : Opcode) (h : a.toNat = Opcode.ECALL.toNat) :
+    a = Opcode.ECALL := by
+  revert h; cases a <;> decide
+
 /-- **`regidxVal` is injective on the register-index range.** Two 5-bit register indices with
 equal committed field values (`(·.toNat : ZMod p)`) are equal — the indices are `< 32 < 2^17 < p`,
 so `Nat.cast` does not collide. The pinning fact the ∀-state decode uniqueness (`decodesRType`)
@@ -778,6 +783,88 @@ theorem decodedInROM.decodes {prog : GuestProgram} {row : ProgramRow (ZMod p)}
       (ext_decode w).run s = .ok i s ∧ instrToProgramRow (rowPcVec row) i = some row := by
   obtain ⟨w, I, hfetch, hrun, hrow⟩ := h
   exact ⟨w, I, hfetch, hrun s hs, instrToProgramRow'_some hrow⟩
+
+/-! ## The committed-row fragment (halt-table wave)
+
+`instrToProgramRow`/`instrToProgramRow'` are deliberately the **instruction-chip** projection:
+their image is the routed 25-chip fragment (`instrToProgramRow_route_agreement`), and the whole
+decode-inversion family plus the grounding walk ride that. The halting shard's `ECALL` site is
+committed in ROM too, but it routes to the **halt system table**, not an instruction chip — so the
+committed-row vocabulary extends `decodedInROM` with an explicit encoding-pinned `ECALL` branch
+rather than widening the projection (which would falsify the routing lemmas). SP1's transpiler
+maps the fixed `ECALL` word `0x00000073` to operands `(x5, x10, x11)` with no immediates
+(`../sp1 crates/core/executor/src/disassembler/rrs.rs: process_ecall`; `instruction.rs: encode`),
+and the branch pins that literal word — the exact fetch fact `SP1Halted` consumes — so no
+decoder-injectivity argument is ever needed. -/
+
+omit [Fact p.Prime] [Fact (2 ^ 17 < p)] in
+/-- The committed `ECALL` Program row at a pc: SP1's transpiled `ECALL` shape — opcode `ECALL`,
+operands `(x5, x10, x11)` as register indices, no immediates, `op_a_0 = 0` (`x5 ≠ x0`). Matches
+the halt table's Program pull (`Native/Chips/HaltChip/Defs.lean`, `programMsg`)
+field-for-field. -/
+def ecallProgramRow (pc : Vector (ZMod p) 3) : ProgramRow (ZMod p) :=
+  { pc0 := pc[0], pc1 := pc[1], pc2 := pc[2],
+    opcode := ((Opcode.ECALL).toNat : ZMod p),
+    op_a := 5, op_b := #v[10, 0, 0, 0], imm_b := 0,
+    op_c := #v[11, 0, 0, 0], op_a_0 := 0, imm_c := 0 }
+
+/-- **Committed-row membership** — `decodedInROM` extended to the whole committed fragment: either
+the row is the hoisted decode of a routed instruction (`decodedInROM`), or the ROM holds the
+literal `ECALL` word at the row's pc and the row is its transpiled shape. The Program provider
+re-bases on this predicate in the halt-table wiring wave; each instruction chip recovers today's
+`decodedInROM` through `committedInROM.decoded_of_opcode_ne` (its fetch pins a non-`ECALL`
+opcode), and the halt table takes `committedInROM.ecall_of_opcode`. -/
+def committedInROM (prog : GuestProgram) (row : ProgramRow (ZMod p)) : Prop :=
+  decodedInROM prog row ∨
+    (prog.fetchWord (pcBitsOfRow row) = some ECALL_ENC ∧ row = ecallProgramRow (rowPcVec row))
+
+omit [Fact (2 ^ 17 < p)] in
+/-- The instruction-chip fragment embeds. -/
+theorem decodedInROM.committed {prog : GuestProgram} {row : ProgramRow (ZMod p)}
+    (h : decodedInROM prog row) : committedInROM prog row := Or.inl h
+
+omit [Fact (2 ^ 17 < p)] in
+/-- The `ECALL`-site introduction: the ROM word and the transpiled row shape. -/
+theorem committedInROM_ecall {prog : GuestProgram} {row : ProgramRow (ZMod p)}
+    (hfetch : prog.fetchWord (pcBitsOfRow row) = some ECALL_ENC)
+    (hrow : row = ecallProgramRow (rowPcVec row)) : committedInROM prog row :=
+  Or.inr ⟨hfetch, hrow⟩
+
+/-- Every projected instruction-chip row's opcode is a covered (non-`ECALL`) discriminant — via
+the routing agreement and the proof-free coverage of `instructionRouteKey`. -/
+theorem instrToProgramRow'_opcode_ne_ecall {pc : Vector (ZMod p) 3} {i : instruction}
+    {row : ProgramRow (ZMod p)} (h : instrToProgramRow' pc i = some row) :
+    row.opcode ≠ ((Opcode.ECALL).toNat : ZMod p) := by
+  obtain ⟨key, keyEq, hop, -, -⟩ := instrToProgramRow'_route_agreement h
+  obtain ⟨hne, -, -⟩ := instructionRouteKey_opcode_covered keyEq
+  intro hEq
+  exact hne (opcode_eq_ecall_of_toNat _ (opcodeCast_inj (hop.symm.trans hEq)))
+
+/-- `decodedInROM` rows never carry the `ECALL` discriminant. -/
+theorem decodedInROM_opcode_ne_ecall {prog : GuestProgram} {row : ProgramRow (ZMod p)}
+    (h : decodedInROM prog row) : row.opcode ≠ ((Opcode.ECALL).toNat : ZMod p) := by
+  obtain ⟨w, I, -, -, hrow⟩ := h
+  exact instrToProgramRow'_opcode_ne_ecall hrow
+
+omit [Fact (2 ^ 17 < p)] in
+/-- The per-chip strengthening step of the wiring wave: a committed row whose pinned opcode is not
+`ECALL`'s is a decoded instruction-chip row. -/
+theorem committedInROM.decoded_of_opcode_ne {prog : GuestProgram} {row : ProgramRow (ZMod p)}
+    (h : committedInROM prog row) (hne : row.opcode ≠ ((Opcode.ECALL).toNat : ZMod p)) :
+    decodedInROM prog row := by
+  rcases h with h | ⟨-, hrow⟩
+  · exact h
+  · exact absurd (by rw [hrow]; rfl) hne
+
+/-- The halt-side eliminator: a committed row whose opcode **is** `ECALL`'s is the literal
+transpiled `ECALL` site — the ROM holds `ECALL_ENC` at its pc (the fetch fact `SP1Halted`
+consumes) and the operand columns are pinned to `(x5, x10, x11)`. -/
+theorem committedInROM.ecall_of_opcode {prog : GuestProgram} {row : ProgramRow (ZMod p)}
+    (h : committedInROM prog row) (hop : row.opcode = ((Opcode.ECALL).toNat : ZMod p)) :
+    prog.fetchWord (pcBitsOfRow row) = some ECALL_ENC ∧ row = ecallProgramRow (rowPcVec row) := by
+  rcases h with h | h
+  · exact absurd hop (decodedInROM_opcode_ne_ecall h)
+  · exact h
 
 omit [Fact (2 ^ 17 < p)] in
 /-- The official Sail instruction families routed by SP1's `AluX0` chip. Immediate ALU and shift
