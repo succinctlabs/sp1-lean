@@ -904,4 +904,5 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Soundness.Target.cfgState_get_other
 #print axioms SP1Clean.Soundness.Target.cfgState_pma
 #print axioms SP1Clean.Soundness.Target.cfgState_misa
+#print axioms SP1Clean.Soundness.Target.cfgState_configured
 #print axioms SP1Clean.Soundness.Target.isInitialState_nonvacuous
