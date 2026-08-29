@@ -24,6 +24,9 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.DivRemChip.contractSoundness
 #print axioms SP1Clean.DivRemChip.soundness
 #print axioms SP1Clean.DivRemChip.circuit
+#print axioms SP1Clean.HaltChip.soundness
+#print axioms SP1Clean.HaltChip.completeness
+#print axioms SP1Clean.HaltChip.circuit
 #print axioms SP1Clean.JalChip.soundness
 #print axioms SP1Clean.JalChip.completeness
 #print axioms SP1Clean.JalChip.circuit
