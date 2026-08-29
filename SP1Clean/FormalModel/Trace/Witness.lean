@@ -1,3 +1,4 @@
+import SP1Clean.Model.Machine.Execution
 import SP1Clean.Model.Semantics.GuestProgram
 
 /-! # W6b — the non-vacuity witness: `IsInitialState` is satisfiable
@@ -139,6 +140,46 @@ lemma cfgState_misa (pc : BitVec 64) (hmem : Register.misa ∈ (configuredState 
 satisfiable; a richer program (real ROM bytes) reuses `configuredState` + adds `mem` content. -/
 def emptyProgram : GuestProgram := ⟨[], 0, [], by simp, by simp, by simp, by simp⟩
 
+/-- The configured core state satisfies the whole strengthened `SailConfigured` at any pc:
+`init`/`priv`/`active`/`mie`/`mideleg`/`no_landing_pad` from the register defaults, and
+the memory configuration from the overridden `pma_regions` + the disable-bit defaults. -/
+theorem cfgState_configured (pc : BitVec 64) : SailConfigured (configuredState pc) :=
+       { init := cfgState_init pc
+         priv := cfgState_priv pc
+         active := by
+           rw [cfgState_get?_other pc Register.hart_state (by decide) (by decide) (by decide) (by decide)]; rfl
+         mie := by
+           rw [cfgState_get_other pc Register.mstatus (by decide) (by decide) (by decide) (by decide)]
+           exact (by decide : _get_Mstatus_MIE (default : RegisterType Register.mstatus) = 0#1)
+         mideleg := by
+           rw [cfgState_get_other pc Register.mideleg (by decide) (by decide) (by decide) (by decide)]
+           exact (by decide : (default : RegisterType Register.mideleg) = zeros)
+         no_landing_pad := by
+           rw [cfgState_get?_other pc Register.elp (by decide) (by decide) (by decide) (by decide)]
+           exact (by decide : ¬ (some (default : RegisterType Register.elp)
+             = some (landing_pad_bits_backwards landing_pad_expectation.LP_EXPECTED)))
+         mprv_disabled := by
+           rw [cfgState_get_other pc Register.mstatus (by decide) (by decide) (by decide) (by decide)]
+           exact (by decide :
+             BitVec.ofNat 1 ((default : RegisterType Register.mstatus).toNat >>> 17) = 0#1)
+         mseccfg_disabled := by
+           rw [cfgState_get_other pc Register.mseccfg (by decide) (by decide) (by decide) (by decide)]
+           exact (by decide :
+             BitVec.ofNat 1 ((default : RegisterType Register.mseccfg).toNat >>> 10) = 0#1)
+         mseccfg_pmm := by
+           rw [cfgState_get_other pc Register.mseccfg (by decide) (by decide) (by decide) (by decide)]
+           exact (by decide :
+             BitVec.ofNat 2 ((default : RegisterType Register.mseccfg).toNat >>> 32) = 0#2)
+         htif_disabled := by
+           rw [cfgState_get_other pc Register.htif_tohost_base (by decide) (by decide) (by decide) (by decide)]
+           exact (by decide : (default : RegisterType Register.htif_tohost_base) = none)
+         pmp_off := by
+           rw [cfgState_get_other pc Register.pmpcfg_n (by decide) (by decide) (by decide) (by decide)]
+           exact (by decide :
+             (default : RegisterType Register.pmpcfg_n) = Vector.replicate 64 0#8)
+         misa_m := by rw [cfgState_misa pc _]; decide
+         pma_regions := cfgState_pma pc _ }
+
 /-- **The W6b non-vacuity witness.** `IsInitialState` is satisfiable: the configured initial state loads
 the (minimal) guest program. So the target theorem's universally-quantified hypothesis is not vacuous. The
 `configured` field discharges the whole strengthened `SailConfigured`: `init`/`priv`/`active`/`mie`/
@@ -150,41 +191,104 @@ theorem isInitialState_nonvacuous : ∃ s0, IsInitialState emptyProgram s0 :=
      pc := cfgState_pc 0
      romLoaded := by intro a w hf; simp [emptyProgram, GuestProgram.fetchWord] at hf
      imageLoaded := by intro av hav; simp [emptyProgram] at hav
-     configured :=
-       { init := cfgState_init 0
-         priv := cfgState_priv 0
-         active := by
-           rw [cfgState_get?_other 0 Register.hart_state (by decide) (by decide) (by decide) (by decide)]; rfl
-         mie := by
-           rw [cfgState_get_other 0 Register.mstatus (by decide) (by decide) (by decide) (by decide)]
-           exact (by decide : _get_Mstatus_MIE (default : RegisterType Register.mstatus) = 0#1)
-         mideleg := by
-           rw [cfgState_get_other 0 Register.mideleg (by decide) (by decide) (by decide) (by decide)]
-           exact (by decide : (default : RegisterType Register.mideleg) = zeros)
-         no_landing_pad := by
-           rw [cfgState_get?_other 0 Register.elp (by decide) (by decide) (by decide) (by decide)]
-           exact (by decide : ¬ (some (default : RegisterType Register.elp)
-             = some (landing_pad_bits_backwards landing_pad_expectation.LP_EXPECTED)))
-         mprv_disabled := by
-           rw [cfgState_get_other 0 Register.mstatus (by decide) (by decide) (by decide) (by decide)]
-           exact (by decide :
-             BitVec.ofNat 1 ((default : RegisterType Register.mstatus).toNat >>> 17) = 0#1)
-         mseccfg_disabled := by
-           rw [cfgState_get_other 0 Register.mseccfg (by decide) (by decide) (by decide) (by decide)]
-           exact (by decide :
-             BitVec.ofNat 1 ((default : RegisterType Register.mseccfg).toNat >>> 10) = 0#1)
-         mseccfg_pmm := by
-           rw [cfgState_get_other 0 Register.mseccfg (by decide) (by decide) (by decide) (by decide)]
-           exact (by decide :
-             BitVec.ofNat 2 ((default : RegisterType Register.mseccfg).toNat >>> 32) = 0#2)
-         htif_disabled := by
-           rw [cfgState_get_other 0 Register.htif_tohost_base (by decide) (by decide) (by decide) (by decide)]
-           exact (by decide : (default : RegisterType Register.htif_tohost_base) = none)
-         pmp_off := by
-           rw [cfgState_get_other 0 Register.pmpcfg_n (by decide) (by decide) (by decide) (by decide)]
-           exact (by decide :
-             (default : RegisterType Register.pmpcfg_n) = Vector.replicate 64 0#8)
-         misa_m := by rw [cfgState_misa 0 _]; decide
-         pma_regions := cfgState_pma 0 _ } }⟩
+     configured := cfgState_configured 0 }⟩
+
+/-! ## The loaded boot witness
+
+The enrichment the file header promises: a program with a real instruction word and a real
+data-image byte, loaded into memory byte by byte, whose configured state also carries SP1's
+zeroed integer register file — the joint satisfiability core of `BootBoundaryFacts`
+(`Soundness/ProviderBindings.lean`). -/
+
+/-- One real instruction — `ADDI x0, x0, 0` (encoding `0x00000013`) — at the bottom of the SP1
+code window, plus one data-image byte above it. -/
+def oneInstrProgram : GuestProgram where
+  rom := [(65536#64, 0x00000013#32)]
+  pc_start := 65536#64
+  memImage := [(131072#64, 0xAB#8)]
+  rom_nodup := by simp
+  rom_aligned := by intro a ha; simp at ha; subst ha; decide
+  rom_in_window := by intro aw haw; simp at haw; subst haw; decide
+  rom_full_width := by intro aw haw; simp at haw; subst haw; decide
+
+/-- The configured core with `oneInstrProgram`'s four ROM bytes and one image byte in memory. -/
+noncomputable def loadedState : SailState :=
+  { configuredState 65536#64 with
+    mem := ((((((∅ : Std.ExtHashMap ℕ (BitVec 8)).insert 65536 0x13#8).insert
+      65537 0x00#8).insert 65538 0x00#8).insert 65539 0x00#8).insert 131072 0xAB#8) }
+
+/-- Every `x`-register index maps away from the four registers `configuredState` overrides. -/
+private lemma reg_idx_ne_overrides : ∀ idx : BitVec 5,
+    reg_idx_to_Register idx ≠ Register.PC ∧
+    reg_idx_to_Register idx ≠ Register.cur_privilege ∧
+    reg_idx_to_Register idx ≠ Register.pma_regions ∧
+    reg_idx_to_Register idx ≠ Register.misa := by
+  decide
+
+/-- The default value of every `x`-register, transported to its 64-bit form, is zero. -/
+private lemma regDefault_reg_idx (idx : BitVec 5) :
+    (reg_idx_must_64 idx ▸
+      (some (regDefault (reg_idx_to_Register idx)) :
+        Option (RegisterType (reg_idx_to_Register idx))) : Option (BitVec 64)) = some 0 := by
+  obtain ⟨⟨n, hn⟩⟩ := idx
+  interval_cases n <;> rfl
+
+/-- SP1's zeroed integer register file holds on the configured core: `x0` is hardwired and every
+other `x`-register keeps its (zero) default. -/
+theorem registersZero_configuredState (pc : BitVec 64) :
+    SP1Clean.Machine.RegistersZero (configuredState pc) := by
+  intro idx
+  by_cases h0 : idx = 0
+  · simp [SailState.get_reg?, h0]
+  · rw [SailState.get_reg?, if_neg h0]
+    have hne := reg_idx_ne_overrides idx
+    rw [cfgState_get?_other pc _ hne.1 hne.2.1 hne.2.2.1 hne.2.2.2]
+    exact regDefault_reg_idx idx
+
+/-- **The loaded boot witness**: `IsInitialState` over a program with real ROM and image content,
+jointly with SP1's zeroed register file. -/
+theorem isInitialState_nonvacuous_loaded :
+    ∃ s0, IsInitialState oneInstrProgram s0 ∧ SP1Clean.Machine.RegistersZero s0 := by
+  refine ⟨loadedState,
+    { initialized := cfgState_init 65536#64
+      pc := cfgState_pc 65536#64
+      romLoaded := ?_
+      imageLoaded := ?_
+      configured :=
+        { init := (cfgState_configured 65536#64).init
+          priv := (cfgState_configured 65536#64).priv
+          active := (cfgState_configured 65536#64).active
+          mie := (cfgState_configured 65536#64).mie
+          mideleg := (cfgState_configured 65536#64).mideleg
+          no_landing_pad := (cfgState_configured 65536#64).no_landing_pad
+          mprv_disabled := (cfgState_configured 65536#64).mprv_disabled
+          mseccfg_disabled := (cfgState_configured 65536#64).mseccfg_disabled
+          mseccfg_pmm := (cfgState_configured 65536#64).mseccfg_pmm
+          htif_disabled := (cfgState_configured 65536#64).htif_disabled
+          pmp_off := (cfgState_configured 65536#64).pmp_off
+          misa_m := (cfgState_configured 65536#64).misa_m
+          pma_regions := (cfgState_configured 65536#64).pma_regions } },
+    registersZero_configuredState 65536#64⟩
+  · intro a w hf i
+    unfold GuestProgram.fetchWord oneInstrProgram at hf
+    simp only [List.find?] at hf
+    rcases hcond : ((65536#64, 0x00000013#32).1 == a) with - | -
+    · rw [hcond] at hf
+      simp at hf
+    · rw [hcond] at hf
+      simp only [Option.map_some, Option.some.injEq] at hf
+      obtain rfl : a = 65536#64 := by
+        have := (beq_iff_eq).mp hcond
+        simpa using this.symm
+      subst hf
+      fin_cases i <;>
+        · simp only [loadedState, Std.ExtHashMap.get?_eq_getElem?,
+            Std.ExtHashMap.getElem?_insert]
+          decide
+  · intro av hav
+    simp only [oneInstrProgram, List.mem_singleton] at hav
+    subst hav
+    simp only [loadedState, Std.ExtHashMap.get?_eq_getElem?, Std.ExtHashMap.getElem?_insert]
+    decide
 
 end SP1Clean.Soundness.Target

@@ -410,10 +410,9 @@ one-directional — `isInitial` + `entryPc` re-derive the base record's pc/ROM/c
 fields (`BootBoundaryFacts.shardStartState`); the base record is retained whole so every
 `InitialBoundaryFacts` consumer applies unchanged.
 
-Satisfiability status: `IsInitialState` is witnessed (`isInitialState_nonvacuous`,
-`FormalModel/Trace/Witness.lean`); the joint witness with `RegistersZero` and loaded ROM/image
-content is the named enrichment that file's header promises (per-x-register reasoning over the
-generated Sail register file), not yet constructed. -/
+Satisfiability status: the joint witness — `IsInitialState` over a program with real ROM and
+image content, together with `RegistersZero` — is `isInitialState_nonvacuous_loaded`
+(`FormalModel/Trace/Witness.lean`). -/
 structure BootBoundaryFacts
     (statement : ProgramStatement (SupportedCorePrefixPublicValues (ZMod p)))
     (witness : EnsembleWitness (sp1Ensemble (p := p))) (initial : SailState) : Prop where
