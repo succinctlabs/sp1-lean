@@ -298,4 +298,13 @@ def ProgramMsg.RowSpec (msg : ProgramMsg (ZMod p)) : Prop :=
   msg.pc0.val < 2 ^ 16 ∧ msg.pc1.val < 2 ^ 16 ∧ msg.pc2.val < 2 ^ 16 ∧
   (msg.op_a_0 = 0 ∨ msg.op_a_0 = 1)
 
+/-- The Exit-bus message — the halting shard's exit-code operand, as the 4-limb `Word` the halt
+table reads out of `x10`/`a0` at the `HALT` ECALL. SP1 constrains `public_values.exit_code`
+directly inside its syscall chip; the native ensemble factors that binding through one channel —
+the halt row pushes this word and the state-boundary verifier pulls it against the committed
+`exit_code` public value (the pull is ensemble-wiring work; this struct is the shared payload). -/
+structure ExitMsg (F : Type) where
+  value : Word F
+deriving ProvableStruct
+
 end SP1Clean.Channels
