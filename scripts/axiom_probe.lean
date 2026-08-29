@@ -820,6 +820,8 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Soundness.Target.storeWidthOK
 #print axioms SP1Clean.Soundness.Target.decodedInROM
 #print axioms SP1Clean.Soundness.Target.decodedInROM.decodes
+#print axioms SP1Clean.Soundness.Target.decodedInROM.committed
+#print axioms SP1Clean.Soundness.Target.decodedInROM_opcode_ne_ecall
 #print axioms SP1Clean.Soundness.Target.instrToProgramRow_isCoreAlu_of_opcode_lt
 #print axioms SP1Clean.Soundness.Target.decodedInROM.register_bounds
 #print axioms SP1Clean.Soundness.Target.decodedInROM.immediate_flags_binary
