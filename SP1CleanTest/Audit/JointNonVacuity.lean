@@ -60,7 +60,7 @@ namespace SP1Clean.Audit.JointNonVacuity
 open Air.Flat Circuit
 open SP1Clean SP1Clean.TraceGenTests
 open SP1Clean.Soundness SP1Clean.Soundness.Target SP1Clean.Execution
-open SP1Clean.Channels (stateChannel byteChannel programChannel memoryChannel)
+open SP1Clean.Channels (stateChannel byteChannel programChannel memoryChannel exitChannel)
 open Sail LeanRV64D LeanRV64D.Functions
 
 /-! ## The committed program: `JAL x0, 0` at `0x10000`
@@ -451,6 +451,14 @@ theorem balancedInteractions_nil {F : Type} [FiniteField F] [DecidableEq F]
   · intro msg
     rfl
 
+/-- Multiplicity-zero interactions move no message's balance. -/
+theorem balanceOf_eq_zero_of_mult_zero {l : List (Interaction (ZMod SP1Prime))}
+    (h : ∀ i ∈ l, i.mult = 0) (msg : Array (ZMod SP1Prime)) : balanceOf l msg = 0 := by
+  rw [balanceOf]
+  refine List.sum_eq_zero fun m hm => ?_
+  obtain ⟨i, hi, rfl⟩ := List.mem_map.mp hm
+  exact h i (List.mem_of_mem_filter hi)
+
 theorem sp1Prime_char_pos_facts :
     (2 : ℕ) < ringChar (ZMod SP1Prime) ∧ (0 : ℕ) < ringChar (ZMod SP1Prime) := by
   rw [ZMod.ringChar_zmod_n]
@@ -524,19 +532,68 @@ theorem emptyTables_interactionsWith_nil (ch : RawChannel (ZMod SP1Prime)) :
   obtain ⟨c, -, rfl⟩ := List.mem_map.mp ht
   rfl
 
-/-- The whole-shard channel view splits into the verifier row plus the two provider tables (in
-stable position order), the 51 zero-row tables contributing nothing. -/
+/-- The whole-shard channel view splits into the verifier row plus the two provider tables and the
+Halt padding table (in stable position order), the 51 zero-row tables contributing nothing. -/
 theorem jointWitness_interactionsWith_split (ch : RawChannel (ZMod SP1Prime)) :
     jointWitness.interactionsWith ch =
       jointWitness.verifierTable.interactionsWith ch ++
-        (u8RangeTable.interactionsWith ch ++ range16Table.interactionsWith ch) := by
+        (u8RangeTable.interactionsWith ch ++
+          (range16Table.interactionsWith ch ++ haltPaddingTable.interactionsWith ch)) := by
   show (jointWitness.verifierTable :: jointWitness.tables).flatMap (·.interactionsWith ch) = _
   rw [List.flatMap_cons]
-  congr 1
-  show jointTables.flatMap (·.interactionsWith ch) = _
-  rw [jointTables]
-  exact flatMap_set_set_of_nil (by omega) (by rw [emptyTables_length]; omega)
-    fun t ht => emptyTables_interactionsWith_nil ch t ht
+  show _ ++ jointTables.flatMap (·.interactionsWith ch) = _
+  rw [jointTables, flatMap_set_set_set_of_nil (f := (·.interactionsWith ch)) (by omega) (by omega)
+    (by rw [emptyTables_length]; omega) fun t ht => emptyTables_interactionsWith_nil ch t ht]
+
+/-! ### The Halt padding row's per-channel views
+
+The padding row emits nineteen interactions.  Eighteen are gated by `is_real = 0` and so carry
+multiplicity zero; the nineteenth is the anti-gated Exit push of `⟨0⟩` at multiplicity `1 - 0 = 1`.
+The first fact is checked executably over the (computable) whole-row interaction list; the Exit view
+is recovered from the halt circuit's own exposed-channel closed form. -/
+
+/-- Executable check: every Halt padding-row interaction outside the Exit bus is gated off. -/
+theorem haltPaddingTable_zeroOrExit :
+    haltPaddingTable.interactions.all
+      (fun i => decide (i.mult = 0) || (i.channel.name == "SP1Exit")) = true := by native_decide
+
+/-- Executable check: the padding row emits nineteen interactions in total. -/
+theorem haltPaddingTable_interactions_length : haltPaddingTable.interactions.length = 19 := by
+  native_decide
+
+/-- On any non-Exit channel the Halt padding table contributes only multiplicity-zero entries. -/
+theorem haltPaddingTable_mult_zero {ch : RawChannel (ZMod SP1Prime)} (hname : ch.name ≠ "SP1Exit") :
+    ∀ i ∈ haltPaddingTable.interactionsWith ch, i.mult = 0 := by
+  intro i hi
+  rw [Table.interactionsWith_eq_filter] at hi
+  obtain ⟨hmem, hch⟩ := List.mem_filter.mp hi
+  have hchannel : i.channel = ch := by simpa using hch
+  rcases Bool.or_eq_true _ _ |>.mp (List.all_eq_true.mp haltPaddingTable_zeroOrExit i hmem) with
+    hzero | hexit
+  · exact of_decide_eq_true hzero
+  · exact absurd (hchannel ▸ beq_iff_eq.mp hexit : ch.name = "SP1Exit") hname
+
+/-- A channel view is a sublist of the whole interaction list, so it is bounded by its length. -/
+theorem haltPaddingTable_interactionsWith_length (ch : RawChannel (ZMod SP1Prime)) :
+    (haltPaddingTable.interactionsWith ch).length ≤ 19 := by
+  rw [Table.interactionsWith_eq_filter, ← haltPaddingTable_interactions_length]
+  exact List.length_filter_le _ _
+
+/-- Appending the Halt padding row's view of a non-Exit channel preserves balance: each of its
+entries is gated off, so it shifts no message's balance, and its length is bounded by the row's
+nineteen interactions. -/
+theorem balancedInteractions_append_halt {l : List (Interaction (ZMod SP1Prime))}
+    (hlen : l.length < 100) (hbal : ∀ msg, balanceOf l msg = 0)
+    {ch : RawChannel (ZMod SP1Prime)} (hname : ch.name ≠ "SP1Exit") :
+    BalancedInteractions (l ++ haltPaddingTable.interactionsWith ch) := by
+  have hchar : (119 : ℕ) < ringChar (ZMod SP1Prime) := by
+    rw [ZMod.ringChar_zmod_n]; norm_num [SP1Prime]
+  refine ⟨Or.inl ?_, fun msg => ?_⟩
+  · have h19 := haltPaddingTable_interactionsWith_length ch
+    rw [List.length_append]
+    omega
+  · rw [balanceOf_append, hbal msg,
+      balanceOf_eq_zero_of_mult_zero (haltPaddingTable_mult_zero hname), add_zero]
 
 /-! ### The verifier row's per-channel views -/
 
@@ -564,6 +621,17 @@ theorem jointWitness_verifierMemory_nil :
     jointWitness.verifierTable.interactionsWith memoryChannel.toRaw = [] := by
   have h := congrArg (List.map TypedInteraction.raw)
     (witness_verifierMemoryInteractions_eq_nil (p := SP1Prime) jointWitness)
+  rw [typedTableInteractionsWith_raw] at h
+  simpa using h
+
+/-- The verifier row's Exit view: the single ungated `⟨exit_code⟩` pull (the erasure of
+`witness_verifierExitInteractions_eq` at the joint witness).  The committed `exit_code` is `0`, so
+this is a `-1` pull of `⟨0⟩`. -/
+theorem jointWitness_verifierExit :
+    jointWitness.verifierTable.interactionsWith exitChannel.toRaw =
+      [exitChannel.pulledIfValue 1 (⟨pv.exit_code⟩ : Channels.ExitMsg (ZMod SP1Prime))] := by
+  have h := congrArg (List.map TypedInteraction.raw)
+    (witness_verifierExitInteractions_eq (p := SP1Prime) jointWitness)
   rw [typedTableInteractionsWith_raw] at h
   simpa using h
 
@@ -643,41 +711,104 @@ theorem jointWitness_verifierByte :
   rw [sp1StateVerifierMain_byteInteractions]
 
 theorem jointWitness_byteInteractions :
-    jointWitness.interactionsWith byteChannel.toRaw = byteInteractions := by
+    jointWitness.interactionsWith byteChannel.toRaw =
+      byteInteractions ++ haltPaddingTable.interactionsWith byteChannel.toRaw := by
   rw [jointWitness_interactionsWith_split, jointWitness_verifierByte,
     table_interactionsWith_eq_interactions u8RangeTable_channels,
     table_interactionsWith_eq_interactions range16Table_channels]
+  simp only [byteInteractions, List.append_assoc]
+
+/-- The verifier's twelve pulls and the two provider tables' pushes cancel message-for-message. -/
+theorem byteInteractions_balanced : BalancedInteractions byteInteractions := by
+  refine balancedInteractions_of_member_balance ?_ (by native_decide)
+  rw [show byteInteractions.length = 15 from by native_decide, ZMod.ringChar_zmod_n]
+  norm_num [SP1Prime]
+
+/-! ### The Exit bus
+
+The verifier's ungated `-1` pull of `⟨exit_code⟩ = ⟨0⟩` against the Halt padding row's two pushes:
+the reduced-`x10` push at multiplicity `is_real = 0` and the padding push of `⟨0⟩` at multiplicity
+`1 - is_real = 1`. -/
+
+/-- The Halt padding table's Exit view: the halt circuit's two exposed Exit pushes, evaluated at the
+all-zero row.  Recovering it through the circuit's own `interactionsWith_exit_eq` closed form is
+what keeps the list computable (`interactionsWith` itself filters over an undecidable channel
+equality). -/
+def haltExitInteractions : List (Interaction (ZMod SP1Prime)) :=
+  [(exitChannel.pushedIf
+      (varFromOffset HaltChip.Inputs 0 : Var HaltChip.Inputs (ZMod SP1Prime)).is_real
+      (HaltChip.exitMsg (varFromOffset HaltChip.Inputs 0))).toRaw,
+   (exitChannel.pushedIf
+      (1 - (varFromOffset HaltChip.Inputs 0 : Var HaltChip.Inputs (ZMod SP1Prime)).is_real)
+      (HaltChip.exitPaddingMsg (p := SP1Prime))).toRaw].map
+    (AbstractInteraction.eval (haltPaddingTable.environment haltPaddingRow))
+
+theorem haltPaddingTable_exit :
+    haltPaddingTable.interactionsWith exitChannel.toRaw = haltExitInteractions := by
+  show [haltPaddingRow].flatMap _ = _
+  rw [List.flatMap_singleton, Operations.interactionValuesWith_eq_map,
+    Component.interactionsWith_eq]
+  change List.map (AbstractInteraction.eval (haltPaddingTable.environment haltPaddingRow))
+    (((HaltChip.main
+      (varFromOffset HaltChip.Inputs 0 : Var HaltChip.Inputs (ZMod SP1Prime))).operations
+        (size HaltChip.Inputs)).interactionsWith exitChannel.toRaw) = _
+  rw [HaltChip.interactionsWith_exit_eq]
+  rfl
+
+/-- The evaluated Exit-channel contribution of the joint shard, as one executable list. -/
+def exitInteractions : List (Interaction (ZMod SP1Prime)) :=
+  [exitChannel.pulledIfValue 1 (⟨pv.exit_code⟩ : Channels.ExitMsg (ZMod SP1Prime))] ++
+    haltExitInteractions
+
+theorem jointWitness_exitInteractions :
+    jointWitness.interactionsWith exitChannel.toRaw = exitInteractions := by
+  rw [jointWitness_interactionsWith_split, jointWitness_verifierExit,
+    u8RangeTable_interactionsWith_nil (of_eq_false Channels.exitChannel_eq_byteChannel_false),
+    range16Table_interactionsWith_nil (of_eq_false Channels.exitChannel_eq_byteChannel_false),
+    haltPaddingTable_exit, List.nil_append, List.nil_append]
   rfl
 
 theorem jointWitness_balanced : jointWitness.BalancedChannels := by
   intro channel hchannel
   rw [sp1Ensemble_channels] at hchannel
   simp only [List.mem_cons, List.not_mem_nil, or_false] at hchannel
-  rcases hchannel with rfl | rfl | rfl | rfl
+  rcases hchannel with rfl | rfl | rfl | rfl | rfl
   · show BalancedInteractions (jointWitness.interactionsWith stateChannel.toRaw)
     rw [jointWitness_interactionsWith_split, jointWitness_verifierState,
       u8RangeTable_interactionsWith_nil (of_eq_false Channels.stateChannel_eq_byteChannel_false),
       range16Table_interactionsWith_nil (of_eq_false Channels.stateChannel_eq_byteChannel_false),
-      List.append_nil, List.append_nil]
-    exact balancedInteractions_pair (by native_decide) (neg_add_cancel 1)
-      (Or.inl sp1Prime_char_pos_facts.1)
+      List.nil_append, List.nil_append]
+    exact balancedInteractions_append_halt (by norm_num)
+      (balancedInteractions_pair (by native_decide) (neg_add_cancel 1)
+        (Or.inl sp1Prime_char_pos_facts.1)).2
+      (by simp only [Channel.toRaw_name, Channels.stateChannel]; decide)
   · show BalancedInteractions (jointWitness.interactionsWith byteChannel.toRaw)
     rw [jointWitness_byteInteractions]
-    refine balancedInteractions_of_member_balance ?_ (by native_decide)
-    rw [show byteInteractions.length = 15 from by native_decide, ZMod.ringChar_zmod_n]
-    norm_num [SP1Prime]
+    exact balancedInteractions_append_halt
+      (by rw [show byteInteractions.length = 15 from by native_decide]; norm_num)
+      byteInteractions_balanced.2
+      (by simp only [Channel.toRaw_name, Channels.byteChannel]; decide)
   · show BalancedInteractions (jointWitness.interactionsWith programChannel.toRaw)
     rw [jointWitness_interactionsWith_split, jointWitness_verifierProgram_nil,
       u8RangeTable_interactionsWith_nil (of_eq_false Channels.programChannel_eq_byteChannel_false),
       range16Table_interactionsWith_nil
-        (of_eq_false Channels.programChannel_eq_byteChannel_false)]
-    exact balancedInteractions_nil (Or.inl sp1Prime_char_pos_facts.2)
+        (of_eq_false Channels.programChannel_eq_byteChannel_false),
+      List.nil_append, List.nil_append]
+    exact balancedInteractions_append_halt (by norm_num) (fun _ => rfl)
+      (by simp only [Channel.toRaw_name, Channels.programChannel]; decide)
   · show BalancedInteractions (jointWitness.interactionsWith memoryChannel.toRaw)
     rw [jointWitness_interactionsWith_split, jointWitness_verifierMemory_nil,
       u8RangeTable_interactionsWith_nil (of_eq_false Channels.memoryChannel_eq_byteChannel_false),
       range16Table_interactionsWith_nil
-        (of_eq_false Channels.memoryChannel_eq_byteChannel_false)]
-    exact balancedInteractions_nil (Or.inl sp1Prime_char_pos_facts.2)
+        (of_eq_false Channels.memoryChannel_eq_byteChannel_false),
+      List.nil_append, List.nil_append]
+    exact balancedInteractions_append_halt (by norm_num) (fun _ => rfl)
+      (by simp only [Channel.toRaw_name, Channels.memoryChannel]; decide)
+  · show BalancedInteractions (jointWitness.interactionsWith exitChannel.toRaw)
+    rw [jointWitness_exitInteractions]
+    refine balancedInteractions_of_member_balance ?_ (by native_decide)
+    rw [show exitInteractions.length = 3 from by native_decide, ZMod.ringChar_zmod_n]
+    norm_num [SP1Prime]
 
 /-! ## The concrete initial Sail state
 
@@ -796,14 +927,17 @@ theorem anchorState_romLoaded : RomLoaded anchorProgram anchorState := by
 theorem programProviderTable_table_nil :
     (programProviderTable (p := SP1Prime) jointWitness).table = [] :=
   jointTables_table_nil_of_ne 35 (by rw [jointTables_length]; omega) (by omega) (by omega)
+    (by omega)
 
 theorem memoryInitProviderTable_table_nil :
     (memoryInitProviderTable (p := SP1Prime) jointWitness).table = [] :=
   jointTables_table_nil_of_ne 36 (by rw [jointTables_length]; omega) (by omega) (by omega)
+    (by omega)
 
 theorem memoryFinalizeProviderTable_table_nil :
     (memoryFinalizeProviderTable (p := SP1Prime) jointWitness).table = [] :=
   jointTables_table_nil_of_ne 37 (by rw [jointTables_length]; omega) (by omega) (by omega)
+    (by omega)
 
 theorem jointWitness_programProviderBound :
     ProgramProviderBound (p := SP1Prime) jointWitness := by
@@ -981,9 +1115,9 @@ theorem anchorBoundaryFacts : InitialBoundaryFacts stmt jointWitness anchorState
 
 /-- **Joint non-vacuity of the capstone's hypothesis bundle.**  The boundary-only shard with equal
 public State endpoints satisfies the complete `SupportedCoreNativeRelation` at the concrete prime:
-the raw ensemble relation (constraints + four-bus balance, the Byte bus balanced by the two honest
-provider tables) and the semantic boundary binding (with the committed one-instruction program and
-the concrete configured initial state).  Those two conjuncts are the whole relation — the memory
+the raw ensemble relation (constraints + five-bus balance, the Byte bus balanced by the two honest
+provider tables and the Exit bus by the mandatory Halt padding row) and the semantic boundary
+binding (with the committed one-instruction program and the concrete configured initial state).  Those two conjuncts are the whole relation — the memory
 pull-timestamp range fact that used to ride along as a third companion is now derived inside the
 capstone from the per-location Memory balance.  Applying `supported_core_native_sound` to this
 witness yields the honest 0-step local Sail execution between the equal endpoints. -/
