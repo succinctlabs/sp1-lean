@@ -158,8 +158,9 @@ verifier pulls `⟨exit_code⟩` **ungated**, and every Halt-table row pushes ei
 word (when live) or the zero code (when padding), so balance forces exactly one physical Halt row,
 `exit_code = 0` on an ordinary shard, and `exit_code = reduce(a0)` on a halting one. The halt row
 additionally pins `a0`'s upper three limbs to zero — a disclosed 16-bit exit-code profile
-restriction, without which the single committed field cell cannot decode back to `a0` (SP1's own
-reduce wraps modulo a prime below `2^32`).
+restriction, so that the single committed field cell decodes back to `a0`. The restriction is ours
+and narrower than upstream's: SP1's halt arm instead bounds `op_b` to a valid field element, which
+caps its reduction at `p - 1` so the decode never wraps.
 
 ### The first whole-execution claim
 

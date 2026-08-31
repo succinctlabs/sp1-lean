@@ -177,12 +177,15 @@ Two disclosures attach to the halting branch:
   6 Memory). Closing this needs a *gated projection* anchor — agreement on rows whose syscall-code
   selector is `HALT` and whose excluded-bus terms vanish — which in turn needs the syscall bus in
   ensemble scope. Until then the restriction relation is reviewed prose, not a theorem.
-* **A 16-bit exit-code profile restriction.** The halt row pins `a0`'s upper three limbs to zero.
-  Without it the single committed `exit_code` field cell cannot be decoded back to `a0` at all,
-  because SP1's own `b().reduce()` folds the whole 64-bit word into one cell of a prime below
-  `2^32` and therefore wraps. This is a *strengthening* of the AIR (an honest prover of a
-  larger exit code cannot produce a satisfying halt row), disclosed here rather than hidden in the
-  contract.
+* **A 16-bit exit-code profile restriction — ours, not SP1's.** The halt row pins `a0`'s upper
+  three limbs to zero, so only a 16-bit exit code can satisfy it. This is a *strengthening* of the
+  AIR (an honest prover of a larger exit code cannot produce a satisfying halt row), disclosed here
+  rather than hidden in the contract. It is **not** forced by the single-cell `reduce()`: SP1's own
+  halt arm constrains `op_b` to be a valid field element — upper limbs zero, and limb 1 bounded by
+  a `U16CompareOperation` against `32512 = 0x7F00` — which caps `reduce(op_b)` at exactly
+  `p - 1 = 2130706432`, so upstream the decode never wraps. Our restriction exists only because
+  `HaltChip` omits that compare; reproducing it widens the profile to SP1's own ~31-bit range and
+  removes this disclosure entirely.
 
 The **compiler** direction does not yet emit a live halt row, so the totality-conditional
 correctness and language-equality statements are relative to
@@ -343,7 +346,7 @@ recomputed and matched cell-for-cell), and the independent Rust interpreter diff
 | Native semantic boundary relation | native provider tables must mean the selected program/state | derive from exact Program/Memory/Global system tables |
 | `SyscallHandler` | Sail does not implement SP1 host syscalls | `ExecutableSyscallHandler.haltOnly` is now a *concrete* handler for the one claimed syscall (`HALT`), so the halting conclusion rests on a named executable host semantics rather than an opaque relation; every other syscall still evaluates to `none` (outside the profile) |
 | Native `HaltChip` | SP1's ECALL row is a multi-arm dispatcher (`IsZero` selectors for syscall codes 0/3/16/26/240) that also sends on the global `.syscall` bus, which the supported profile's channels exclude; `HaltChip` implements the `HALT` arm alone | the Rust oracle exists (`Extracted/SystemOracle/SyscallInstrs.lean`) but no `ChipFaithful` anchor does — whole-row assertion/interaction equality is false between an arm and its dispatcher; the restriction relation is reviewed prose. Close it with a gated-projection anchor once the syscall bus is in ensemble scope |
-| 16-bit exit codes | the halt row pins `a0`'s upper three limbs to zero so the single committed `exit_code` cell decodes back to `a0`; SP1's own `b().reduce()` wraps modulo a prime below `2^32` | widen when the public-values block carries enough cells to hold a full `u32`/`u64` exit code, or when a range-checked decomposition is added |
+| 16-bit exit codes | the halt row pins `a0`'s upper three limbs to zero so the single committed `exit_code` cell decodes back to `a0`. Ours, not upstream's: SP1's halt arm bounds `op_b` to a valid field element (`U16CompareOperation` vs `32512`), capping `reduce(op_b)` at `p - 1`, so it never wraps | reproduce SP1's compare instead of pinning limb 1 — widens to upstream's ~31-bit range and retires this row |
 | Preprocessed commitment | verifying key must bind the Program/provider trace | discharge in PCS/ArkLib layer |
 | Exact natural balance | execution needs a real multiset, not modular equality | extract with LogUp/GKR soundness and bounds |
 | Shard ledger cryptography | cumulative sums and deferred proofs are recursive-proof facts | prove in recursion/verifier layer |

@@ -263,7 +263,8 @@ and no widening of the public-values record: the Halt table has exactly one phys
 ordinary shard's committed `exit_code` is `0`; and a halting shard's is `reduce(a0)`. That is the
 dichotomy `supported_core_witness_grounding` case-splits on, and it is why the halting conclusion
 needs no extra hypothesis at the capstone. The halt row additionally pins `a0`'s upper three limbs
-to zero — a **disclosed 16-bit exit-code profile restriction**, without which the single committed
+to zero — a **disclosed 16-bit exit-code profile restriction** (ours, not upstream's: SP1 instead
+bounds `op_b` to a valid field element, so its decode never wraps), without which the single committed
 field cell cannot decode back to `a0`, since SP1's own reduce wraps modulo a prime below `2^32`.
 
 The whole-machine proof derives meaning in this order:

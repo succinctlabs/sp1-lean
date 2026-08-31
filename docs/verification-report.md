@@ -758,9 +758,10 @@ and pins the committed exit code to `0` or to `reduce(a0)` accordingly, which is
 (`Extracted/SystemOracle/SyscallInstrs.lean`), but whole-row assertion and interaction equality is
 false between a single arm and the multi-arm dispatcher SP1 actually compiles, which also sends on
 a global syscall bus the supported profile's channels exclude — and the halt row pins `a0`'s upper
-three limbs to zero — a 16-bit exit-code profile restriction without which the single committed field
-cell cannot be decoded back to `a0`, since SP1's own `b().reduce()` wraps modulo a prime below
-`2^32`.
+three limbs to zero — a 16-bit exit-code profile restriction that is ours rather than upstream's.
+SP1's halt arm bounds `op_b` to a valid field element (upper limbs zero, limb 1 compared against
+`32512 = 0x7F00`), capping `reduce(op_b)` at exactly `p - 1`, so its single committed cell never
+wraps; our narrower pin exists only because `HaltChip` omits that compare.
 
 One corollary steps outside the shard: `supported_core_boot_to_halt_single_shard`
 (`SP1Clean/Soundness/BootHalt.lean`) adds a *boot* semantic boundary (`BootBoundaryFacts`:

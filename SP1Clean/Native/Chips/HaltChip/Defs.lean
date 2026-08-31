@@ -100,8 +100,10 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
   assertZero (input.is_real * input.x5_memory.prev_value[3])
   -- The exit code fits one 16-bit limb: `x10`'s upper three limbs vanish.  This is the disclosed
   -- profile strengthening that makes the single committed `exit_code` cell reconstruct the exact
-  -- 64-bit `a0` value — SP1's own AIR reduces the whole word into one cell, which wraps mod `p`
-  -- for `a0 ≥ p` (KoalaBear is below `2 ^ 32`), so no unconditional decode exists there.
+  -- 64-bit `a0` value.  It is narrower than SP1's own halt arm, which pins limbs 2 and 3 and then
+  -- bounds limb 1 with a `U16CompareOperation` against `32512 = 0x7F00` (the "op_b is a valid
+  -- SP1Field word" check): that caps the reduction at `p - 1`, so upstream's decode never wraps
+  -- either.  Reproducing the compare here is what widens this to SP1's own range.
   assertZero (input.is_real * input.x10_memory.prev_value[1])
   assertZero (input.is_real * input.x10_memory.prev_value[2])
   assertZero (input.is_real * input.x10_memory.prev_value[3])
