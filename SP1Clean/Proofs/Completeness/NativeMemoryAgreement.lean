@@ -864,8 +864,26 @@ theorem nativeTrace_memoryLedgerPermHandoffChains
     accessAt (MemoryHistoryAccess.entryKey (p := p) entry) (-1)
   let bumpLedger := compiled.bumpMemoryHistory.flatMap
     (MemoryHistoryAccess.ledger (p := p))
-  rw [memoryLedger_eq, active_append, active_append, active_append,
-    nativeTrace_activeMemoryInitLedger, nativeTrace_activeMemoryFinalizeLedger]
+  have haltInactive : active ((typedTableInteractionsWith
+      (haltTable (nativeTrace statement execution).witness) memoryChannel).map
+        fun i => Interaction.toAccess i.raw) = [] := by
+    obtain ⟨-, hpad⟩ := (nativeTrace statement execution).haltTablePadding
+    rw [active, List.filter_eq_nil_iff]
+    intro access accessMem
+    obtain ⟨i, iMem, rfl⟩ := List.mem_map.mp accessMem
+    rw [haltTable_typedMemory] at iMem
+    obtain ⟨row, rowMem, iMem⟩ := List.mem_flatMap.mp iMem
+    have hzero := hpad row rowMem
+    simp only [List.mem_cons, List.not_mem_nil, or_false] at iMem
+    rcases iMem with rfl | rfl | rfl | rfl | rfl | rfl <;>
+      simp only [TypedInteraction.pulledIfValue_raw, TypedInteraction.pushedIfValue_raw,
+        toAccess_pulledIfValue, toAccess_pushedIfValue, hzero, neg_zero,
+        LookupAccessList.accessAt, multOf, signedVal, ZMod.val_zero, Nat.cast_zero,
+        Nat.mul_zero, ne_eq, decide_not] <;>
+      simp
+  rw [memoryLedger_eq, active_append, active_append, active_append, active_append,
+    nativeTrace_activeMemoryInitLedger, nativeTrace_activeMemoryFinalizeLedger, haltInactive,
+    List.append_nil]
   have projected' :
       (active (physicalInstructionMemoryLedger trace) ++
         (initLedger ++ (finalizeLedger ++ active (physicalMemoryBumpLedger trace)))).Perm

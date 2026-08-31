@@ -109,16 +109,18 @@ theorem stateBumpProgramInteractions_eq_nil :
   simp [Channels.programChannel_eq_byteChannel_false,
     Channels.programChannel_eq_stateChannel_false]
 
-/-- None of the four non-preprocessed provider tables name the Program channel. -/
-theorem providerSuffixProgramInteractions_eq_nil :
+/-- The non-preprocessed provider suffix's Program interactions are exactly the halt table's
+gated ECALL fetch pulls (the four Memory/State system tables are Program-silent). -/
+theorem providerSuffixProgramInteractions_eq :
     (trace.providerTables.drop preprocessedProviderTableCount).flatMap
-      (typedTableInteractionsWith · programChannel) = [] := by
+      (typedTableInteractionsWith · programChannel) =
+    typedTableInteractionsWith (trace.providerTableFor .halt) programChannel := by
   rw [providerTables_drop_preprocessed]
   simp only [List.flatMap_cons, List.flatMap_nil,
     trace.memoryInitProgramInteractions_eq_nil,
     trace.memoryFinalizeProgramInteractions_eq_nil,
     trace.memoryBumpProgramInteractions_eq_nil,
-    trace.stateBumpProgramInteractions_eq_nil, List.nil_append]
+    trace.stateBumpProgramInteractions_eq_nil, List.nil_append, List.append_nil]
 
 /-- The skeleton verifier table does not name the Program channel. -/
 theorem skeletonVerifierProgramInteractions_eq_nil :
@@ -171,8 +173,31 @@ theorem skeleton_program_mult_nonpos (wf : trace.WellFormed) {access : LookupAcc
           (typedTableInteractionsWith · programChannel) := by
       rw [tables_drop_preprocessed] at suffix
       exact List.mem_flatMap.mpr ⟨table, suffix, interactionMem⟩
-    rw [trace.providerSuffixProgramInteractions_eq_nil] at suffixMem
-    simp only [List.not_mem_nil] at suffixMem
+    rw [trace.providerSuffixProgramInteractions_eq] at suffixMem
+    -- the halt table's Program interactions are gated pulls: mult ∈ {0, -1}
+    rw [← trace.haltTable_witness, haltTable_typedProgram] at suffixMem
+    obtain ⟨row, rowMem, hmem⟩ := List.mem_flatMap.mp suffixMem
+    rw [List.mem_singleton] at hmem
+    subst hmem
+    have hp : 2 < p := by have := Fact.out (p := 2 ^ 25 < p); omega
+    change signedVal (TypedInteraction.pulledIfValue programChannel
+      (haltRow (haltTable trace.witness) row).is_real
+      (HaltChip.programMessage (haltRow (haltTable trace.witness) row))).raw.mult ≤ 0
+    rcases witness_haltRows_selectorBinary trace.witness
+        (trace.witness_constraints wf) row rowMem with h0 | h1
+    · rw [show (TypedInteraction.pulledIfValue programChannel
+          (haltRow (haltTable trace.witness) row).is_real
+          (HaltChip.programMessage (haltRow (haltTable trace.witness) row))).raw.mult =
+          -(haltRow (haltTable trace.witness) row).is_real from rfl, h0, neg_zero,
+        signedVal_is_real hp (Or.inl rfl), ZMod.val_zero]
+      norm_num
+    · rw [show (TypedInteraction.pulledIfValue programChannel
+          (haltRow (haltTable trace.witness) row).is_real
+          (HaltChip.programMessage (haltRow (haltTable trace.witness) row))).raw.mult =
+          -(haltRow (haltTable trace.witness) row).is_real from rfl, h1,
+        signedVal_neg_is_real hp (Or.inr rfl), ZMod.val_one_eq_one_mod,
+        Nat.mod_eq_of_lt (by omega)]
+      norm_num
 
 /-- The one residual polarity fact: only Byte accesses in the provider-free *actual Clean ledger*
 need to be supplied. -/

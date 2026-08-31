@@ -913,7 +913,9 @@ theorem DecodedInstructionRow.programTruth_of_active
     (constraints : witness.Constraints) (balanced : witness.BalancedChannels)
     (providerBound : ProgramProviderBound witness)
     (decodedMem : decoded ∈ decodedInstructionRows (p := p) witness.tables)
-    (active : (decoded.toChipRow witness.data).is_real = 1) :
+    (active : (decoded.toChipRow witness.data).is_real = 1)
+    (opcodeNe : (programAccess (decoded.toChipRow witness.data).view).toRow.opcode ≠
+      ((Opcode.ECALL).toNat : ZMod p)) :
     ProgTruth (programMessageOfView (decoded.toChipRow witness.data).view) witness.data := by
   let consumers :=
     decodedWitnessInstructionInteractionsWith witness.data witness.tables programChannel
@@ -975,42 +977,96 @@ theorem DecodedInstructionRow.programTruth_of_active
   have truth := providerBound provider.raw rawMem (by
     simpa only [TypedInteraction.mult] using providerNonzero)
   have reboundEq : rebound = provider := TypedInteraction.raw_injective rfl
-  change ProgTruth rebound.message witness.data at truth
+  change Semantics.CommittedProgTruth rebound.message witness.data at truth
   rw [reboundEq] at truth
   rw [messageEq] at truth
-  simpa only [target, TypedInteraction.pulledIfValue_message] using truth
+  have committed : Semantics.CommittedProgTruth
+      (programMessageOfView (decoded.toChipRow witness.data).view) witness.data := by
+    simpa only [target, TypedInteraction.pulledIfValue_message] using truth
+  exact committed.progTruth_of_opcode_ne
+    (by simpa only [rowOfMsg_programMessageOfView] using opcodeNe)
 
-/-- Program grounding after erasing the retained dependent descriptor: every active canonical
-`ChipRow` is decoded from the program named by the semantic statement binding. -/
-theorem witness_realDecodedChipRows_programDecoded
+/-- **The halt row's committed `ECALL` fetch.**  An active Halt row's Program-bus pull is matched
+by an active committed-provider push, and the received row's opcode is the pinned `ECALL`
+discriminant, so the committed guest program holds the literal `ECALL` word at the halt pc and the
+pulled row is the transpiled `ECALL` shape (`committedInROM.ecall_of_opcode`). -/
+theorem witness_haltRow_ecallTruth
     (witness : EnsembleWitness (sp1Ensemble (p := p)))
     (constraints : witness.Constraints) (balanced : witness.BalancedChannels)
-    (providerBound : ProgramProviderBound witness) (program : Target.GuestProgram)
-    (programCommitted : Commit.StatementFor witness.data program) :
-    ∀ row ∈ realDecodedChipRows witness.data witness.tables,
-      Target.decodedInROM program (programAccess row.view).toRow := by
-  intro row rowMem
-  rw [realDecodedChipRows, decodedChipRows, List.mem_filter] at rowMem
-  simp only [decide_eq_true_eq] at rowMem
-  obtain ⟨decoded, decodedMem, rfl⟩ := List.mem_map.mp rowMem.1
-  have truth := decoded.programTruth_of_active witness constraints balanced providerBound decodedMem
-    rowMem.2
-  have decodedTruth := truth.2
-  rw [programCommitted.2] at decodedTruth
-  simpa only [rowOfMsg_programMessageOfView] using decodedTruth
-
-/-- Exhaustive reordering preserves committed-program decode truth row by row. -/
-theorem witness_orderedRows_programDecoded
-    (witness : EnsembleWitness (sp1Ensemble (p := p)))
-    (constraints : witness.Constraints) (balanced : witness.BalancedChannels)
-    (providerBound : ProgramProviderBound witness) (program : Target.GuestProgram)
-    (programCommitted : Commit.StatementFor witness.data program)
-    (orderedRows : List (ChipRow p))
-    (exhaustive : orderedRows.Perm (realDecodedChipRows witness.data witness.tables)) :
-    ∀ row ∈ orderedRows,
-      Target.decodedInROM program (programAccess row.view).toRow := by
-  intro row rowMem
-  exact witness_realDecodedChipRows_programDecoded witness constraints balanced providerBound program
-    programCommitted row (exhaustive.mem_iff.mp rowMem)
+    (providerBound : ProgramProviderBound witness)
+    {row : Array (ZMod p)} (rowMem : row ∈ realHaltRows witness) :
+    (Commit.progOf witness.data).fetchWord
+        (Target.pcBitsOfRow (rowOfMsg
+          (HaltChip.programMessage (haltRow (haltTable witness) row)))) =
+        some Target.ECALL_ENC ∧
+      rowOfMsg (HaltChip.programMessage (haltRow (haltTable witness) row)) =
+        Target.ecallProgramRow (Target.rowPcVec (rowOfMsg
+          (HaltChip.programMessage (haltRow (haltTable witness) row)))) := by
+  obtain ⟨rowTableMem, active⟩ := mem_realHaltRows witness rowMem
+  let consumers :=
+    decodedWitnessInstructionInteractionsWith witness.data witness.tables programChannel
+  let haltPulls := typedTableInteractionsWith (haltTable witness) programChannel
+  let target := TypedInteraction.pulledIfValue programChannel
+    (haltRow (haltTable witness) row).is_real
+    (HaltChip.programMessage (haltRow (haltTable witness) row))
+  have targetMem : target ∈ haltPulls := by
+    dsimp only [haltPulls]
+    rw [haltTable_typedProgram]
+    exact List.mem_flatMap.mpr ⟨row, rowTableMem, by simp [target]⟩
+  have targetPull : target.mult = -1 := by
+    simp [target, active]
+  have consumerShape : ∀ interaction ∈ consumers ++ haltPulls,
+      interaction.mult = 0 ∨ interaction.mult = -1 := by
+    intro interaction interactionMem
+    rcases List.mem_append.mp interactionMem with h | h
+    · exact decodedWitnessProgramInteractions_pullShape witness constraints interaction h
+    · dsimp only [haltPulls] at h
+      rw [haltTable_typedProgram] at h
+      obtain ⟨row', rowMem', hmem⟩ := List.mem_flatMap.mp h
+      rw [List.mem_singleton] at hmem
+      subst hmem
+      rcases witness_haltRows_selectorBinary witness constraints row' rowMem' with h0 | h1
+      · left; rw [TypedInteraction.pulledIfValue_mult, h0, neg_zero]
+      · right; rw [TypedInteraction.pulledIfValue_mult, h1]
+  have channelBalanced := typedInteractions_balanced witness balanced programChannel
+    (by simp [sp1Ensemble_channels])
+  let table := programProviderTable witness
+  have tableAt := programProviderTable_getElem? witness
+  have ensembleShape : typedEnsembleInteractionsWith witness programChannel =
+      consumers ++ (typedTableInteractionsWith table programChannel ++ haltPulls) := by
+    rw [typedEnsembleInteractionsWith_partition,
+      witness_verifierProgramInteractions_eq_nil,
+      witness_providerProgramInteractions_eq witness table tableAt]
+    rfl
+  rw [ensembleShape] at channelBalanced
+  have channelBalanced' :
+      BalancedInteractions
+        (((consumers ++ haltPulls) ++ typedTableInteractionsWith table programChannel).map
+          TypedInteraction.raw) :=
+    balancedInteractions_of_perm channelBalanced
+      (List.Perm.map _
+        (((List.perm_append_comm ..).append_left consumers).trans
+          (List.Perm.of_eq (List.append_assoc consumers haltPulls _).symm)))
+  obtain ⟨provider, providerMem, messageEq, providerNonzero⟩ :=
+    provider_matches_active_pull (consumers ++ haltPulls)
+      (typedTableInteractionsWith table programChannel)
+      channelBalanced' consumerShape target
+      (List.mem_append.mpr (Or.inr targetMem)) targetPull
+  have rawMem : provider.raw ∈ table.interactionsWith programChannel.toRaw := by
+    rw [← typedTableInteractionsWith_raw]
+    exact List.mem_map_of_mem providerMem
+  let rebound : TypedInteraction programChannel :=
+    { raw := provider.raw
+      channel_eq := table.channel_eq_of_mem_interactionsWith rawMem }
+  have truth := providerBound provider.raw rawMem (by
+    simpa only [TypedInteraction.mult] using providerNonzero)
+  have reboundEq : rebound = provider := TypedInteraction.raw_injective rfl
+  change Semantics.CommittedProgTruth rebound.message witness.data at truth
+  rw [reboundEq] at truth
+  rw [messageEq] at truth
+  have committed : Semantics.CommittedProgTruth
+      (HaltChip.programMessage (haltRow (haltTable witness) row)) witness.data := by
+    simpa only [target, TypedInteraction.pulledIfValue_message] using truth
+  exact committed.2.ecall_of_opcode rfl
 
 end SP1Clean.Soundness

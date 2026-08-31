@@ -128,6 +128,18 @@ theorem localMemTruth_of_initial {initial : SailState} {initialClock : ℕ}
   ⟨isU64, clkBound, localValueAt_of_initial content before⟩
 
 set_option linter.unusedSectionVars false in
+/-- Raw form of `localValueAt_stepStart_iff`: at the beginning of semantic step `steps`, local
+micro-time *is* the reached pre-state's content. -/
+theorem microValue_stepStart {initial state : SailState} {initialClock steps : ℕ}
+    (chain : SailChain steps initial state) (location : MemLoc) :
+    microValue initial initialClock location (initialClock + 8 * steps) =
+      locContent state location := by
+  unfold microValue
+  rw [if_neg (by omega), Nat.add_sub_cancel_left, show 8 * steps / 8 = steps by omega,
+    show 8 * steps % 8 = 0 by omega]
+  cases location <;> norm_num <;> rw [chainState_of_sailChain chain] <;> rfl
+
+set_option linter.unusedSectionVars false in
 /-- At the beginning of semantic step `steps`, local micro-time reads exactly the reached pre-state.
 This is the generic bridge from timed Memory currency to the live Sail state used by chip dispatch. -/
 theorem localValueAt_stepStart_iff {initial state : SailState} {initialClock steps : ℕ}
@@ -262,6 +274,31 @@ derived from balance against the ROM provider plus the program-commitment bindin
 def ProgTruth (m : ProgramMsg (ZMod p)) (data : ProverData (ZMod p)) : Prop :=
   SP1Clean.Channels.ProgramMsg.RowSpec m ∧
     SP1Clean.Soundness.Target.decodedInROM (Commit.progOf data) (rowOfMsg m)
+
+/-- **Committed-fragment truth** — `ProgTruth` re-based on the whole committed fragment (the
+halt-table wave): the message decodes structurally (`RowSpec`), and its row is committed — either
+the hoisted decode of a routed instruction or the transpiled `ECALL` site (`committedInROM`).  The
+Program provider certifies this weaker predicate; each instruction chip recovers `ProgTruth`
+through `committedInROM.decoded_of_opcode_ne` with its pinned non-`ECALL` opcode, and the halt
+table takes `committedInROM.ecall_of_opcode`. -/
+def CommittedProgTruth (m : ProgramMsg (ZMod p)) (data : ProverData (ZMod p)) : Prop :=
+  SP1Clean.Channels.ProgramMsg.RowSpec m ∧
+    SP1Clean.Soundness.Target.committedInROM (Commit.progOf data) (rowOfMsg m)
+
+omit [Fact (2 ^ 17 < p)] in
+/-- The instruction-chip fragment embeds. -/
+theorem ProgTruth.committed {m : ProgramMsg (ZMod p)} {data : ProverData (ZMod p)}
+    (h : ProgTruth m data) : CommittedProgTruth m data :=
+  ⟨h.1, h.2.committed⟩
+
+omit [Fact (2 ^ 17 < p)] in
+/-- The per-chip strengthening step: a committed fetch whose pinned opcode is not `ECALL`'s is a
+genuine decoded fetch. -/
+theorem CommittedProgTruth.progTruth_of_opcode_ne {m : ProgramMsg (ZMod p)}
+    {data : ProverData (ZMod p)} (h : CommittedProgTruth m data)
+    (hne : (rowOfMsg m).opcode ≠ ((SP1Clean.Soundness.Opcode.ECALL).toNat : ZMod p)) :
+    ProgTruth m data :=
+  ⟨h.1, h.2.decoded_of_opcode_ne hne⟩
 
 set_option linter.unusedSectionVars false in
 /-- **`ProgTruth` → the RV64-decoded instruction.** From a fetch message's `ProgTruth`, the genuine

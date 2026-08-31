@@ -292,4 +292,74 @@ theorem BitwiseChip.rowViewOpCBinding_of_constraints (env : Environment (ZMod p)
     Readers.ALUTypeReader.eval_opCPrev, Readers.ALUTypeReader.eval_opC]
   simpa only [readerInput, BitwiseChip.aluTypeReaderInput] using binding
 
+/-- With binary flags summing to one, Bitwise's committed opcode combination avoids `ECALL`'s
+discriminant `50`. -/
+private theorem BitwiseChip.flagCombo_ne_ecall {x y z : ZMod p}
+    (hx : x = 0 ∨ x = 1) (hy : y = 0 ∨ y = 1) (hz : z = 0 ∨ z = 1)
+    (hsum : x + y + z = 1) :
+    x * 3 + y * 4 + z * 5 ≠ (50 : ZMod p) := by
+  obtain ⟨a, ha, rfl⟩ : ∃ a : ℕ, a ≤ 1 ∧ x = (a : ZMod p) := by
+    rcases hx with h | h
+    · exact ⟨0, Nat.zero_le 1, by rw [h, Nat.cast_zero]⟩
+    · exact ⟨1, Nat.le_refl 1, by rw [h, Nat.cast_one]⟩
+  obtain ⟨b, hb, rfl⟩ : ∃ b : ℕ, b ≤ 1 ∧ y = (b : ZMod p) := by
+    rcases hy with h | h
+    · exact ⟨0, Nat.zero_le 1, by rw [h, Nat.cast_zero]⟩
+    · exact ⟨1, Nat.le_refl 1, by rw [h, Nat.cast_one]⟩
+  obtain ⟨c, hc, rfl⟩ : ∃ c : ℕ, c ≤ 1 ∧ z = (c : ZMod p) := by
+    rcases hz with h | h
+    · exact ⟨0, Nat.zero_le 1, by rw [h, Nat.cast_zero]⟩
+    · exact ⟨1, Nat.le_refl 1, by rw [h, Nat.cast_one]⟩
+  have hp : (131072 : ℕ) < p := by
+    have hfact : (2 : ℕ) ^ 17 < p := Fact.out
+    norm_num at hfact
+    exact hfact
+  have hsumNat : ((a + b + c : ℕ) : ZMod p) = ((1 : ℕ) : ZMod p) := by exact_mod_cast hsum
+  have hs := congrArg ZMod.val hsumNat
+  rw [ZMod.val_natCast_of_lt (by omega), ZMod.val_natCast_of_lt (by omega)] at hs
+  intro h
+  have hcast : ((a * 3 + b * 4 + c * 5 : ℕ) : ZMod p) = ((50 : ℕ) : ZMod p) := by
+    exact_mod_cast h
+  have hval := congrArg ZMod.val hcast
+  rw [ZMod.val_natCast_of_lt (by omega), ZMod.val_natCast_of_lt (by omega)] at hval
+  omega
+
+/-- A real physical Bitwise row's Program-bus opcode is never the `ECALL` discriminant `50`
+(the committed-fragment re-base's per-chip strengthening fact). -/
+theorem BitwiseChip.physicalViewOpcode_ne_ecall (env : Environment (ZMod p))
+    (constraints :
+      (⟨BitwiseChip.circuit (p := p)⟩ : Component (ZMod p)).operations.ConstraintsHold env)
+    (real : (BitwiseChip.physicalView env).is_real = 1) :
+    (BitwiseChip.physicalView env).opcode ≠ (50 : ZMod p) := by
+  let input : Var BitwiseChip.Inputs (ZMod p) := varFromOffset BitwiseChip.Inputs 0
+  let offset := size BitwiseChip.Inputs
+  have mainConstraints : ((BitwiseChip.main input).operations offset).ConstraintsHold env :=
+    (Component.constraintsHold_iff env).mp constraints
+  have control := BitwiseChip.controlFacts_of_mainConstraints input offset env mainConstraints
+  have realInput : Expression.eval env input.is_real = 1 := by
+    have realValue : (Eval.eval env input).is_real = 1 :=
+      (BitwiseChip.physicalView_isReal env).symm.trans real
+    exact (BitwiseChip.eval_inputIsReal env input).symm.trans realValue
+  have sumOne : Expression.eval env (var { index := offset }) +
+      Expression.eval env (var { index := offset + 1 }) +
+        Expression.eval env (var { index := offset + 2 }) = 1 :=
+    control.selectorLink.symm.trans realInput
+  have notEcall :
+      Expression.eval env (var { index := offset }) * 3 +
+          Expression.eval env (var { index := offset + 1 }) * 4 +
+          Expression.eval env (var { index := offset + 2 }) * 5 ≠ (50 : ZMod p) :=
+    BitwiseChip.flagCombo_ne_ecall control.xorBinary control.orBinary control.andBinary sumOne
+  have outputEq : Eval.eval env ((BitwiseChip.circuit (p := p)).output input offset) =
+      BitwiseChip.physicalCols env := by
+    simp only [input, offset, BitwiseChip.physicalCols, Component.rowOutput, circuit_norm]
+  show (BitwiseChip.physicalCols env).is_xor * 3 + (BitwiseChip.physicalCols env).is_or * 4 +
+    (BitwiseChip.physicalCols env).is_and * 5 ≠ (50 : ZMod p)
+  rw [← outputEq]
+  change (Eval.eval env ((BitwiseChip.elaborated (p := p)).output input offset)).is_xor * 3 +
+      (Eval.eval env ((BitwiseChip.elaborated (p := p)).output input offset)).is_or * 4 +
+      (Eval.eval env ((BitwiseChip.elaborated (p := p)).output input offset)).is_and * 5 ≠
+    (50 : ZMod p)
+  rw [BitwiseChip.directOutput_eq, BitwiseChip.eval_columns]
+  simpa only [offset, circuit_norm] using notEcall
+
 end SP1Clean.Soundness

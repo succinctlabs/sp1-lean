@@ -62,7 +62,8 @@ access clock `clk_low + off`. -/
 
 /-- The Exit-bus payload of a real row: the **reduced** `x10`/`a0` word — SP1's `b().reduce()`
 (`crates/core/machine/src/syscall/instructions/air.rs:487`), `w0 + w1·2^16 + w2·2^32 + w3·2^48`.
-With the gated high-limb zero checks below, this is exactly the u32 exit code. -/
+With the gated upper-limb zero checks below this is exactly the low limb, so the single committed
+`exit_code` cell decodes back to `a0` with no modular wraparound. -/
 @[circuit_norm] def exitMsg (input : Var Inputs (ZMod p)) : ExitMsg (Expression (ZMod p)) :=
   ⟨input.x10_memory.prev_value[0] +
     (input.x10_memory.prev_value[1] +
@@ -93,9 +94,11 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
   assertZero (input.is_real * input.x5_memory.prev_value[1])
   assertZero (input.is_real * input.x5_memory.prev_value[2])
   assertZero (input.is_real * input.x5_memory.prev_value[3])
-  -- The exit code is a u32: the `x10` word's high limbs vanish — the profile strengthening that
-  -- makes the committed `exit_code` cell reconstruct the exact 64-bit `a0` value (SP1's own AIR
-  -- reduces the full word without this check, wrapping mod p for `a0 ≥ 2^32`).
+  -- The exit code fits one 16-bit limb: `x10`'s upper three limbs vanish.  This is the disclosed
+  -- profile strengthening that makes the single committed `exit_code` cell reconstruct the exact
+  -- 64-bit `a0` value — SP1's own AIR reduces the whole word into one cell, which wraps mod `p`
+  -- for `a0 ≥ p` (KoalaBear is below `2 ^ 32`), so no unconditional decode exists there.
+  assertZero (input.is_real * input.x10_memory.prev_value[1])
   assertZero (input.is_real * input.x10_memory.prev_value[2])
   assertZero (input.is_real * input.x10_memory.prev_value[3])
   -- Three pure register reads: read-prior pull + read-back push (`x5` at `+4`, `x10` at `+3`,

@@ -42,7 +42,9 @@ theorem NativeTraceReady.balancedChannels
     (ready.wellFormed publicWellFormed) ready.demandServable
     (ready.skeletonNonpositive publicWellFormed) stateKeys memoryKeys
     (ready.stateLedgerPerm publicWellFormed) ready.memoryLedgerPerm
-    (NativeTraceFootprint.interactionLengths fits)
+    ((nativeBaseTrace statement execution).canonicalClosure.haltTablePadding).2
+    ((nativeBaseTrace statement execution).canonicalClosure.haltTablePadding).1
+    ready.exitZero (NativeTraceFootprint.interactionLengths fits)
 
 /-- Functional completeness of the native ensemble on its exact deterministic compiler image.
 The witness map is independent of the proof of admissibility. -/
@@ -110,7 +112,7 @@ shards join both directions with the terminal halt row.  The unqualified correct
 reserved until `NativeShardTraceTotal` is proved. -/
 theorem supported_core_native_shard_correct_of_totality
     (total : NativeShardTraceTotal (p := p)) :
-    WitnessRelation.Correct (SupportedCoreNativeShardRelation (p := p))
+    WitnessRelation.Correct (SupportedCoreNativeOrdinaryShardRelation (p := p))
       (Execution.SupportedCoreOrdinaryShardExecutionRelation (p := p)) where
   sound := by
     intro statement witness valid
@@ -120,14 +122,16 @@ theorem supported_core_native_shard_correct_of_totality
   complete := by
     intro statement witness valid
     obtain ⟨semantic, ordinary⟩ := valid
-    exact supported_core_native_shard_complete statement witness
-      ⟨semantic, total statement witness semantic ordinary⟩
+    refine ⟨_, (supported_core_native_shard_functionalCompleteness (p := p)).map_valid statement
+      witness ⟨semantic, total statement witness semantic ordinary⟩, ?_⟩
+    exact (nativeTrace statement
+      (witness.evaluatedTrace (supportedCoreShardModel (p := p)))).realHaltRows_nil
 
 /-- Public-language equality on the syscall-free sub-language, a direct consequence of the same
 single totality theorem. -/
 theorem supported_core_native_shard_language_eq_of_totality
     (total : NativeShardTraceTotal (p := p)) :
-    WitnessRelation.language (SupportedCoreNativeShardRelation (p := p)) =
+    WitnessRelation.language (SupportedCoreNativeOrdinaryShardRelation (p := p)) =
       WitnessRelation.language
         (Execution.SupportedCoreOrdinaryShardExecutionRelation (p := p)) :=
   (supported_core_native_shard_correct_of_totality total).language_eq

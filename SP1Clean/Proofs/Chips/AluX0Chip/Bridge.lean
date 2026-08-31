@@ -3,6 +3,7 @@ import SP1Clean.Math.Word
 import SP1Clean.Proofs.Chips.AluX0Chip.Formal
 import SP1Clean.Soundness.ChipRow
 import SP1Clean.Proofs.Sail.Advance
+import Clean.Air.FlatComponent
 import RISCV.Instructions
 import RISCV.SailToRV64
 import RISCV.SailPureToInstructions
@@ -290,5 +291,122 @@ def kind : Soundness.ChipKind p where
   chipSpec := fun inp cols data => Spec inp cols data
   advanceReady := fun _ cols _ _ => advanceReady cols
   advance := some (PLift.up advance)
+
+/-! ## Physical row view and the ECALL opcode exclusion -/
+
+open Air.Flat Circuit
+
+/-- The completed AluX0 columns at one physical component row. -/
+noncomputable def physicalCols (env : Environment (ZMod p)) : Columns (ZMod p) :=
+  (⟨AluX0Chip.circuit (p := p)⟩ : Component (ZMod p)).rowOutput env
+
+/-- The completed AluX0 row view at one physical component row. -/
+noncomputable def physicalView (env : Environment (ZMod p)) : Trace.RowView (ZMod p) :=
+  rowView ((⟨AluX0Chip.circuit (p := p)⟩ : Component (ZMod p)).rowInput env) (physicalCols env)
+
+omit [Fact (2 ^ 17 < p)] in
+/-- Evaluation of AluX0's input selector, exposed without decomposing the reader blocks. -/
+private theorem eval_inputIsReal (env : Environment (ZMod p))
+    (input : Inputs (Expression (ZMod p))) :
+    (Eval.eval env input).is_real = Expression.eval env input.is_real := by
+  simpa only [CircuitType.eval_expr] using
+    congrArg (fun value : Inputs (ZMod p) => value.is_real) (AluX0Chip.eval_inputs env input)
+
+/-- Scalar projection of AluX0's committed opcode through the completed circuit output. -/
+private theorem eval_outputOpcode (input : Var Inputs (ZMod p)) (offset : ℕ)
+    (env : Environment (ZMod p)) :
+    (Eval.eval env ((AluX0Chip.circuit (p := p)).output input offset)).opcode =
+      Expression.eval env input.opcode := by
+  change (Eval.eval env ((AluX0Chip.elaborated (p := p)).output input offset)).opcode = _
+  rw [AluX0Chip.directOutput_eq, AluX0Chip.eval_columns]
+  simp only [CircuitType.eval_expr]
+
+/-- The chip-owned LTU byte pull (`opcode < 29`) occupies its declared slot in AluX0's Byte
+interaction list. -/
+private theorem ltuPull_mem_interactionsWith (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    ((Channels.byteChannel (p := p)).pulledIf input.is_real
+        (⟨4, 1, input.opcode, 29⟩ : ByteRow (Expression (ZMod p)))).toRaw ∈
+      ((AluX0Chip.main input).operations offset).interactionsWith
+        (Channels.byteChannel (p := p)).toRaw := by
+  rw [AluX0Chip.interactionsWith_byte_eq input offset]
+  simp [AluX0Chip.exposedByteInteractions]
+
+/-- The `ECALL` discriminant's `ZMod.val` is literal under the ambient field bound. -/
+private theorem val_ecall_discriminant : ((50 : ZMod p)).val = 50 := by
+  have hp := Fact.out (p := 2 ^ 17 < p)
+  rw [show (50 : ZMod p) = ((50 : ℕ) : ZMod p) from by norm_cast,
+    ZMod.val_natCast_of_lt (show (50 : ℕ) < p by omega)]
+
+/-- AluX0's chip-owned LTU Byte pull, under the finished Byte-channel guarantee, bounds the
+committed dynamic opcode column by `29` on active rows. -/
+private theorem opcodeBound_of_byteGuarantees (input : Var Inputs (ZMod p)) (offset : ℕ)
+    (env : Environment (ZMod p))
+    (guarantees : Operations.ChannelGuarantees (Channels.byteChannel (p := p)).toRaw env
+      ((AluX0Chip.main input).operations offset))
+    (real : Expression.eval env input.is_real = 1) :
+    (Expression.eval env input.opcode).val < 29 := by
+  let ltu := (Channels.byteChannel (p := p)).pulledIf input.is_real
+    (⟨4, 1, input.opcode, 29⟩ : ByteRow (Expression (ZMod p)))
+  have ltuGuarantee : ltu.toRaw.Guarantees env :=
+    Operations.forall_interactionsWith_iff.mpr guarantees _
+      (ltuPull_mem_interactionsWith input offset)
+  have typed := (ChannelInteraction.toRaw_guarantees env ltu).mp ltuGuarantee
+  have negReal : -(Expression.eval env input.is_real) = -1 := by rw [real]
+  have ltuMult : (fun x => Expression.eval env x) ltu.toRaw.mult = -1 := by
+    simpa only [ltu, circuit_norm] using negReal
+  have spec : ByteRowSpec (Eval.eval env ltu.msg) := by
+    have guarantee := typed rfl (by simpa only [circuit_norm] using ltuMult)
+    change ByteRowSpec (Eval.eval env ltu.msg) at guarantee
+    exact guarantee
+  have msgEq : Eval.eval env ltu.msg =
+      (⟨4, 1, Expression.eval env input.opcode, 29⟩ : ByteRow (ZMod p)) := by
+    dsimp only [ltu, Channel.pulledIf, pulledIf]
+    simp only [ProvableStruct.eval_eq_eval, ProvableStruct.structEvalLiteralProc, Expression.eval]
+  rw [msgEq] at spec
+  exact byteRowSpec_ltu_29_iff.mp spec
+
+/-- A real physical AluX0 row's Program-bus opcode is never the `ECALL` discriminant `50`: the
+chip's own LTU Byte pull bounds the dynamic opcode column by `29` (the committed-fragment
+re-base's per-chip strengthening fact). The Byte-channel guarantee premise is discharged by
+`sp1_finishedChannel_guarantees` at the whole-ensemble level. -/
+theorem physicalViewOpcode_ne_ecall (env : Environment (ZMod p))
+    (_constraints :
+      (⟨AluX0Chip.circuit (p := p)⟩ : Component (ZMod p)).operations.ConstraintsHold env)
+    (guarantees :
+      (⟨AluX0Chip.circuit (p := p)⟩ : Component (ZMod p)).operations.ChannelGuarantees
+        (Channels.byteChannel (p := p)).toRaw env)
+    (real : (physicalView env).is_real = 1) :
+    (physicalView env).opcode ≠ (50 : ZMod p) := by
+  let input : Var Inputs (ZMod p) := varFromOffset Inputs 0
+  let offset := size Inputs
+  have inputEq : Eval.eval env input =
+      (⟨AluX0Chip.circuit (p := p)⟩ : Component (ZMod p)).rowInput env :=
+    eval_varFromOffset_valueFromOffset Inputs 0 env
+  have rowGuarantees : Operations.ChannelGuarantees (Channels.byteChannel (p := p)).toRaw env
+      ((AluX0Chip.main input).operations offset) := by
+    have h := (Component.channelGuarantees_iff env (Channels.byteChannel (p := p)).toRaw).mp
+      guarantees
+    rw [Component.rowOperations_mk, AluX0Chip.circuit_main_eq] at h
+    exact h
+  have viewIsReal : (physicalView env).is_real = (Eval.eval env input).is_real := by
+    simpa only [physicalView, rowView] using
+      congrArg (fun value : Inputs (ZMod p) => value.is_real) inputEq.symm
+  have realInput : Expression.eval env input.is_real = 1 := by
+    have realValue : (Eval.eval env input).is_real = 1 := viewIsReal.symm.trans real
+    rwa [eval_inputIsReal] at realValue
+  have opBound : (Expression.eval env input.opcode).val < 29 :=
+    opcodeBound_of_byteGuarantees input offset env rowGuarantees realInput
+  have outputEq : Eval.eval env ((AluX0Chip.circuit (p := p)).output input offset) =
+      physicalCols env := by
+    simp only [input, offset, physicalCols, Component.rowOutput, circuit_norm]
+  have colsOpcode : (physicalCols env).opcode = Expression.eval env input.opcode := by
+    rw [← outputEq]
+    exact eval_outputOpcode input offset env
+  have viewOpcode : (physicalView env).opcode = Expression.eval env input.opcode := by
+    simpa only [physicalView, rowView] using colsOpcode
+  rw [viewOpcode]
+  intro h
+  rw [h, val_ecall_discriminant] at opBound
+  omega
 
 end SP1Clean.AluX0Chip

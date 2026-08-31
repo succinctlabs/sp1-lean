@@ -268,4 +268,43 @@ theorem ShiftLeftChip.rowViewOpCBinding_of_constraints
     Readers.ALUTypeReader.eval_opC]
   simpa only [readerInput, ShiftLeftChip.aluReaderInput] using binding
 
+/-- With binary flags, ShiftLeft's committed opcode combination avoids `ECALL`'s discriminant
+`50`. -/
+private theorem ShiftLeftChip.flagCombo_ne_ecall {x y : ZMod p}
+    (hx : x = 0 ∨ x = 1) (hy : y = 0 ∨ y = 1) :
+    x * 6 + y * 21 ≠ (50 : ZMod p) := by
+  obtain ⟨a, ha, rfl⟩ : ∃ a : ℕ, a ≤ 1 ∧ x = (a : ZMod p) := by
+    rcases hx with h | h
+    · exact ⟨0, Nat.zero_le 1, by rw [h, Nat.cast_zero]⟩
+    · exact ⟨1, Nat.le_refl 1, by rw [h, Nat.cast_one]⟩
+  obtain ⟨b, hb, rfl⟩ : ∃ b : ℕ, b ≤ 1 ∧ y = (b : ZMod p) := by
+    rcases hy with h | h
+    · exact ⟨0, Nat.zero_le 1, by rw [h, Nat.cast_zero]⟩
+    · exact ⟨1, Nat.le_refl 1, by rw [h, Nat.cast_one]⟩
+  have hp : (131072 : ℕ) < p := by
+    have hfact : (2 : ℕ) ^ 17 < p := Fact.out
+    norm_num at hfact
+    exact hfact
+  intro h
+  have hcast : ((a * 6 + b * 21 : ℕ) : ZMod p) = ((50 : ℕ) : ZMod p) := by
+    exact_mod_cast h
+  have hval := congrArg ZMod.val hcast
+  rw [ZMod.val_natCast_of_lt (by omega), ZMod.val_natCast_of_lt (by omega)] at hval
+  omega
+
+/-- A real physical ShiftLeft row's Program-bus opcode is never the `ECALL` discriminant `50`
+(the committed-fragment re-base's per-chip strengthening fact). -/
+theorem ShiftLeftChip.physicalViewOpcode_ne_ecall (env : Environment (ZMod p))
+    (constraints :
+      (⟨ShiftLeftChip.circuit (p := p)⟩ : Component (ZMod p)).operations.ConstraintsHold env)
+    (real : (ShiftLeftChip.physicalView env).is_real = 1) :
+    (ShiftLeftChip.physicalView env).opcode ≠ (50 : ZMod p) := by
+  have active := ShiftLeftChip.rowViewSelectorActive_of_constraints env constraints real
+  rw [ShiftLeftChip.ActiveSelector] at active
+  show (ShiftLeftChip.physicalCols env).is_sll * 6 +
+    (ShiftLeftChip.physicalCols env).is_sllw * 21 ≠ (50 : ZMod p)
+  rcases active with ⟨hsll, hsllw⟩ | ⟨hsllw, hsll⟩
+  · exact ShiftLeftChip.flagCombo_ne_ecall (Or.inr hsll) (Or.inl hsllw)
+  · exact ShiftLeftChip.flagCombo_ne_ecall (Or.inl hsll) (Or.inr hsllw)
+
 end SP1Clean.Soundness

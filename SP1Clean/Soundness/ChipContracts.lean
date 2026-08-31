@@ -435,10 +435,16 @@ theorem memoryBalance_of_alignsWith [Fact (2 ^ 24 < p)]
     optMS (memoryInitFrontier witness loc) + pushesAt (orderedRows.map g) loc +
         Multiset.filter (fun m => Semantics.MemoryMsg.locOf m = loc)
           (↑(producedMessages (typedTableInteractionsWith (memoryBumpTable witness)
+            Channels.memoryChannel))) +
+        Multiset.filter (fun m => Semantics.MemoryMsg.locOf m = loc)
+          (↑(producedMessages (typedTableInteractionsWith (haltTable witness)
             Channels.memoryChannel))) =
       optMS (memoryFinalizeFrontier witness loc) + pullsAt (orderedRows.map g) loc +
         Multiset.filter (fun m => Semantics.MemoryMsg.locOf m = loc)
           (↑(consumedMessages (typedTableInteractionsWith (memoryBumpTable witness)
+            Channels.memoryChannel))) +
+        Multiset.filter (fun m => Semantics.MemoryMsg.locOf m = loc)
+          (↑(consumedMessages (typedTableInteractionsWith (haltTable witness)
             Channels.memoryChannel))) := by
   have hordinary : memoryFrontierRows witness =
       (realDecodedInstructionRows witness.data witness.tables).map
@@ -4732,6 +4738,183 @@ theorem memoryBump_consumedMessages_eq
   refine flatMap_pair_eq_filter_map _ _ _ _ fun row rowMem => ?_
   exact consumedMessages_gatedPair hp
     (memoryBumpRows_selectorBinary witness constraints row rowMem)
+
+private lemma flatMap_triple_eq_filter_flatMap {α β : Type} (l : List α) (P : α → Prop)
+    [DecidablePred P] (f : α → List β) (g : α → List β)
+    (h : ∀ a ∈ l, f a = if P a then g a else []) :
+    l.flatMap f = (l.filter fun a => P a).flatMap g := by
+  induction l with
+  | nil => rfl
+  | cons a l ih =>
+      rw [List.flatMap_cons, h a List.mem_cons_self,
+        ih fun a ha => h a (List.mem_cons_of_mem _ ha)]
+      by_cases hP : P a
+      · rw [if_pos hP, List.filter_cons_of_pos (by simpa using hP), List.flatMap_cons]
+      · rw [if_neg hP, List.filter_cons_of_neg (by simpa using hP), List.nil_append]
+
+omit [Fact (2 ^ 17 < p)] in
+/-- The Halt table's produced Memory messages are exactly its active rows' three register
+read-backs (`x5`/`x10`/`x11`, at access clocks `clk + 4/3/2`). -/
+theorem halt_producedMessages_eq
+    (witness : EnsembleWitness (sp1Ensemble (p := p))) (constraints : witness.Constraints) :
+    producedMessages (typedTableInteractionsWith (haltTable witness) memoryChannel) =
+      (realHaltRows witness).flatMap (fun row =>
+        [HaltChip.memPushedMessage (haltRow (haltTable witness) row)
+           (haltRow (haltTable witness) row).x5_memory 5 4,
+         HaltChip.memPushedMessage (haltRow (haltTable witness) row)
+           (haltRow (haltTable witness) row).x10_memory 10 3,
+         HaltChip.memPushedMessage (haltRow (haltTable witness) row)
+           (haltRow (haltTable witness) row).x11_memory 11 2]) := by
+  have hp : 2 < p := by have := Fact.out (p := 2 ^ 25 < p); omega
+  rw [haltTable_typedMemory, producedMessages_flatMap, realHaltRows]
+  refine flatMap_triple_eq_filter_flatMap _ _ _ _ fun row rowMem => ?_
+  have hbool := witness_haltRows_selectorBinary witness constraints row rowMem
+  rw [show [TypedInteraction.pulledIfValue memoryChannel
+        (haltRow (haltTable witness) row).is_real
+        (HaltChip.memPulledMessage (haltRow (haltTable witness) row)
+          (haltRow (haltTable witness) row).x5_memory 5),
+      TypedInteraction.pushedIfValue memoryChannel
+        (haltRow (haltTable witness) row).is_real
+        (HaltChip.memPushedMessage (haltRow (haltTable witness) row)
+          (haltRow (haltTable witness) row).x5_memory 5 4),
+      TypedInteraction.pulledIfValue memoryChannel
+        (haltRow (haltTable witness) row).is_real
+        (HaltChip.memPulledMessage (haltRow (haltTable witness) row)
+          (haltRow (haltTable witness) row).x10_memory 10),
+      TypedInteraction.pushedIfValue memoryChannel
+        (haltRow (haltTable witness) row).is_real
+        (HaltChip.memPushedMessage (haltRow (haltTable witness) row)
+          (haltRow (haltTable witness) row).x10_memory 10 3),
+      TypedInteraction.pulledIfValue memoryChannel
+        (haltRow (haltTable witness) row).is_real
+        (HaltChip.memPulledMessage (haltRow (haltTable witness) row)
+          (haltRow (haltTable witness) row).x11_memory 11),
+      TypedInteraction.pushedIfValue memoryChannel
+        (haltRow (haltTable witness) row).is_real
+        (HaltChip.memPushedMessage (haltRow (haltTable witness) row)
+          (haltRow (haltTable witness) row).x11_memory 11 2)] =
+      [TypedInteraction.pulledIfValue memoryChannel
+        (haltRow (haltTable witness) row).is_real
+        (HaltChip.memPulledMessage (haltRow (haltTable witness) row)
+          (haltRow (haltTable witness) row).x5_memory 5),
+      TypedInteraction.pushedIfValue memoryChannel
+        (haltRow (haltTable witness) row).is_real
+        (HaltChip.memPushedMessage (haltRow (haltTable witness) row)
+          (haltRow (haltTable witness) row).x5_memory 5 4)] ++
+      ([TypedInteraction.pulledIfValue memoryChannel
+        (haltRow (haltTable witness) row).is_real
+        (HaltChip.memPulledMessage (haltRow (haltTable witness) row)
+          (haltRow (haltTable witness) row).x10_memory 10),
+      TypedInteraction.pushedIfValue memoryChannel
+        (haltRow (haltTable witness) row).is_real
+        (HaltChip.memPushedMessage (haltRow (haltTable witness) row)
+          (haltRow (haltTable witness) row).x10_memory 10 3)] ++
+      [TypedInteraction.pulledIfValue memoryChannel
+        (haltRow (haltTable witness) row).is_real
+        (HaltChip.memPulledMessage (haltRow (haltTable witness) row)
+          (haltRow (haltTable witness) row).x11_memory 11),
+      TypedInteraction.pushedIfValue memoryChannel
+        (haltRow (haltTable witness) row).is_real
+        (HaltChip.memPushedMessage (haltRow (haltTable witness) row)
+          (haltRow (haltTable witness) row).x11_memory 11 2)]) from rfl,
+    producedMessages_append, producedMessages_append,
+    producedMessages_gatedPair hp hbool, producedMessages_gatedPair hp hbool,
+    producedMessages_gatedPair hp hbool]
+  by_cases hreal : (haltRow (haltTable witness) row).is_real = 1
+  · simp only [if_pos hreal]
+    rfl
+  · simp only [if_neg hreal]
+    rfl
+
+omit [Fact (2 ^ 17 < p)] in
+/-- The Halt table's consumed Memory messages are exactly its active rows' three pulled register
+priors. -/
+theorem halt_consumedMessages_eq
+    (witness : EnsembleWitness (sp1Ensemble (p := p))) (constraints : witness.Constraints) :
+    consumedMessages (typedTableInteractionsWith (haltTable witness) memoryChannel) =
+      (realHaltRows witness).flatMap (fun row =>
+        [HaltChip.memPulledMessage (haltRow (haltTable witness) row)
+           (haltRow (haltTable witness) row).x5_memory 5,
+         HaltChip.memPulledMessage (haltRow (haltTable witness) row)
+           (haltRow (haltTable witness) row).x10_memory 10,
+         HaltChip.memPulledMessage (haltRow (haltTable witness) row)
+           (haltRow (haltTable witness) row).x11_memory 11]) := by
+  have hp : 2 < p := by have := Fact.out (p := 2 ^ 25 < p); omega
+  rw [haltTable_typedMemory, consumedMessages_flatMap, realHaltRows]
+  refine flatMap_triple_eq_filter_flatMap _ _ _ _ fun row rowMem => ?_
+  have hbool := witness_haltRows_selectorBinary witness constraints row rowMem
+  rw [show [TypedInteraction.pulledIfValue memoryChannel
+        (haltRow (haltTable witness) row).is_real
+        (HaltChip.memPulledMessage (haltRow (haltTable witness) row)
+          (haltRow (haltTable witness) row).x5_memory 5),
+      TypedInteraction.pushedIfValue memoryChannel
+        (haltRow (haltTable witness) row).is_real
+        (HaltChip.memPushedMessage (haltRow (haltTable witness) row)
+          (haltRow (haltTable witness) row).x5_memory 5 4),
+      TypedInteraction.pulledIfValue memoryChannel
+        (haltRow (haltTable witness) row).is_real
+        (HaltChip.memPulledMessage (haltRow (haltTable witness) row)
+          (haltRow (haltTable witness) row).x10_memory 10),
+      TypedInteraction.pushedIfValue memoryChannel
+        (haltRow (haltTable witness) row).is_real
+        (HaltChip.memPushedMessage (haltRow (haltTable witness) row)
+          (haltRow (haltTable witness) row).x10_memory 10 3),
+      TypedInteraction.pulledIfValue memoryChannel
+        (haltRow (haltTable witness) row).is_real
+        (HaltChip.memPulledMessage (haltRow (haltTable witness) row)
+          (haltRow (haltTable witness) row).x11_memory 11),
+      TypedInteraction.pushedIfValue memoryChannel
+        (haltRow (haltTable witness) row).is_real
+        (HaltChip.memPushedMessage (haltRow (haltTable witness) row)
+          (haltRow (haltTable witness) row).x11_memory 11 2)] =
+      [TypedInteraction.pulledIfValue memoryChannel
+        (haltRow (haltTable witness) row).is_real
+        (HaltChip.memPulledMessage (haltRow (haltTable witness) row)
+          (haltRow (haltTable witness) row).x5_memory 5),
+      TypedInteraction.pushedIfValue memoryChannel
+        (haltRow (haltTable witness) row).is_real
+        (HaltChip.memPushedMessage (haltRow (haltTable witness) row)
+          (haltRow (haltTable witness) row).x5_memory 5 4)] ++
+      ([TypedInteraction.pulledIfValue memoryChannel
+        (haltRow (haltTable witness) row).is_real
+        (HaltChip.memPulledMessage (haltRow (haltTable witness) row)
+          (haltRow (haltTable witness) row).x10_memory 10),
+      TypedInteraction.pushedIfValue memoryChannel
+        (haltRow (haltTable witness) row).is_real
+        (HaltChip.memPushedMessage (haltRow (haltTable witness) row)
+          (haltRow (haltTable witness) row).x10_memory 10 3)] ++
+      [TypedInteraction.pulledIfValue memoryChannel
+        (haltRow (haltTable witness) row).is_real
+        (HaltChip.memPulledMessage (haltRow (haltTable witness) row)
+          (haltRow (haltTable witness) row).x11_memory 11),
+      TypedInteraction.pushedIfValue memoryChannel
+        (haltRow (haltTable witness) row).is_real
+        (HaltChip.memPushedMessage (haltRow (haltTable witness) row)
+          (haltRow (haltTable witness) row).x11_memory 11 2)]) from rfl,
+    consumedMessages_append, consumedMessages_append,
+    consumedMessages_gatedPair hp hbool, consumedMessages_gatedPair hp hbool,
+    consumedMessages_gatedPair hp hbool]
+  by_cases hreal : (haltRow (haltTable witness) row).is_real = 1
+  · simp only [if_pos hreal]
+    rfl
+  · simp only [if_neg hreal]
+    rfl
+
+omit [Fact (2 ^ 17 < p)] in
+/-- On a shard with no active Halt row the Halt table produces no Memory message. -/
+theorem halt_producedMessages_nil_of_haltFree
+    (witness : EnsembleWitness (sp1Ensemble (p := p))) (constraints : witness.Constraints)
+    (haltFree : realHaltRows witness = []) :
+    producedMessages (typedTableInteractionsWith (haltTable witness) memoryChannel) = [] := by
+  rw [halt_producedMessages_eq witness constraints, haltFree, List.flatMap_nil]
+
+omit [Fact (2 ^ 17 < p)] in
+/-- On a shard with no active Halt row the Halt table consumes no Memory message. -/
+theorem halt_consumedMessages_nil_of_haltFree
+    (witness : EnsembleWitness (sp1Ensemble (p := p))) (constraints : witness.Constraints)
+    (haltFree : realHaltRows witness = []) :
+    consumedMessages (typedTableInteractionsWith (haltTable witness) memoryChannel) = [] := by
+  rw [halt_consumedMessages_eq witness constraints, haltFree, List.flatMap_nil]
 
 omit [Fact (2 ^ 25 < p)] in
 /-- A `⟨3, 0, b, c⟩` paired-`U8Range` byte pull's guarantee bounds both checked scalars (the pair

@@ -265,4 +265,42 @@ theorem LtChip.rowViewOpCBinding_of_constraints (env : Environment (ZMod p))
     Readers.ALUTypeReader.eval_opCPrev, Readers.ALUTypeReader.eval_opC]
   simpa only [readerInput, LtChip.aluTypeReaderInput] using binding
 
+/-- With binary flags, Lt's committed opcode combination avoids `ECALL`'s discriminant `50`. -/
+private theorem LtChip.flagCombo_ne_ecall {x y : ZMod p}
+    (hx : x = 0 ∨ x = 1) (hy : y = 0 ∨ y = 1) :
+    x * 9 + y * 10 ≠ (50 : ZMod p) := by
+  obtain ⟨a, ha, rfl⟩ : ∃ a : ℕ, a ≤ 1 ∧ x = (a : ZMod p) := by
+    rcases hx with h | h
+    · exact ⟨0, Nat.zero_le 1, by rw [h, Nat.cast_zero]⟩
+    · exact ⟨1, Nat.le_refl 1, by rw [h, Nat.cast_one]⟩
+  obtain ⟨b, hb, rfl⟩ : ∃ b : ℕ, b ≤ 1 ∧ y = (b : ZMod p) := by
+    rcases hy with h | h
+    · exact ⟨0, Nat.zero_le 1, by rw [h, Nat.cast_zero]⟩
+    · exact ⟨1, Nat.le_refl 1, by rw [h, Nat.cast_one]⟩
+  have hp : (131072 : ℕ) < p := by
+    have hfact : (2 : ℕ) ^ 17 < p := Fact.out
+    norm_num at hfact
+    exact hfact
+  intro h
+  have hcast : ((a * 9 + b * 10 : ℕ) : ZMod p) = ((50 : ℕ) : ZMod p) := by
+    exact_mod_cast h
+  have hval := congrArg ZMod.val hcast
+  rw [ZMod.val_natCast_of_lt (by omega), ZMod.val_natCast_of_lt (by omega)] at hval
+  omega
+
+/-- A real physical Lt row's Program-bus opcode is never the `ECALL` discriminant `50`
+(the committed-fragment re-base's per-chip strengthening fact). -/
+theorem LtChip.physicalViewOpcode_ne_ecall (env : Environment (ZMod p))
+    (constraints :
+      (⟨LtChip.circuit (p := p)⟩ : Component (ZMod p)).operations.ConstraintsHold env)
+    (real : (LtChip.physicalView env).is_real = 1) :
+    (LtChip.physicalView env).opcode ≠ (50 : ZMod p) := by
+  have active := LtChip.rowViewSelectorActive_of_constraints env constraints real
+  rw [LtChip.ActiveSelector] at active
+  show (LtChip.physicalCols env).is_slt * 9 + (LtChip.physicalCols env).is_sltu * 10 ≠
+    (50 : ZMod p)
+  rcases active with ⟨hslt, hsltu⟩ | ⟨hslt, hsltu⟩
+  · exact LtChip.flagCombo_ne_ecall (Or.inr hslt) (Or.inl hsltu)
+  · exact LtChip.flagCombo_ne_ecall (Or.inl hslt) (Or.inr hsltu)
+
 end SP1Clean.Soundness

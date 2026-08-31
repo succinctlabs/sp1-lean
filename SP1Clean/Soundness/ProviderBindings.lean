@@ -176,15 +176,20 @@ theorem memoryFinalizeProviderTable_requirements
   rw [Table.channelsWithRequirements, memoryFinalizeProviderTable_component witness]
   simp [MemoryFinalizeChip.circuit]
 
-/-- Every active Program-provider contribution is a decode of the program committed in shared prover
-data.  Zero-multiplicity padding rows impose no semantic condition. -/
+/-- Every active Program-provider contribution is a **committed** row of the program committed in
+shared prover data: the hoisted decode of a routed instruction, or the transpiled `ECALL` site
+(`Semantics.CommittedProgTruth`).  Zero-multiplicity padding rows impose no semantic condition.
+The halt-table wave weakened the conclusion from `ProgTruth` (decode-only) so a halting guest
+program — whose ROM contains the literal `ECALL` word — still has a satisfiable provider binding;
+each instruction chip recovers the decoded form through its pinned non-`ECALL` opcode
+(`Soundness/FetchDiscriminant.lean`). -/
 noncomputable def ProgramProviderBound
     (witness : EnsembleWitness (sp1Ensemble (p := p))) : Prop :=
   ∀ interaction,
     ∀ member : interaction ∈
       (programProviderTable witness).interactionsWith programChannel.toRaw,
     interaction.mult ≠ 0 →
-      ProgTruth (TypedInteraction.message
+      Semantics.CommittedProgTruth (TypedInteraction.message
         { raw := interaction
           channel_eq := (programProviderTable witness).channel_eq_of_mem_interactionsWith member })
         witness.data

@@ -190,7 +190,8 @@ def Spec (r : Inputs (ZMod p)) : Prop :=
   (r.is_real = 1 →
     (r.x5_memory.prev_value[0] = 0 ∧ r.x5_memory.prev_value[1] = 0 ∧
       r.x5_memory.prev_value[2] = 0 ∧ r.x5_memory.prev_value[3] = 0) ∧
-    (r.x10_memory.prev_value[2] = 0 ∧ r.x10_memory.prev_value[3] = 0) ∧
+    (r.x10_memory.prev_value[1] = 0 ∧ r.x10_memory.prev_value[2] = 0 ∧
+      r.x10_memory.prev_value[3] = 0) ∧
     Word.isU64 r.x5_memory.prev_value ∧ Word.isU64 r.x10_memory.prev_value ∧
     Word.isU64 r.x11_memory.prev_value ∧
     r.x5_memory.access_timestamp.prev_low.val < 2 ^ 24 ∧

@@ -109,6 +109,38 @@ theorem exists_trail (edge : α → V × V) (E : Multiset α) :
       rw [← Multiset.cons_erase he_mem]
       exact Multiset.cons_le_cons e hsub'
 
+omit [DecidableEq α] [DecidableEq V] in
+/-- A walk over a mapped edge list is a walk of the composed edge function (the sum-typed trail's
+per-injection projection). -/
+theorem isWalk_map {β : Type*} (edge : β → V × V) (f : α → β) :
+    ∀ (l : List α) (a b : V), IsWalk edge a b (l.map f) ↔
+      IsWalk (fun x => edge (f x)) a b l
+  | [], _, _ => Iff.rfl
+  | _ :: rest, a, b => by
+      simp only [List.map_cons]
+      exact and_congr Iff.rfl (isWalk_map edge f rest _ b)
+
+omit [DecidableEq α] [DecidableEq V] in
+/-- A walk over an append splits at the junction vertex. -/
+theorem isWalk_append (edge : α → V × V) :
+    ∀ (l₁ l₂ : List α) (a b : V), IsWalk edge a b (l₁ ++ l₂) ↔
+      ∃ c, IsWalk edge a c l₁ ∧ IsWalk edge c b l₂
+  | [], l₂, a, b => by
+      constructor
+      · intro h
+        exact ⟨a, rfl, by simpa using h⟩
+      · rintro ⟨c, rfl, h⟩
+        simpa using h
+  | x :: rest, l₂, a, b => by
+      simp only [List.cons_append]
+      change ((edge x).1 = a ∧ IsWalk edge (edge x).2 b (rest ++ l₂)) ↔ _
+      rw [isWalk_append edge rest l₂]
+      constructor
+      · rintro ⟨h1, c, h2, h3⟩
+        exact ⟨c, ⟨h1, h2⟩, h3⟩
+      · rintro ⟨c, ⟨h1, h2⟩, h3⟩
+        exact ⟨h1, c, h2, h3⟩
+
 end Walk
 
 end SP1Clean.Soundness

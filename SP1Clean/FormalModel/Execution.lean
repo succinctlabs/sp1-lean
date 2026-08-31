@@ -102,21 +102,46 @@ theorem ShardStartState.of_isInitialState {p : ℕ} {statement : SupportedCoreSt
     romLoaded := boot.romLoaded
     configured := boot.configured }
 
+/-- The ordinary (all-retire) run shape of one plain-Sail shard segment: a normally-retiring
+official-interpreter run between the committed public pc endpoints, taking exactly the committed
+number of eight-tick instructions, with the committed exit code zero (the Exit hand-off's
+ordinary-shard consequence). -/
+def SailSegmentWitness.OrdinaryRun {p : ℕ} (statement : SupportedCoreStatement p)
+    (w : SailSegmentWitness) : Prop :=
+  SailRetireChain w.steps w.initial w.final ∧
+  w.final.regs.get? Register.PC = some statement.finalPcBits ∧
+  statement.finalClkNat = statement.initClkNat + 8 * w.steps ∧
+  statement.publicValues.exit_code = 0
+
+/-- The halting run shape of one plain-Sail shard segment: a normally-retiring prefix reaches a
+genuine `SP1Halted` state — the pc at a committed `ECALL` word, `t0` holding the canonical `HALT`
+code, `a0` the committed exit code — and the final state is that state parked at SP1's terminal
+`haltPc`, one 264-tick syscall window after the prefix. -/
+def SailSegmentWitness.HaltedRun {p : ℕ} (statement : SupportedCoreStatement p)
+    (w : SailSegmentWitness) : Prop :=
+  ∃ preHalt : SailState,
+    1 ≤ w.steps ∧
+    SailRetireChain (w.steps - 1) w.initial preHalt ∧
+    SP1Halted statement.program statement.exitCodeBits preHalt ∧
+    w.final = { preHalt with regs := preHalt.regs.insert Register.PC Machine.haltPc } ∧
+    statement.finalPcBits = Machine.haltPc ∧
+    statement.finalClkNat = statement.initClkNat + 8 * (w.steps - 1) + 264
+
 /-- **The plain-Sail relation.**  What the native ensemble certifies about the official Sail
-machine, with no machine-model parameter: a normally-retiring official-interpreter run between the
-committed public pc endpoints, taking exactly the committed number of eight-tick instructions,
-whose Memory boundary is well formed at the committed final clock and agrees with real location
-content at both ends of the run. -/
+machine, with no machine-model parameter: from the committed shard start, either an ordinary
+normally-retiring run between the committed public pc endpoints (`OrdinaryRun`), or a
+normally-retiring prefix reaching a genuine `SP1Halted` state, terminally parked at `haltPc`
+(`HaltedRun`); in both shapes the Memory boundary is well formed at the committed final clock and
+agrees with real location content at both ends of the run. -/
 def SupportedCoreSailRelation {p : ℕ} :
     WitnessRelation.Relation (SupportedCoreStatement p) SailSegmentWitness :=
   fun statement w =>
     statement.program.WellFormed ∧
     ShardStartState statement w.initial ∧
-    SailRetireChain w.steps w.initial w.final ∧
-    w.final.regs.get? Register.PC = some statement.finalPcBits ∧
-    statement.finalClkNat = statement.initClkNat + 8 * w.steps ∧
     w.memory.WellFormed statement.finalClkNat ∧
-    w.memory.AgreesWith w.initial w.final
+    w.memory.AgreesWith w.initial w.final ∧
+    (SailSegmentWitness.OrdinaryRun statement w ∨
+      SailSegmentWitness.HaltedRun statement w)
 
 /-- One execution segment agrees with decoded clock and pc endpoints. -/
 noncomputable def SegmentMatches {model : Machine.SP1MachineModel}
@@ -180,9 +205,11 @@ model-free `SupportedCoreSailRelation`. -/
 theorem supportedCoreLocalExecution_of_sailRelation {p : ℕ}
     (model : Machine.SP1MachineModel) (ordinary : model.UsesOrdinarySchedule)
     {statement : SupportedCoreStatement p} {w : SailSegmentWitness}
-    (valid : SupportedCoreSailRelation statement w) :
+    (valid : SupportedCoreSailRelation statement w)
+    (run : SailSegmentWitness.OrdinaryRun statement w) :
     ∃ witness, SupportedCoreLocalExecutionRelation model statement witness := by
-  obtain ⟨wellFormed, start, chain, finalPc, clock, -, -⟩ := valid
+  obtain ⟨wellFormed, start, -, -, -⟩ := valid
+  obtain ⟨chain, finalPc, clock, -⟩ := run
   let context : Machine.LocalExecutionCtx model :=
     { program := statement.program, wellFormed, initial := w.initial
       romLoaded := start.romLoaded, configured := start.configured }

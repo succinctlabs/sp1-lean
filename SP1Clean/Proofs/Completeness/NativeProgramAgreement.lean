@@ -245,8 +245,8 @@ theorem nativeTrace_programProviderBound
     (by simpa only [Execution.SupportedCoreShardExecutionValid.program_eq semantic] using
       Execution.SupportedCoreShardExecutionValid.programEncodable semantic)
     clockEncodable
-  change ProgTruth typed.message (nativeTrace statement execution).witness.data
-  refine ⟨rowSpec_of_programServable keyServable typed rawKeyEq, ?_⟩
+  change Semantics.CommittedProgTruth typed.message (nativeTrace statement execution).witness.data
+  refine ⟨rowSpec_of_programServable keyServable typed rawKeyEq, Or.inl ?_⟩
   have programEq :
       Commit.progOf (nativeTrace statement execution).witness.data = statement.program := by
     change Commit.progOf

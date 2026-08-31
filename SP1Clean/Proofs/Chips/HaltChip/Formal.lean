@@ -33,7 +33,7 @@ theorem soundness :
   simp only [circuit_norm, memoryChannel, programChannel, exitChannel,
     Channels.MemoryMsg.isU64, Channels.MemoryMsg.ClkBound, Channels.ProgramMsg.RowSpec]
     at h_holds ⊢
-  obtain ⟨h_gate, h_cpu, h_rac5, h_rac10, h_rac11, h_prog, z0, z1, z2, z3, z4, z5,
+  obtain ⟨h_gate, h_cpu, h_rac5, h_rac10, h_rac11, h_prog, z0, z1, z2, z3, z4, z5, z6,
     h_m5, h_m10, h_m11⟩ := h_holds
   have h_bin := bool_of_mul_pred h_gate
   have h_clk := Readers.ClkDiscipline.of_cpuState_spec (h_cpu h_bin)
@@ -66,10 +66,11 @@ theorem soundness :
   · -- the gated tail: `x5 = 0` / the x10 high-limb zeros from the gated asserts, `isU64`/clock
     -- bounds from the pulls.
     have hneg : -input_is_real = -1 := by rw [hr]
-    rw [hr, one_mul] at z0 z1 z2 z3 z4 z5
+    rw [hr, one_mul] at z0 z1 z2 z3 z4 z5 z6
     exact ⟨⟨e5 0 (by norm_num) ▸ z0, e5 1 (by norm_num) ▸ z1,
       e5 2 (by norm_num) ▸ z2, e5 3 (by norm_num) ▸ z3⟩,
-      ⟨e10 2 (by norm_num) ▸ z4, e10 3 (by norm_num) ▸ z5⟩,
+      ⟨e10 1 (by norm_num) ▸ z4, e10 2 (by norm_num) ▸ z5,
+        e10 3 (by norm_num) ▸ z6⟩,
       (h_m5 hneg).1, (h_m10 hneg).1, (h_m11 hneg).1,
       (h_m5 hneg).2, (h_m10 hneg).2, (h_m11 hneg).2⟩
   · -- the requirement tail: sub-circuit assumptions, off-gate pulls, push requirements (the two
@@ -111,11 +112,11 @@ theorem completeness :
     have := congrArg (fun v => v[i]'hi) h_input.2.2.1.1
     simpa using this
   -- Slots, in op order: the gate, the `CPUState`/register-access sub pairs, the gated Program
-  -- pull, the four `x5 = 0` asserts, the two x10 high-limb asserts, and the three Memory
+  -- pull, the four `x5 = 0` asserts, the three x10 upper-limb asserts, and the three Memory
   -- read-prior pulls (a push owes nothing in completeness — its requirement is a soundness-side
   -- obligation, and the two Exit pushes carry `Guarantees := True`).
   refine ⟨?_, ⟨h_bin, h_cpu⟩, ⟨h_bin, h_rac5⟩, ⟨h_bin, h_rac10⟩, ⟨h_bin, h_rac11⟩,
-    fun hneg => ?_, ?_, ?_, ?_, ?_, ?_, ?_,
+    fun hneg => ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_,
     fun hneg => ?_, fun hneg => ?_, fun hneg => ?_⟩
   · rcases h_bin with h | h <;> rw [h] <;> simp
   · -- Program pull: `RowSpec` of the ECALL fetch, from the pc bounds + the index literal.
@@ -138,10 +139,13 @@ theorem completeness :
     · rw [one_mul, e5 3 (by norm_num)]; exact ((h_tail h).1).2.2.2
   · rcases h_bin with h | h <;> rw [h]
     · rw [zero_mul]
-    · rw [one_mul, e10 2 (by norm_num)]; exact ((h_tail h).2.1).1
+    · rw [one_mul, e10 1 (by norm_num)]; exact ((h_tail h).2.1).1
   · rcases h_bin with h | h <;> rw [h]
     · rw [zero_mul]
-    · rw [one_mul, e10 3 (by norm_num)]; exact ((h_tail h).2.1).2
+    · rw [one_mul, e10 2 (by norm_num)]; exact ((h_tail h).2.1).2.1
+  · rcases h_bin with h | h <;> rw [h]
+    · rw [zero_mul]
+    · rw [one_mul, e10 3 (by norm_num)]; exact ((h_tail h).2.1).2.2
   · -- x5 read-prior pull: `isU64` + the pulled clock's 24-bit bound.
     have hr : input_is_real = 1 := neg_inj.mp hneg
     exact ⟨(h_tail hr).2.2.1, (h_tail hr).2.2.2.2.2.1⟩

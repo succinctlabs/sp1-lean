@@ -446,6 +446,7 @@ import SP1Clean.Soundness.SP1Ensemble
 import SP1Clean.Soundness.WitnessDecode
 import SP1Clean.Soundness.TypedInteractions
 import SP1Clean.Soundness.TypedState
+import SP1Clean.Soundness.ExitAccounting
 import SP1Clean.Soundness.TimeExtraction
 import SP1Clean.Soundness.TypedTime
 import SP1Clean.Soundness.TypedTimeContracts
@@ -462,6 +463,7 @@ import SP1Clean.Soundness.LocalExecution
 import SP1Clean.Soundness.RowSoundness
 import SP1Clean.Soundness.RowEffectDefs
 import SP1Clean.Soundness.GroundingAdapter
+import SP1Clean.Soundness.FetchDiscriminant
 import SP1Clean.Soundness.GroundingInternal
 import SP1Clean.Soundness.Grounding.RTypeChips
 import SP1Clean.Soundness.Grounding.ITypeChips

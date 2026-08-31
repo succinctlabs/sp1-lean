@@ -379,4 +379,72 @@ theorem EventExecutionTrace.events_length (execution : EventExecutionTrace) :
     execution.events.length = execution.steps := by
   simp [EventExecutionTrace.events, EventExecutionTrace.steps]
 
+/-! ## Append/snoc structure (the halting-shard assembly)
+
+A halting shard's trace is an ordinary instruction prefix with one terminal syscall transition
+appended.  These lemmas transport validity, the schedule discipline, the clock accounting, and the
+terminal-halt condition across that append. -/
+
+theorem stateAfterTransitions_append (source : SailState) (l₁ l₂ : List EventTransition) :
+    stateAfterTransitions source (l₁ ++ l₂) =
+      stateAfterTransitions (stateAfterTransitions source l₁) l₂ :=
+  List.foldl_append ..
+
+theorem clockAfterEvents_append (clock : ℕ) (e₁ e₂ : List ExecutionEvent) :
+    clockAfterEvents clock (e₁ ++ e₂) = clockAfterEvents (clockAfterEvents clock e₁) e₂ :=
+  List.foldl_append ..
+
+theorem EventTransitionsValid.append {handler : SyscallHandler} {program : GuestProgram}
+    {source : SailState} {l₁ l₂ : List EventTransition}
+    (h₁ : EventTransitionsValid handler program source l₁)
+    (h₂ : EventTransitionsValid handler program (stateAfterTransitions source l₁) l₂) :
+    EventTransitionsValid handler program source (l₁ ++ l₂) := by
+  induction l₁ generalizing source with
+  | nil =>
+      cases h₁
+      simpa [stateAfterTransitions] using h₂
+  | cons t rest ih =>
+      cases h₁ with
+      | cons _ step tail =>
+          refine .cons t step (ih tail ?_)
+          simpa [stateAfterTransitions] using h₂
+
+theorem eventTransitionsClocked_append {clock : ℕ} {l₁ l₂ : List EventTransition}
+    (h₁ : EventTransitionsClocked clock l₁)
+    (h₂ : EventTransitionsClocked
+      (clockAfterEvents clock (l₁.map EventTransition.event)) l₂) :
+    EventTransitionsClocked clock (l₁ ++ l₂) := by
+  induction l₁ generalizing clock with
+  | nil => simpa [clockAfterEvents] using h₂
+  | cons t rest ih =>
+      obtain ⟨starts, tail⟩ := h₁
+      exact ⟨starts, ih tail (by simpa [clockAfterEvents] using h₂)⟩
+
+theorem locateTransitions_append (source : SailState) (l₁ l₂ : List EventTransition) :
+    locateTransitions source (l₁ ++ l₂) =
+      locateTransitions source l₁ ++
+        locateTransitions (stateAfterTransitions source l₁) l₂ := by
+  induction l₁ generalizing source with
+  | nil => rfl
+  | cons transition rest ih =>
+      simp only [List.cons_append, locateTransitions, ih, stateAfterTransitions,
+        List.foldl_cons]
+
+/-- The snoc trace's terminal condition: appending one canonical-HALT syscall transition to a
+trace whose final state is `SP1Halted` halts the whole trace. -/
+theorem EventExecutionTrace.haltsWith_snoc (program : GuestProgram) (exitCode : BitVec 64)
+    (execution : EventExecutionTrace) (event : CoreSyscallEvent) (target : SailState)
+    (canonical : event.IsCanonicalHalt) (arg1 : event.arg1 = exitCode)
+    (halted : SP1Halted program exitCode execution.finalState) :
+    EventExecutionTrace.HaltsWith program exitCode
+      ⟨execution.initialState,
+        execution.transitions ++ [⟨.syscall event, target⟩]⟩ := by
+  refine ⟨⟨.syscall event, target⟩, event, ?_, rfl, canonical, arg1, ?_⟩
+  · exact List.getLast?_concat
+  · show SP1Halted program exitCode (stateAfterTransitions execution.initialState
+      ((execution.transitions ++
+        [(⟨.syscall event, target⟩ : EventTransition)]).dropLast))
+    rw [List.dropLast_concat]
+    exact halted
+
 end SP1Clean.Machine

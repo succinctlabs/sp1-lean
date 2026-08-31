@@ -354,15 +354,19 @@ theorem groundedRows_sailRelation {Row : Type u}
     (walk : PcWalk rowOf statement.initPcBits statement.finalPcBits rows)
     (grounded : RowsGrounded rowOf data statement.program initial rows)
     (clockCount : statement.initClkNat + 8 * rows.length = statement.finalClkNat)
+    (exitZero : statement.publicValues.exit_code = 0)
     (memoryWellFormed : memory.WellFormed statement.finalClkNat)
     (memoryAgrees : ∀ final, Semantics.chainState initial rows.length = some final →
       memory.AgreesWith initial final) :
-    ∃ w, SupportedCoreSailRelation statement w := by
+    ∃ w, SupportedCoreSailRelation statement w ∧
+      SailSegmentWitness.OrdinaryRun statement w := by
   obtain ⟨finalState, chain, finalPc⟩ :=
     sailRetireChain_of_groundedRows rowOf data statement.program initial rows _ _ walk grounded
       codeMemoryCompatible pc rom cfg
   exact ⟨⟨initial, rows.length, finalState, memory⟩,
-    wellFormed, ⟨pc, rom, cfg⟩, chain, finalPc, clockCount.symm, memoryWellFormed,
-    memoryAgrees finalState (Semantics.chainState_of_sailChain chain.toSailChain)⟩
+    ⟨wellFormed, ⟨pc, rom, cfg⟩, memoryWellFormed,
+      memoryAgrees finalState (Semantics.chainState_of_sailChain chain.toSailChain),
+      Or.inl ⟨chain, finalPc, clockCount.symm, exitZero⟩⟩,
+    chain, finalPc, clockCount.symm, exitZero⟩
 
 end SP1Clean.Soundness

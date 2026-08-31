@@ -436,6 +436,271 @@ private theorem haltRow_cpuState_bounds
   rw [e1] at clk1B
   exact ⟨clk0B, clk1B⟩
 
+private theorem halt_x5_subcircuit_mem :
+    (⟨size HaltChip.Inputs, (Readers.RegisterAccessCols.circuit (p := p)).toSubcircuit
+      (size HaltChip.Inputs)
+      ⟨(varFromOffset HaltChip.Inputs 0 : Var HaltChip.Inputs (ZMod p)).x5_memory,
+        (varFromOffset HaltChip.Inputs 0 : Var HaltChip.Inputs (ZMod p)).is_real,
+        HaltChip.clkLow (varFromOffset HaltChip.Inputs 0 : Var HaltChip.Inputs (ZMod p)) + 4⟩⟩ :
+      (n : ℕ) ×' Subcircuit (ZMod p) n) ∈
+    ((HaltChip.main (varFromOffset HaltChip.Inputs 0 : Var HaltChip.Inputs (ZMod p))).operations
+      (size HaltChip.Inputs)).subcircuits := by
+  simp only [HaltChip.main, circuit_norm]
+
+/-- The `x5` register access's two timestamp byte bounds at one active halt row, from the
+finished Byte channel alone. -/
+private theorem haltRow_x5_timestamp_bounds
+    (witness : EnsembleWitness (sp1Ensemble (p := p)))
+    (constraints : witness.Constraints) (balanced : witness.BalancedChannels)
+    {row : Array (ZMod p)} (rowMem : row ∈ realHaltRows witness) :
+    ((haltRow (haltTable witness) row).x5_memory.access_timestamp.diff_low_limb).val < 2 ^ 16 ∧
+      (((haltRow (haltTable witness) row).state.clk_0_16 +
+          (haltRow (haltTable witness) row).state.clk_16_24 * 65536 + 4 -
+        (haltRow (haltTable witness) row).x5_memory.access_timestamp.prev_low - 1 -
+        (haltRow (haltTable witness) row).x5_memory.access_timestamp.diff_low_limb) *
+        (65536 : ZMod p)⁻¹).val < 2 ^ 8 := by
+  obtain ⟨tableMem, real⟩ := mem_realHaltRows witness rowMem
+  have tableGuarantees := (sp1_finishedChannel_guarantees witness constraints balanced
+    _ (witness.mem_allTables_of_mem_tables
+      (List.getElem_mem (haltIndex_lt_tablesLength witness)))).1
+  set env := (haltTable witness).environment row with envDef
+  have opsGuarantees : (haltTable witness).component.operations.ChannelGuarantees
+      Channels.byteChannel.toRaw env := tableGuarantees row tableMem
+  rw [haltTable_component] at opsGuarantees
+  have rowGuarantees :=
+    (Component.channelGuarantees_iff env Channels.byteChannel.toRaw).mp opsGuarantees
+  set inputVar : Var HaltChip.Inputs (ZMod p) := varFromOffset HaltChip.Inputs 0 with inputVarDef
+  set raInput : Var Readers.RegisterAccessCols.Inputs (ZMod p) :=
+    ⟨inputVar.x5_memory, inputVar.is_real, HaltChip.clkLow inputVar + 4⟩ with raInputDef
+  have raMem : (⟨size HaltChip.Inputs,
+      (Readers.RegisterAccessCols.circuit (p := p)).toSubcircuit (size HaltChip.Inputs) raInput⟩ :
+        (n : ℕ) ×' Subcircuit (ZMod p) n) ∈
+      ((⟨HaltChip.circuit⟩ : Component (ZMod p)).rowOperations).subcircuits := by
+    rw [Component.rowOperations_mk, raInputDef, inputVarDef]
+    exact halt_x5_subcircuit_mem
+  have raGuarantees := channelGuarantees_subcircuit_of_mem Channels.byteChannel.toRaw env
+    (⟨HaltChip.circuit⟩ : Component (ZMod p)).rowOperations
+    ((Readers.RegisterAccessCols.circuit (p := p)).toSubcircuit (size HaltChip.Inputs) raInput)
+    raMem rowGuarantees
+  have crossing : (haltRow (haltTable witness) row).is_real =
+      Expression.eval env raInput.is_real := by
+    rw [raInputDef]
+    rw [haltRow_eq, inputVarDef]
+    simp only [circuit_norm]
+    rw [envDef]
+  have realEval : Expression.eval env raInput.is_real = 1 := crossing ▸ real
+  obtain ⟨diffB, scaledB⟩ := Readers.RegisterAccessCols.bounds_of_byteGuarantees raInput
+    (size HaltChip.Inputs) env raGuarantees realEval
+  have ediff : Expression.eval env raInput.cols.access_timestamp.diff_low_limb =
+      (haltRow (haltTable witness) row).x5_memory.access_timestamp.diff_low_limb := by
+    rw [raInputDef, haltRow_eq, inputVarDef]
+    simp only [circuit_norm]
+    rw [envDef]
+  have eprev : Expression.eval env raInput.cols.access_timestamp.prev_low =
+      (haltRow (haltTable witness) row).x5_memory.access_timestamp.prev_low := by
+    rw [raInputDef, haltRow_eq, inputVarDef]
+    simp only [circuit_norm]
+    rw [envDef]
+  have eclk : Expression.eval env raInput.clk_target =
+      (haltRow (haltTable witness) row).state.clk_0_16 +
+        (haltRow (haltTable witness) row).state.clk_16_24 * 65536 + 4 := by
+    rw [raInputDef, haltRow_eq, inputVarDef]
+    simp only [circuit_norm, HaltChip.clkLow]
+    rw [envDef]
+  rw [ediff] at diffB
+  rw [ediff, eprev, eclk] at scaledB
+  exact ⟨diffB, scaledB⟩
+
+private theorem halt_x10_subcircuit_mem :
+    (⟨size HaltChip.Inputs, (Readers.RegisterAccessCols.circuit (p := p)).toSubcircuit
+      (size HaltChip.Inputs)
+      ⟨(varFromOffset HaltChip.Inputs 0 : Var HaltChip.Inputs (ZMod p)).x10_memory,
+        (varFromOffset HaltChip.Inputs 0 : Var HaltChip.Inputs (ZMod p)).is_real,
+        HaltChip.clkLow (varFromOffset HaltChip.Inputs 0 : Var HaltChip.Inputs (ZMod p)) + 3⟩⟩ :
+      (n : ℕ) ×' Subcircuit (ZMod p) n) ∈
+    ((HaltChip.main (varFromOffset HaltChip.Inputs 0 : Var HaltChip.Inputs (ZMod p))).operations
+      (size HaltChip.Inputs)).subcircuits := by
+  simp only [HaltChip.main, circuit_norm]
+
+/-- The `x10` register access's two timestamp byte bounds at one active halt row, from the
+finished Byte channel alone. -/
+private theorem haltRow_x10_timestamp_bounds
+    (witness : EnsembleWitness (sp1Ensemble (p := p)))
+    (constraints : witness.Constraints) (balanced : witness.BalancedChannels)
+    {row : Array (ZMod p)} (rowMem : row ∈ realHaltRows witness) :
+    ((haltRow (haltTable witness) row).x10_memory.access_timestamp.diff_low_limb).val < 2 ^ 16 ∧
+      (((haltRow (haltTable witness) row).state.clk_0_16 +
+          (haltRow (haltTable witness) row).state.clk_16_24 * 65536 + 3 -
+        (haltRow (haltTable witness) row).x10_memory.access_timestamp.prev_low - 1 -
+        (haltRow (haltTable witness) row).x10_memory.access_timestamp.diff_low_limb) *
+        (65536 : ZMod p)⁻¹).val < 2 ^ 8 := by
+  obtain ⟨tableMem, real⟩ := mem_realHaltRows witness rowMem
+  have tableGuarantees := (sp1_finishedChannel_guarantees witness constraints balanced
+    _ (witness.mem_allTables_of_mem_tables
+      (List.getElem_mem (haltIndex_lt_tablesLength witness)))).1
+  set env := (haltTable witness).environment row with envDef
+  have opsGuarantees : (haltTable witness).component.operations.ChannelGuarantees
+      Channels.byteChannel.toRaw env := tableGuarantees row tableMem
+  rw [haltTable_component] at opsGuarantees
+  have rowGuarantees :=
+    (Component.channelGuarantees_iff env Channels.byteChannel.toRaw).mp opsGuarantees
+  set inputVar : Var HaltChip.Inputs (ZMod p) := varFromOffset HaltChip.Inputs 0 with inputVarDef
+  set raInput : Var Readers.RegisterAccessCols.Inputs (ZMod p) :=
+    ⟨inputVar.x10_memory, inputVar.is_real, HaltChip.clkLow inputVar + 3⟩ with raInputDef
+  have raMem : (⟨size HaltChip.Inputs,
+      (Readers.RegisterAccessCols.circuit (p := p)).toSubcircuit (size HaltChip.Inputs) raInput⟩ :
+        (n : ℕ) ×' Subcircuit (ZMod p) n) ∈
+      ((⟨HaltChip.circuit⟩ : Component (ZMod p)).rowOperations).subcircuits := by
+    rw [Component.rowOperations_mk, raInputDef, inputVarDef]
+    exact halt_x10_subcircuit_mem
+  have raGuarantees := channelGuarantees_subcircuit_of_mem Channels.byteChannel.toRaw env
+    (⟨HaltChip.circuit⟩ : Component (ZMod p)).rowOperations
+    ((Readers.RegisterAccessCols.circuit (p := p)).toSubcircuit (size HaltChip.Inputs) raInput)
+    raMem rowGuarantees
+  have crossing : (haltRow (haltTable witness) row).is_real =
+      Expression.eval env raInput.is_real := by
+    rw [raInputDef]
+    rw [haltRow_eq, inputVarDef]
+    simp only [circuit_norm]
+    rw [envDef]
+  have realEval : Expression.eval env raInput.is_real = 1 := crossing ▸ real
+  obtain ⟨diffB, scaledB⟩ := Readers.RegisterAccessCols.bounds_of_byteGuarantees raInput
+    (size HaltChip.Inputs) env raGuarantees realEval
+  have ediff : Expression.eval env raInput.cols.access_timestamp.diff_low_limb =
+      (haltRow (haltTable witness) row).x10_memory.access_timestamp.diff_low_limb := by
+    rw [raInputDef, haltRow_eq, inputVarDef]
+    simp only [circuit_norm]
+    rw [envDef]
+  have eprev : Expression.eval env raInput.cols.access_timestamp.prev_low =
+      (haltRow (haltTable witness) row).x10_memory.access_timestamp.prev_low := by
+    rw [raInputDef, haltRow_eq, inputVarDef]
+    simp only [circuit_norm]
+    rw [envDef]
+  have eclk : Expression.eval env raInput.clk_target =
+      (haltRow (haltTable witness) row).state.clk_0_16 +
+        (haltRow (haltTable witness) row).state.clk_16_24 * 65536 + 3 := by
+    rw [raInputDef, haltRow_eq, inputVarDef]
+    simp only [circuit_norm, HaltChip.clkLow]
+    rw [envDef]
+  rw [ediff] at diffB
+  rw [ediff, eprev, eclk] at scaledB
+  exact ⟨diffB, scaledB⟩
+
+private theorem halt_x11_subcircuit_mem :
+    (⟨size HaltChip.Inputs, (Readers.RegisterAccessCols.circuit (p := p)).toSubcircuit
+      (size HaltChip.Inputs)
+      ⟨(varFromOffset HaltChip.Inputs 0 : Var HaltChip.Inputs (ZMod p)).x11_memory,
+        (varFromOffset HaltChip.Inputs 0 : Var HaltChip.Inputs (ZMod p)).is_real,
+        HaltChip.clkLow (varFromOffset HaltChip.Inputs 0 : Var HaltChip.Inputs (ZMod p)) + 2⟩⟩ :
+      (n : ℕ) ×' Subcircuit (ZMod p) n) ∈
+    ((HaltChip.main (varFromOffset HaltChip.Inputs 0 : Var HaltChip.Inputs (ZMod p))).operations
+      (size HaltChip.Inputs)).subcircuits := by
+  simp only [HaltChip.main, circuit_norm]
+
+/-- The `x11` register access's two timestamp byte bounds at one active halt row, from the
+finished Byte channel alone. -/
+private theorem haltRow_x11_timestamp_bounds
+    (witness : EnsembleWitness (sp1Ensemble (p := p)))
+    (constraints : witness.Constraints) (balanced : witness.BalancedChannels)
+    {row : Array (ZMod p)} (rowMem : row ∈ realHaltRows witness) :
+    ((haltRow (haltTable witness) row).x11_memory.access_timestamp.diff_low_limb).val < 2 ^ 16 ∧
+      (((haltRow (haltTable witness) row).state.clk_0_16 +
+          (haltRow (haltTable witness) row).state.clk_16_24 * 65536 + 2 -
+        (haltRow (haltTable witness) row).x11_memory.access_timestamp.prev_low - 1 -
+        (haltRow (haltTable witness) row).x11_memory.access_timestamp.diff_low_limb) *
+        (65536 : ZMod p)⁻¹).val < 2 ^ 8 := by
+  obtain ⟨tableMem, real⟩ := mem_realHaltRows witness rowMem
+  have tableGuarantees := (sp1_finishedChannel_guarantees witness constraints balanced
+    _ (witness.mem_allTables_of_mem_tables
+      (List.getElem_mem (haltIndex_lt_tablesLength witness)))).1
+  set env := (haltTable witness).environment row with envDef
+  have opsGuarantees : (haltTable witness).component.operations.ChannelGuarantees
+      Channels.byteChannel.toRaw env := tableGuarantees row tableMem
+  rw [haltTable_component] at opsGuarantees
+  have rowGuarantees :=
+    (Component.channelGuarantees_iff env Channels.byteChannel.toRaw).mp opsGuarantees
+  set inputVar : Var HaltChip.Inputs (ZMod p) := varFromOffset HaltChip.Inputs 0 with inputVarDef
+  set raInput : Var Readers.RegisterAccessCols.Inputs (ZMod p) :=
+    ⟨inputVar.x11_memory, inputVar.is_real, HaltChip.clkLow inputVar + 2⟩ with raInputDef
+  have raMem : (⟨size HaltChip.Inputs,
+      (Readers.RegisterAccessCols.circuit (p := p)).toSubcircuit (size HaltChip.Inputs) raInput⟩ :
+        (n : ℕ) ×' Subcircuit (ZMod p) n) ∈
+      ((⟨HaltChip.circuit⟩ : Component (ZMod p)).rowOperations).subcircuits := by
+    rw [Component.rowOperations_mk, raInputDef, inputVarDef]
+    exact halt_x11_subcircuit_mem
+  have raGuarantees := channelGuarantees_subcircuit_of_mem Channels.byteChannel.toRaw env
+    (⟨HaltChip.circuit⟩ : Component (ZMod p)).rowOperations
+    ((Readers.RegisterAccessCols.circuit (p := p)).toSubcircuit (size HaltChip.Inputs) raInput)
+    raMem rowGuarantees
+  have crossing : (haltRow (haltTable witness) row).is_real =
+      Expression.eval env raInput.is_real := by
+    rw [raInputDef]
+    rw [haltRow_eq, inputVarDef]
+    simp only [circuit_norm]
+    rw [envDef]
+  have realEval : Expression.eval env raInput.is_real = 1 := crossing ▸ real
+  obtain ⟨diffB, scaledB⟩ := Readers.RegisterAccessCols.bounds_of_byteGuarantees raInput
+    (size HaltChip.Inputs) env raGuarantees realEval
+  have ediff : Expression.eval env raInput.cols.access_timestamp.diff_low_limb =
+      (haltRow (haltTable witness) row).x11_memory.access_timestamp.diff_low_limb := by
+    rw [raInputDef, haltRow_eq, inputVarDef]
+    simp only [circuit_norm]
+    rw [envDef]
+  have eprev : Expression.eval env raInput.cols.access_timestamp.prev_low =
+      (haltRow (haltTable witness) row).x11_memory.access_timestamp.prev_low := by
+    rw [raInputDef, haltRow_eq, inputVarDef]
+    simp only [circuit_norm]
+    rw [envDef]
+  have eclk : Expression.eval env raInput.clk_target =
+      (haltRow (haltTable witness) row).state.clk_0_16 +
+        (haltRow (haltTable witness) row).state.clk_16_24 * 65536 + 2 := by
+    rw [raInputDef, haltRow_eq, inputVarDef]
+    simp only [circuit_norm, HaltChip.clkLow]
+    rw [envDef]
+  rw [ediff] at diffB
+  rw [ediff, eprev, eclk] at scaledB
+  exact ⟨diffB, scaledB⟩
+
+/-- The halt row's two composed `CPUState` clock byte bounds, exposed for the capstone's
+access-clock arithmetic (`TimeExtraction.clkVal_small_add_of_cpuState_bounds`). -/
+theorem witness_realHaltRows_clkBounds
+    (witness : EnsembleWitness (sp1Ensemble (p := p)))
+    (constraints : witness.Constraints) (balanced : witness.BalancedChannels)
+    (row : Array (ZMod p)) (rowMem : row ∈ realHaltRows witness) :
+    (((haltRow (haltTable witness) row).state.clk_0_16 - 1) * (8 : ZMod p)⁻¹).val < 2 ^ 13 ∧
+      (haltRow (haltTable witness) row).state.clk_16_24.val < 2 ^ 8 :=
+  haltRow_cpuState_bounds witness constraints balanced rowMem
+
+/-- **The halt row's three register-access timestamp disciplines**, from the finished Byte channel
+alone: for each of `x5/x10/x11` (access clocks `clk + 4/3/2`), the 16-bit `diff_low_limb` bound and
+the scaled-high byte bound — exactly the shape `TimeExtraction.prevLow_val_lt_of_accessTimestamp`
+consumes to place each pulled prior strictly before its read-back. -/
+theorem haltRow_accessTimestamp_bounds
+    (witness : EnsembleWitness (sp1Ensemble (p := p)))
+    (constraints : witness.Constraints) (balanced : witness.BalancedChannels)
+    {row : Array (ZMod p)} (rowMem : row ∈ realHaltRows witness) :
+    (((haltRow (haltTable witness) row).x5_memory.access_timestamp.diff_low_limb).val < 2 ^ 16 ∧
+      (((haltRow (haltTable witness) row).state.clk_0_16 +
+          (haltRow (haltTable witness) row).state.clk_16_24 * 65536 + 4 -
+        (haltRow (haltTable witness) row).x5_memory.access_timestamp.prev_low - 1 -
+        (haltRow (haltTable witness) row).x5_memory.access_timestamp.diff_low_limb) *
+        (65536 : ZMod p)⁻¹).val < 2 ^ 8) ∧
+    (((haltRow (haltTable witness) row).x10_memory.access_timestamp.diff_low_limb).val < 2 ^ 16 ∧
+      (((haltRow (haltTable witness) row).state.clk_0_16 +
+          (haltRow (haltTable witness) row).state.clk_16_24 * 65536 + 3 -
+        (haltRow (haltTable witness) row).x10_memory.access_timestamp.prev_low - 1 -
+        (haltRow (haltTable witness) row).x10_memory.access_timestamp.diff_low_limb) *
+        (65536 : ZMod p)⁻¹).val < 2 ^ 8) ∧
+    (((haltRow (haltTable witness) row).x11_memory.access_timestamp.diff_low_limb).val < 2 ^ 16 ∧
+      (((haltRow (haltTable witness) row).state.clk_0_16 +
+          (haltRow (haltTable witness) row).state.clk_16_24 * 65536 + 2 -
+        (haltRow (haltTable witness) row).x11_memory.access_timestamp.prev_low - 1 -
+        (haltRow (haltTable witness) row).x11_memory.access_timestamp.diff_low_limb) *
+        (65536 : ZMod p)⁻¹).val < 2 ^ 8) :=
+  ⟨haltRow_x5_timestamp_bounds witness constraints balanced rowMem,
+   haltRow_x10_timestamp_bounds witness constraints balanced rowMem,
+   haltRow_x11_timestamp_bounds witness constraints balanced rowMem⟩
+
 /-- Every active halt row advances its decoded State time by exactly the syscall width `264`
 (halt-table wave): the composed `CPUState` reader's two byte checks bound the pulled low clock,
 and the `2^25` field bound keeps the `+264` increment exact

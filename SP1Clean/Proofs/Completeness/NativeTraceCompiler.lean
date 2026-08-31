@@ -120,6 +120,7 @@ def nativeBaseProviderOccurrences (compiled : CompiledExecution) :
   | .memoryFinalize => memoryFinalEntries compiled.memoryHistory
   | .memoryBump => compiled.memoryBumps
   | .stateBump => stateBumpEvents compiled.routedEvents
+  | .halt => []
 
 /-- Assemble the unique unclosed native trace from one chronological compiler result.  The three
 preprocessed provider families are empty here; `canonicalClosure` below reconstructs them from
@@ -255,6 +256,7 @@ theorem nativeBaseTraceOfCompiled_wellFormed
     | memoryFinalize => trivial
     | memoryBump => exact compiledWellFormed.memoryBumps event member
     | stateBump => exact stateBumpEvents_wellFormed stateBumpsReady event member
+    | halt => exact event.elim
   · exact publicWellFormed
 
 /-! ## Explicit readiness of the one compiled trace -/
@@ -273,6 +275,11 @@ structure NativeTraceReady (statement : SupportedCoreStatement p)
   canonical HALT syscall) are outside this readiness bundle by construction.  Extending the
   compiler with the terminal halt row lifts this field. -/
   syscallFree : execution.AllOrdinary
+  /-- The Exit hand-off's ordinary-shard consequence: with no active halt row the state-boundary
+  verifier's ungated `⟨exit_code⟩` pull can only balance against the padding row's zero code.
+  Native soundness *derives* this from the same balance
+  (`Soundness/ExitAccounting.lean`); the compiler direction consumes it. -/
+  exitZero : statement.publicValues.exit_code = 0
   compiler : NativeCompilerReady statement.program execution (nativeInitialClock statement)
   stateBumps : StateBumpReady
     (TraceGen.compileExecution statement.program execution
@@ -365,7 +372,7 @@ theorem NativeTraceFootprint.interactionLengths
       (trace.witness.interactionsWith channel).length < p := by
   intro channel channelMem
   simp only [sp1Ensemble_channels, List.mem_cons, List.not_mem_nil, or_false] at channelMem
-  rcases channelMem with rfl | rfl | rfl | rfl
+  rcases channelMem with rfl | rfl | rfl | rfl | rfl
   · simpa only [NativeTraceFootprint.ofTrace,
       Air.Flat.EnsembleWitness.interactionsWith_allTablesWitness] using fits.1
   · simpa only [NativeTraceFootprint.ofTrace,
@@ -373,7 +380,9 @@ theorem NativeTraceFootprint.interactionLengths
   · simpa only [NativeTraceFootprint.ofTrace,
       Air.Flat.EnsembleWitness.interactionsWith_allTablesWitness] using fits.2.2.1
   · simpa only [NativeTraceFootprint.ofTrace,
-      Air.Flat.EnsembleWitness.interactionsWith_allTablesWitness] using fits.2.2.2
+      Air.Flat.EnsembleWitness.interactionsWith_allTablesWitness] using fits.2.2.2.1
+  · simpa only [NativeTraceFootprint.ofTrace,
+      Air.Flat.EnsembleWitness.interactionsWith_allTablesWitness] using fits.2.2.2.2
 
 /-- Public limb well-formedness makes the arbitrary-shard prover-data clock representable. -/
 theorem nativeInitialClock_encodable (statement : SupportedCoreStatement p)

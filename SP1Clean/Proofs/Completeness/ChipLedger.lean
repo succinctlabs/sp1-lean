@@ -152,6 +152,68 @@ theorem stateLedger_eq_channelLedger (trace : SupportedCoreTraceWitness p) :
       (trace.witness.interactionsWith (stateChannel (p := p)).toRaw).map Interaction.toAccess :=
   busLedger_eq_channelLedger trace _ (by simp [sp1Ensemble_channels]) InteractionKind.State rfl
 
+set_option linter.unusedSectionVars false in
+/-- The stable halt position of an assembled witness is its generated Halt table. -/
+theorem SupportedCoreTraceWitness.haltTable_witness
+    (trace : SupportedCoreTraceWitness p) :
+    haltTable trace.witness = trace.providerTableFor .halt := by
+  unfold haltTable SupportedCoreTraceWitness.witness
+  simp [SupportedCoreTraceWitness.tables, SupportedCoreTraceWitness.instructionTables,
+    SupportedCoreTraceWitness.providerTables, haltIndex, instructionTableCount,
+    stateSilentProviderTableCount, InstructionChipId.all, ProviderTableId.all,
+    ByteProviderId.all]
+
+omit [Fact (2 ^ 25 < p)] in
+@[simp] theorem haltRow_buildRow
+    (inputs : List (HaltChip.Inputs (ZMod p)))
+    (input : HaltChip.Inputs (ZMod p)) (data : ProverData (ZMod p))
+    (hint : ProverHint (ZMod p)) :
+    haltRow (Table.build HaltChip.component inputs data hint)
+        (HaltChip.component.buildRow input data hint) = input := by
+  unfold haltRow
+  change HaltChip.component.rowInput
+      (Environment.fromArray (HaltChip.component.buildRow input data hint) data) = input
+  exact HaltChip.component.rowInput_buildRow input data data hint
+
+/-- **The compiled trace's Halt table is exactly the padding row.**  The deterministic compiler
+emits no halt event yet (`Occurrence .halt := Empty`), so its Halt table is the one all-zero
+padding row: the exit hand-off pushes the zero code, which is what balances the state-boundary
+verifier's ungated `⟨exit_code⟩` pull on the ordinary sub-language. -/
+theorem SupportedCoreTraceWitness.haltTablePadding
+    (trace : SupportedCoreTraceWitness p) :
+    (haltTable trace.witness).table.length = 1 ∧
+      ∀ row ∈ (haltTable trace.witness).table,
+        (haltRow (haltTable trace.witness) row).is_real = 0 := by
+  have htab : (haltTable trace.witness).table =
+      [HaltChip.component.buildRow (HaltChip.paddingInputs (p := p)) trace.data trace.hint] := by
+    have hocc : trace.providerOccurrences ProviderTableId.halt = [] := by
+      cases h : trace.providerOccurrences ProviderTableId.halt with
+      | nil => rfl
+      | cons e _ => exact e.elim
+    rw [trace.haltTable_witness]
+    simp only [SupportedCoreTraceWitness.providerTableFor, Table.build_table, hocc]
+    rfl
+  refine ⟨by rw [htab]; rfl, ?_⟩
+  intro row rowMem
+  rw [htab, List.mem_singleton] at rowMem
+  subst rowMem
+  rw [trace.haltTable_witness]
+  change (haltRow (Table.build HaltChip.component
+    (HaltChip.haltTraceInputs (trace.providerOccurrences .halt)) trace.data trace.hint)
+      (HaltChip.component.buildRow (HaltChip.paddingInputs (p := p)) trace.data trace.hint)
+        ).is_real = 0
+  rw [haltRow_buildRow]
+  rfl
+
+/-- The compiled trace has no active Halt row: its Halt table is the padding row. -/
+theorem SupportedCoreTraceWitness.realHaltRows_nil (trace : SupportedCoreTraceWitness p) :
+    realHaltRows trace.witness = [] := by
+  obtain ⟨-, hpad⟩ := trace.haltTablePadding
+  rw [realHaltRows, List.filter_eq_nil_iff]
+  intro row rowMem
+  simp only [decide_eq_true_eq, hpad row rowMem]
+  exact zero_ne_one
+
 /-- The Memory instance — the same fact, and the reason the Memory half of the sweep is not the
 ten-family assembly it looked like. -/
 theorem memoryLedger_eq_channelLedger (trace : SupportedCoreTraceWitness p) :
