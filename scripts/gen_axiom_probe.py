@@ -410,7 +410,18 @@ TARGETS = [
     ("SP1Clean/Soundness/AIR.lean",
      r"theorem\s+(supported_core_native_grounding|supported_core_native_sound|"
      r"supported_core_native_sound_scheduled|"
-     r"supported_core_native_shard_execution|supported_core_native_shard_sound)\b"),
+     r"supported_core_native_shard_execution|supported_core_native_shard_execution_halted|"
+     r"supported_core_native_shard_sound)\b"),
+    # The halt-table wave: the Exit hand-off's forcing theorems, the per-chip fetch discriminant
+    # that re-bases Program truth on the committed fragment, and the halted-shard Sail conclusion.
+    ("SP1Clean/Soundness/ExitAccounting.lean",
+     r"theorem\s+(witness_exitMessages_eq|witness_exit_code_zero_of_haltFree|"
+     r"witness_realHaltRows_eq_of_mem|witness_haltTable_table_eq_of_mem)\b"),
+    ("SP1Clean/Soundness/FetchDiscriminant.lean",
+     r"theorem\s+(supportedChip_fetchDiscriminantShape|"
+     r"witness_realDecodedInstructionRows_opcodeNeEcall)\b"),
+    ("SP1Clean/Soundness/HaltExecution.lean",
+     r"theorem\s+(haltedSail_of_haltGrounding|haltedExecution_of_haltGrounding)\b"),
     # Exact v6.4.0 table/profile guards and the public ArkLib-facing Core AIR capstone.  These are
     # release headlines: adding a new capstone file must not silently leave it outside the census.
     ("SP1Clean/FormalModel/CoreProfile.lean",

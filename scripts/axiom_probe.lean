@@ -719,6 +719,7 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Soundness.sp1StateVerifier_completeness
 #print axioms SP1Clean.Soundness.sp1StateVerifier
 #print axioms SP1Clean.Soundness.sp1StateVerifierMain_stateInteractions
+#print axioms SP1Clean.Soundness.sp1StateVerifierMain_exitInteractions
 #print axioms SP1Clean.Soundness.sp1Tables
 #print axioms SP1Clean.Soundness.sp1Tables_length
 #print axioms SP1Clean.Soundness.sp1RangeProviderTables
@@ -738,7 +739,16 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Soundness.supported_core_native_sound
 #print axioms SP1Clean.Soundness.supported_core_native_sound_scheduled
 #print axioms SP1Clean.Soundness.supported_core_native_shard_execution
+#print axioms SP1Clean.Soundness.supported_core_native_shard_execution_halted
 #print axioms SP1Clean.Soundness.supported_core_native_shard_sound
+#print axioms SP1Clean.Soundness.witness_exitMessages_eq
+#print axioms SP1Clean.Soundness.witness_exit_code_zero_of_haltFree
+#print axioms SP1Clean.Soundness.witness_realHaltRows_eq_of_mem
+#print axioms SP1Clean.Soundness.witness_haltTable_table_eq_of_mem
+#print axioms SP1Clean.Soundness.supportedChip_fetchDiscriminantShape
+#print axioms SP1Clean.Soundness.witness_realDecodedInstructionRows_opcodeNeEcall
+#print axioms SP1Clean.Soundness.haltedSail_of_haltGrounding
+#print axioms SP1Clean.Soundness.haltedExecution_of_haltGrounding
 #print axioms SP1Clean.CoreProfile.checkedIn_semanticRevision
 #print axioms SP1Clean.CoreProfile.coreCluster_matchesExtracted
 #print axioms SP1Clean.CoreProfile.coreClusterShapes_matchExtracted

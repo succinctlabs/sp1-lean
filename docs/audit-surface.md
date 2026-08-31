@@ -43,7 +43,11 @@ kernel, each with the question it decides. Reading these, plus `FormalModel/Cont
 | `supported_core_native_sound_scheduled` | `SP1Clean/Soundness/AIR.lean` | The model-scheduled corollary — the shard-composition seam |
 | `supported_core_native_shard_sound` | `SP1Clean/Soundness/AIR.lean` | Capacity-aligned soundness into the one canonical semantic relation |
 | `SupportedCoreLocalExecutionRelation` | `SP1Clean/FormalModel/Execution.lean` | What the model-scheduled conclusion actually says |
-| `SupportedCoreSailRelation` | `SP1Clean/FormalModel/Execution.lean` | The plain-Sail conclusion: a normally-retiring run between the committed endpoints at eight ticks per step, with a well-formed Memory boundary agreeing with real location content at both ends |
+| `SupportedCoreSailRelation` | `SP1Clean/FormalModel/Execution.lean` | The plain-Sail conclusion, now a dichotomy: an `OrdinaryRun` (a normally-retiring run between the committed endpoints at eight ticks per step, committed exit code zero) or a `HaltedRun` (a normally-retiring prefix reaching a genuine `SP1Halted` state, parked at `haltPc` one syscall window later) — with, in both, a well-formed Memory boundary agreeing with real location content at both ends |
+| `SailSegmentWitness.HaltedRun` | `SP1Clean/FormalModel/Execution.lean` | Exactly what a halting shard is claimed to be |
+| `SupportedCoreHaltGrounding` | `SP1Clean/Soundness/GroundingInternal.lean` | The halted grounding certificate: the eight-tick prefix, the one live Halt row, and its pulled operands' currency |
+| `haltedSail_of_haltGrounding` | `SP1Clean/Soundness/HaltExecution.lean` | How that certificate becomes a genuine `SP1Halted` Sail state |
+| `SupportedCoreNativeOrdinaryShardRelation` | `SP1Clean/Soundness/AIR.lean` | The halt-free sub-relation the deterministic compiler still targets — the exact scope of the totality-conditional correctness statements |
 | `SailSegmentWitness` | `SP1Clean/FormalModel/Execution.lean` | The proof-free run/boundary carrier of the plain-Sail conclusion |
 | `exists_populated_memoryBoundary` | `SP1Clean/Soundness/MemoryBoundaryTruth.lean` | How the boundary is populated: per canonically-addressed, genesis-backed committed finalize record — the two population filters are named follow-up, not soundness gaps |
 | `ShardStartState` | `SP1Clean/FormalModel/Execution.lean` | What the conclusion pins about the shard's start state (public pc, ROM, configuration) |
@@ -66,11 +70,17 @@ kernel, each with the question it decides. Reading these, plus `FormalModel/Cont
 
 | Declaration | File | Question it decides |
 |---|---|---|
-| `sp1Ensemble` | `SP1Clean/Soundness/SP1Ensemble.lean` | The 53-table native machine |
+| `sp1Ensemble` | `SP1Clean/Soundness/SP1Ensemble.lean` | The 54-table native machine and its five channels |
+| `haltTable` | `SP1Clean/Soundness/BumpDecode.lean` | Which physical table witnesses a halting shard (stable index 53) |
 | `sp1Tables` | `SP1Clean/Soundness/SP1Ensemble.lean` | The 25 instruction tables |
-| `sp1ProviderTables` | `SP1Clean/Soundness/SP1Ensemble.lean` | The 28 provider/boundary tables and their order |
+| `sp1ProviderTables` | `SP1Clean/Soundness/SP1Ensemble.lean` | The 29 provider/boundary tables and their order |
 | `sp1StateVerifierMain` | `SP1Clean/Soundness/SP1Ensemble.lean` | The boundary row, incl. its public-limb range checks |
-| `SP1StateBoundary` | `SP1Clean/FormalModel/Contracts/PublicValues.lean` | What is public: the range-checked State-endpoint limbs plus the committed-but-unconstrained terminal cells (`exit_code`, `is_execution_shard`, digest) awaiting halt/COMMIT semantics |
+| `SP1StateBoundary` | `SP1Clean/FormalModel/Contracts/PublicValues.lean` | What is public: the range-checked State-endpoint limbs, the `exit_code` cell now bound by the Exit hand-off, and the still-unconstrained `is_execution_shard`/digest cells awaiting COMMIT semantics |
+| `HaltChip.Spec` | `SP1Clean/FormalModel/Contracts/SystemChips.lean` | What one Halt row means: the `+264`/`haltPc` State edge, the committed `ECALL` fetch, `t0 = HALT`, and the 16-bit exit-code pinning of `a0` |
+| `Channels.exitChannel` | `SP1Clean/Model/Channels.lean` | The fifth bus and its deliberately trivial local guarantee (its whole content is balance) |
+| `witness_exitMessages_eq` | `SP1Clean/Soundness/ExitAccounting.lean` | What Exit balance forces: exactly one physical Halt row, whose hand-off message *is* the committed `exit_code` |
+| `witness_exit_code_zero_of_haltFree` | `SP1Clean/Soundness/ExitAccounting.lean` | Why an ordinary shard's committed exit code must be zero |
+| `supportedChip_fetchDiscriminantShape` | `SP1Clean/Soundness/FetchDiscriminant.lean` | Why no instruction row can claim the `ECALL` opcode — the per-chip step that recovers decode-only Program truth from the re-based committed-fragment provider |
 | `ChipKind` | `SP1Clean/Soundness/ChipRow.lean` | The per-chip interface (`chipSpec`, `advanceReady`, `view`, `advance`) — 25 registrations |
 | `RowEffect` | `SP1Clean/Soundness/RowEffectDefs.lean` | What each row is proved to *do* |
 | `ValueOperandsBound` | `SP1Clean/Soundness/RowEffectDefs.lean` | How a row's operands are tied to machine state |
@@ -181,7 +191,7 @@ them; it does not maintain a second list that could drift from extraction.
 | `compileExecution` | `SP1Clean/Proofs/Completeness/ExecutionCompiler.lean` | The proof-independent chronological all-25 compiler |
 | `compileLocatedTransitions?_exists_of_views` | `SP1Clean/Proofs/Completeness/ExecutionCompiler.lean` | Why the chronological fold itself is total once each retained shared view compiles |
 | `SupportedCoreShardExecutionValid.compileExecution?_exists_of_instructionEventsReady` | `SP1Clean/Proofs/Completeness/ExecutionCompiler.lean` | Why common semantic validity already discharges fetch/decode/image/route projection, leaving only one-row event readiness |
-| `nativeTrace` | `SP1Clean/Proofs/Completeness/NativeTraceCompiler.lean` | The unique 53-table trace produced from a statement and execution |
+| `nativeTrace` | `SP1Clean/Proofs/Completeness/NativeTraceCompiler.lean` | The unique 54-table trace produced from a statement and execution |
 | `NativeTraceReady` | `SP1Clean/Proofs/Completeness/NativeTraceCompiler.lean` | The remaining named semantic/representation facts about that exact compiler output |
 | `NativeTraceAdmissible` | `SP1Clean/Proofs/Completeness/NativeTraceCompiler.lean` | The residual compiler/output predicate, without copied semantic validity or row budget |
 | `NativeShardTraceTotal` | `SP1Clean/Proofs/Completeness/NativeTraceCompiler.lean` | The one domain-closure theorem still separating bounded completeness from full correctness |
@@ -200,15 +210,15 @@ them; it does not maintain a second list that could drift from extraction.
 | `supported_core_native_complete` | `SP1Clean/Soundness/NativeCompleteness.lean` | Existential whole-ensemble completeness on the admissible image |
 | `sp1Ensemble_statement_of_supported_execution` | `SP1Clean/Soundness/NativeCompleteness.lean` | The direct Clean `Ensemble.Statement` consequence |
 | `anchorExecution_admissible` | `SP1CleanTest/Audit/NativeCompletenessNonVacuity.lean` | A concrete zero-event common shard witness jointly inhabits every admissibility premise |
-| `anchorExecution_yields_airWitness` | `SP1CleanTest/Audit/NativeCompletenessNonVacuity.lean` | The functional capstone returns its literal compiled 53-table witness |
+| `anchorExecution_yields_airWitness` | `SP1CleanTest/Audit/NativeCompletenessNonVacuity.lean` | The functional capstone returns its literal compiled 54-table witness |
 | `activeView_compiled_event_exists` | `SP1CleanTest/Audit/ActiveNativeCompleteness.lean` | The official-Sail self-jump's projected input compiles to the exact JAL circuit event used by the active trace |
 | `activeExecution_semantic` | `SP1CleanTest/Audit/ActiveNativeCompleteness.lean` | A genuine one-transition Sail execution inhabits the shared supported-shard semantic relation |
 | `activeTrace_bounded_roundTrip` | `SP1CleanTest/Audit/ActiveNativeCompleteness.lean` | The nonempty circuit-built AIR witness lies in the bounded native relation and soundness reconstructs a semantic witness |
 | `SupportedCoreGeneratedTraceRelation` | `SP1Clean/Soundness/AIRCompleteness.lean` | The lower generated-trace assembly boundary, kept distinct from semantic completeness |
 
-Completeness now covers the deterministic compiler's full 53-table admissible image: all 25 instruction
+Completeness now covers the deterministic compiler's full 54-table admissible image: all 25 instruction
 families, refresh-aware StateBump/MemoryBump placement, canonical Byte/Range/Program closure, both
-Memory boundary tables, the State verifier row, constraints, and all four channel balances.  It is
+Memory boundary tables, the State verifier row, constraints, and all five channel balances.  It is
 still narrower than the common bounded semantic relation. Its compiler domain needs
 access-plan success (notably complete source/target RAM cells), registry-wide event-validity,
 Memory-genesis, representation-agreement, and interaction-footprint theorems. Configured-state

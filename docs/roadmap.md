@@ -14,7 +14,7 @@ Completed:
 - a kernel-checked 25-table oracle-column-size ↔ independent-manifest `mainWidth` battery;
 - deterministic typed row decoding and exhaustive ranked State ordering, with the public
   `supported_core_native_grounding` endpoint retaining final-State and memory-finalize truth;
-- Program and Memory timed grounding for the native 53-table ensemble;
+- Program and Memory timed grounding for the native 54-table ensemble;
 - `supported_core_native_sound`;
 - `supported_core_native_shard_sound` into the shared proof-free
   `CoreShardSemanticWitness`, with deterministic event evaluation, normal-retirement evidence, and
@@ -25,7 +25,7 @@ Completed:
   soundness construction, chronological compiler, and Program agreement proof;
 - the paired exact `CoreAIR.Current.ShardRelation`, containing the list-level 34-table execution and
   6-table Memory-boundary witnesses together;
-- constructive exact-row assembly of all 53 native tables plus the verifier row, with local
+- constructive exact-row assembly of all 54 native tables plus the verifier row, with local
   constraints proved from valid clusters, a caller-supplied `CanonicalPreprocessedInventory`, and
   named preprocessing, memory-boundary, and public-limb transport contracts;
 - a hand-assembled one-instruction semantic trace record whose physical rows are circuit-generated,
@@ -320,7 +320,7 @@ admissible compiler image, and both directions now use one capacity-bounded sema
 Closing the transparent compiler-admissibility totality theorem remains open.**
 
 W4 built `ToClean/Air/TableBuild.lean` and local completeness tables for all 25 instruction chips,
-the 28 provider/boundary tables, and the verifier row.  W5 now adds the semantic construction:
+the 29 provider/boundary tables, and the verifier row.  W5 now adds the semantic construction:
 
 - `InstructionEvent.lean` implements all 25 instruction-family projections;
 - `TransitionView.lean` hoists fetch/decode/route and the attempted access plan into the one
@@ -336,7 +336,7 @@ the 28 provider/boundary tables, and the verifier row.  W5 now adds the semantic
 - `MemoryHistory.lean` constructs the canonical initial/final record per touched location;
 - `CanonicalClosure.lean` constructs Byte, Range, and Program providers from the trace's own literal
   Clean ledger; direct field balance removes the old `2 * multiplicity <= p` restriction; and
-- `nativeTrace` deterministically assembles the exact 53-table witness and verifier boundary with
+- `nativeTrace` deterministically assembles the exact 54-table witness and verifier boundary with
   no proof argument and no instruction padding.
 
 `supported_core_native_functionalCompleteness`

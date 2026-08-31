@@ -113,7 +113,7 @@ bytes by the exact commit, but the gate does not label them semantically inert.
 
 `supported_core_native_complete` is the existential projection of a proof-independent functional
 compiler. It computes all native physical rows, refreshes, Memory boundaries, and canonical
-Byte/Range/Program providers from the supplied semantic execution; constraints and all four channel
+Byte/Range/Program providers from the supplied semantic execution; constraints and all five channel
 balances are proved. Its explicit admissible source still requires the named event-validity,
 provider-semantic, and actual-footprint facts. Proving those on an intended bounded source is not
 by itself enough to combine this theorem with exact soundness: the current soundness target is
@@ -173,12 +173,12 @@ entries.
 The system tables are handled differently: their complete generated lists are used directly in the
 exact relation. StateBump and MemoryBump retain native chips and whole-table faithfulness anchors.
 The rest do not acquire artificial row-wise native counterparts, because the native ensemble uses a
-proof-oriented provider interface (28 provider/boundary tables alongside the 25 instruction chips —
-a 53-table Clean ensemble). The provider family contains six Byte-op tables, all 17 Range widths
+proof-oriented provider interface (29 provider/boundary tables alongside the 25 instruction chips —
+a 54-table Clean ensemble). The provider family contains six Byte-op tables, all 17 Range widths
 `0..16`, Program, MemoryInit, MemoryFinalize, MemoryBump, and StateBump; the complete Range family
 closes the provider side of honest shift-row lookups. `SP1Clean/Composition/{PreprocessedProviders,
 MemoryBoundary,SystemTables,ProviderSegment,CoreEnsemble}.lean` now constructively connects the two
-local interfaces under a caller-supplied `CanonicalPreprocessedInventory` and proves all 53 native
+local interfaces under a caller-supplied `CanonicalPreprocessedInventory` and proves all 54 native
 tables plus the verifier row satisfy their constraints.
 Byte/Range/Program counts are recounted from the actual Clean interaction ledger of the verifier,
 25 transported instruction tables, MemoryInit/MemoryFinalize, and both bumps rather than copied from
