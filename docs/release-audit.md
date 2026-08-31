@@ -127,10 +127,9 @@ requires a shared capacity-bounded semantic relation (or equivalent two-sided re
 ```text
 native public-input equality
 + all native Clean constraints
-+ four-channel balance
++ five-channel balance (State, Byte, Program, Memory, Exit)
 + committed Program and provider/boundary semantics
 + Memory provider uniqueness
-+ an ordinary 8-tick machine schedule
 ```
 
 It does **not** consume a pulled-timestamp range premise: the `< 2^24` bound on every pulled
@@ -149,10 +148,36 @@ between the public PC and clock endpoints
 
 The exported target relation states only the program/endpoint facts; the row-exactness fact lives
 in the intermediate `supported_core_witness_grounding` theorem and is discarded by the final
-existential. The theorem does not consume boot or halt hypotheses and does not conclude either
-fact. It also does not derive its provider/boundary premises from the exact upstream system
-tables. The endpoint/program scope restrictions are in the relation definitions, rather than
-prose assumptions.
+existential. It does not derive its provider/boundary premises from the exact upstream system
+tables. The endpoint/program scope restrictions are in the relation definitions, rather than prose
+assumptions.
+
+The conclusion is now a **dichotomy**: `SupportedCoreSailRelation` is an `OrdinaryRun` (the run
+above, with committed exit code zero) or a `HaltedRun` (a normally-retiring prefix reaching a
+genuine `SP1Halted` state — the pc at a committed `ECALL` word, `t0` holding the canonical `HALT`
+code, `a0` the committed exit code — parked at `haltPc` one 264-tick syscall window later). Which
+branch holds is decided by the Exit hand-off's algebra alone, not by an added hypothesis. The
+theorem still consumes **no boot hypothesis**; boot reachability appears only in the separate
+single-shard corollary `supported_core_boot_to_halt_single_shard`, whose premise
+`SupportedCoreBootHaltRelation` names the boot boundary explicitly.
+
+Two disclosures attach to the halting branch:
+
+* **The Halt table is native, not extracted.** SP1's own ECALL path runs through `SyscallInstrsChip`
+  and the global syscall tables, which the supported profile excludes; `HaltChip` is this
+  repository's explicit replacement for exactly the `HALT` arm, with no Rust oracle and therefore
+  no `ChipFaithful` anchor. Its faithfulness to SP1's executor is reviewed prose, not a theorem.
+* **A 16-bit exit-code profile restriction.** The halt row pins `a0`'s upper three limbs to zero.
+  Without it the single committed `exit_code` field cell cannot be decoded back to `a0` at all,
+  because SP1's own `b().reduce()` folds the whole 64-bit word into one cell of a prime below
+  `2^32` and therefore wraps. This is a *strengthening* of the AIR (an honest prover of a
+  larger exit code cannot produce a satisfying halt row), disclosed here rather than hidden in the
+  contract.
+
+The **compiler** direction does not yet emit a live halt row, so the totality-conditional
+correctness and language-equality statements are relative to
+`SupportedCoreNativeOrdinaryShardRelation` — and `SupportedCoreBootHaltRelation` has no constructed
+inhabitant yet.
 
 ## Faithfulness audit
 
@@ -306,7 +331,9 @@ recomputed and matched cell-for-cell), and the independent Rust interpreter diff
 | Two-key generated Sail config | `clint`/`simple_interrupt_generator` disabled at four generated value sites — devices SP1 does not implement, whose stock defaults make the memory-bridge lemmas false as stated | stays config-generated; the generation pins and config hash are gated by `check_pins.sh` |
 | `SailConfigured` platform state | the theorems' initial-state hypotheses select SP1's platform on the Lean side: machine mode, no enabled interrupts, `MPRV`/`mseccfg`/PMM off, no HTIF, PMP all-OFF (`h_pmp_off`), and the single RWX PMA region `[2^16, 2^48)` | discharge per-field from SP1's boot/ELF-load contract; the PMA window and PMP-off are the platform selection itself (verification-report §3.2) |
 | Native semantic boundary relation | native provider tables must mean the selected program/state | derive from exact Program/Memory/Global system tables |
-| `SyscallHandler` | Sail does not implement SP1 host syscalls | prove concrete handlers for claimed syscalls |
+| `SyscallHandler` | Sail does not implement SP1 host syscalls | `ExecutableSyscallHandler.haltOnly` is now a *concrete* handler for the one claimed syscall (`HALT`), so the halting conclusion rests on a named executable host semantics rather than an opaque relation; every other syscall still evaluates to `none` (outside the profile) |
+| Native `HaltChip` | SP1's ECALL path runs through `SyscallInstrsChip` + the global syscall tables, which the supported profile excludes; `HaltChip` is this repository's explicit replacement for exactly the `HALT` arm | no Rust oracle and therefore no `ChipFaithful` anchor — its faithfulness to SP1's executor is reviewed prose; anchor it when the target architecture's ECALL table is in the extraction scope |
+| 16-bit exit codes | the halt row pins `a0`'s upper three limbs to zero so the single committed `exit_code` cell decodes back to `a0`; SP1's own `b().reduce()` wraps modulo a prime below `2^32` | widen when the public-values block carries enough cells to hold a full `u32`/`u64` exit code, or when a range-checked decomposition is added |
 | Preprocessed commitment | verifying key must bind the Program/provider trace | discharge in PCS/ArkLib layer |
 | Exact natural balance | execution needs a real multiset, not modular equality | extract with LogUp/GKR soundness and bounds |
 | Shard ledger cryptography | cumulative sums and deferred proofs are recursive-proof facts | prove in recursion/verifier layer |

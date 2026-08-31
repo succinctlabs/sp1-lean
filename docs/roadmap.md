@@ -31,15 +31,25 @@ Completed:
 - a hand-assembled one-instruction semantic trace record whose physical rows are circuit-generated,
   carried through native AIR soundness to Sail for any supplied model satisfying
   `UsesOrdinarySchedule`;
-- honest COMMIT-row versus wrapper-coverage separation; and
+- honest COMMIT-row versus wrapper-coverage separation;
+- **halting shards**: the native `HaltChip` table at ensemble position 53, the fifth (Exit) channel
+  whose ungated verifier pull forces exactly one halt row and binds the committed `exit_code`, the
+  committed-fragment Program re-base with its per-chip fetch discriminant, the halted grounding
+  certificate, and the plain-Sail `OrdinaryRun`/`HaltedRun` dichotomy — plus the single-shard
+  boot→halt corollary `supported_core_boot_to_halt_single_shard`; and
 - zero main-library proof deferrals or project axioms.
 
 Not completed:
 
 - a closed `CoreAIRRefinementObligations` value;
 - exact upstream system-table grounding;
-- cross-shard boot-to-halt soundness;
-- concrete syscall-handler refinements beyond the abstract relation;
+- **the compiler's terminal halt row** — the deterministic completeness compiler still emits only
+  the padding Halt row (`Occurrence .halt := Empty`, `NativeTraceReady.exitZero`), so the
+  totality-conditional correctness and language-equality statements remain relative to
+  `SupportedCoreNativeOrdinaryShardRelation`, and `SupportedCoreBootHaltRelation` has no
+  constructed inhabitant; this is the named next tranche;
+- cross-shard boot-to-halt soundness (the single-shard corollary above is not ledger composition);
+- concrete syscall-handler refinements beyond `ExecutableSyscallHandler.haltOnly`;
 - ArkLib verifier knowledge soundness; and
 - `NativeShardTraceTotal`, the residual implications from the shared bounded semantic
   relation to `NativeTraceReady` and `NativeTraceFootprint.Fits`; and
@@ -450,9 +460,12 @@ are involved.
   is duration-generic (`TimedGrounding.walkT` over `Semantics.Timeline`), mixed 8/264-tick walks
   are expressible, and the ordinary walk is its `Timeline.ordinary` instantiation with every
   carrier converted by a proved `…_ordinary` bridge — no chip or exported statement changed.
-  Remaining: the constructive `Timeline` ↔ `Machine.clockAt` bridge and a concrete non-uniform
-  (halt) timeline, which land with the HALT-row work; see `docs/architecture.md` § deliberate
-  layering exceptions item 4.
+  The HALT row has since landed **without** needing the non-uniform timeline: the halted branch
+  splits the halt edge out *before* the walk (the ordinary eight-tick walk runs on the instruction
+  prefix, ending at the halt row's own pre-syscall pull), so the `264` window is arithmetic at the
+  boundary rather than a mixed-duration walk. Remaining: the constructive
+  `Timeline` ↔ `Machine.clockAt` bridge, and a genuinely mixed timeline if a future profile needs
+  interleaved syscalls; see `docs/architecture.md` § deliberate layering exceptions item 4.
 - **Fold more platform facts into the generation config** — `memory.regions`,
   `htif_tohost_base`, and `memory.physaddr_bits` are also config-driven upstream, so the SP1 PMA
   region (base `2^16`, size `2^48 − 2^16`) and HTIF-off could become *generated* values instead
