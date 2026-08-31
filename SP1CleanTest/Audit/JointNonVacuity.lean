@@ -368,8 +368,8 @@ theorem jointTables_table_nil_of_ne (i : ℕ) (hi : i < jointTables.length)
 
 /-! ## Conjunct 1a: constraints
 
-The 51 zero-row tables are constraint-satisfied vacuously.  The verifier row and the three concrete
-provider rows are discharged by the executable whole-circuit constraint check (the
+The 51 zero-row tables are constraint-satisfied vacuously.  The verifier row, the three concrete
+provider rows and the Halt padding row are discharged by the executable whole-circuit check (the
 `NonVacuityReal.lean` bridge, replicated here): no static lookups, and every flattened `assertZero`
 expression — the `rangeCheck` bit decompositions included — evaluates to zero on the concrete
 cells. -/
@@ -400,7 +400,7 @@ theorem jointWitness_constraints : jointWitness.Constraints := by
       (size SP1PublicIO)).ConstraintsHold (.fromInput pv anchorData)
     exact constraintsHold_of_check (by native_decide)
   · intro t ht row hrow
-    rcases mem_jointTables ht with h | rfl | rfl
+    rcases mem_jointTables ht with h | rfl | rfl | rfl
     · rw [emptyTables_table_eq_nil t h] at hrow
       exact absurd hrow (List.not_mem_nil)
     · fin_cases hrow
@@ -408,13 +408,18 @@ theorem jointWitness_constraints : jointWitness.Constraints := by
     · fin_cases hrow
       · exact constraintsHold_of_check (by native_decide)
       · exact constraintsHold_of_check (by native_decide)
+    · fin_cases hrow
+      exact constraintsHold_of_check (by native_decide)
 
-/-! ## Conjunct 1b: four-bus balance
+/-! ## Conjunct 1b: five-bus balance
 
 Zero-row tables contribute no interactions.  On the State channel the verifier contributes exactly
 the final-pull/initial-push pair, which cancels with initial = final endpoints; on the Byte channel
 its twelve `-1` limb-range pulls cancel against the two provider tables' pushes (multiplicities
-`4 + 6 + 2`); Program and Memory stay empty. -/
+`4 + 6 + 2`); on the Exit channel its ungated `-1` pull of `⟨exit_code⟩ = ⟨0⟩` cancels against the
+Halt padding row's anti-gated `+1` push of `⟨0⟩`; Program and Memory stay empty.  The Halt padding
+row's remaining eighteen interactions are all gated off, so on the other four buses it only appends
+multiplicity-zero entries. -/
 
 /-- A pull/push pair of one message balances: the multiplicities cancel pointwise. -/
 theorem balancedInteractions_pair {F : Type} [FiniteField F] [DecidableEq F]
