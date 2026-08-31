@@ -161,6 +161,26 @@ additionally pins `a0`'s upper three limbs to zero — a disclosed 16-bit exit-c
 restriction, without which the single committed field cell cannot decode back to `a0` (SP1's own
 reduce wraps modulo a prime below `2^32`).
 
+### The first whole-execution claim
+
+`supported_core_boot_to_halt_single_shard` (`SP1Clean/Soundness/BootHalt.lean`) is the one place
+where the two ends of a shard are the two ends of a program. Its premise
+`SupportedCoreBootHaltRelation` is the ensemble algebra plus a **boot** semantic boundary
+(`BootBoundaryFacts`: `IsInitialState` at the committed entry pc, SP1's zeroed integer register
+file, boot clock `1`) plus a live Halt row; its conclusion is entirely in Sail/`GuestProgram`
+vocabulary:
+
+> from the program's entry point with zeroed registers, `steps` normally-retiring
+> official-interpreter steps reach a genuine `SP1Halted` state whose `a0` is the committed public
+> exit code, with committed terminal pc `haltPc` and committed final clock `1 + 8·steps + 264`.
+
+It is a **single-shard** statement. Composing shards along an authenticated ledger
+(`EventShardLayout`, `LastExecutionHalts`, `SP1ExecutionRelation`) is a separate,
+recursion-dependent target. And it is not yet demonstrably inhabited: the deterministic compiler
+emits only the padding Halt row, so no *constructed* witness satisfies the live-halt-row
+restriction. Producing one — the compiler's terminal halt row, with `t0`/`a0` read from the
+trace's final state — is the named next step.
+
 `ChipFaithful` is a whole-row statement. For every adversarial Rust row it proves equivalence between:
 
 - the complete upstream `assertZero` list; and

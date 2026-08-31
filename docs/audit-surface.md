@@ -48,6 +48,8 @@ kernel, each with the question it decides. Reading these, plus `FormalModel/Cont
 | `SupportedCoreHaltGrounding` | `SP1Clean/Soundness/GroundingInternal.lean` | The halted grounding certificate: the eight-tick prefix, the one live Halt row, and its pulled operands' currency |
 | `haltedSail_of_haltGrounding` | `SP1Clean/Soundness/HaltExecution.lean` | How that certificate becomes a genuine `SP1Halted` Sail state |
 | `SupportedCoreNativeOrdinaryShardRelation` | `SP1Clean/Soundness/AIR.lean` | The halt-free sub-relation the deterministic compiler still targets — the exact scope of the totality-conditional correctness statements |
+| `supported_core_boot_to_halt_single_shard` | `SP1Clean/Soundness/BootHalt.lean` | The first whole-execution claim: from the entry point with zeroed registers to a genuine `SP1Halted` state carrying the committed exit code, on one shard that both boots and halts |
+| `SupportedCoreBootHaltRelation` | `SP1Clean/Soundness/BootHalt.lean` | Exactly what that corollary assumes: the ensemble algebra, a *boot* semantic boundary, and a live Halt row |
 | `SailSegmentWitness` | `SP1Clean/FormalModel/Execution.lean` | The proof-free run/boundary carrier of the plain-Sail conclusion |
 | `exists_populated_memoryBoundary` | `SP1Clean/Soundness/MemoryBoundaryTruth.lean` | How the boundary is populated: per canonically-addressed, genesis-backed committed finalize record — the two population filters are named follow-up, not soundness gaps |
 | `ShardStartState` | `SP1Clean/FormalModel/Execution.lean` | What the conclusion pins about the shard's start state (public pc, ROM, configuration) |

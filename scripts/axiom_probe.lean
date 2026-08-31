@@ -749,6 +749,7 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Soundness.witness_realDecodedInstructionRows_opcodeNeEcall
 #print axioms SP1Clean.Soundness.haltedSail_of_haltGrounding
 #print axioms SP1Clean.Soundness.haltedExecution_of_haltGrounding
+#print axioms SP1Clean.Soundness.supported_core_boot_to_halt_single_shard
 #print axioms SP1Clean.CoreProfile.checkedIn_semanticRevision
 #print axioms SP1Clean.CoreProfile.coreCluster_matchesExtracted
 #print axioms SP1Clean.CoreProfile.coreClusterShapes_matchExtracted

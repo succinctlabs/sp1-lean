@@ -11,7 +11,7 @@ The external PR110 report's Finding 3 asks whether the capstone's **full** hypot
 **jointly** satisfiable, or whether some conjunction of
 boundary fields is silently contradictory.  This file exhibits a fully proved witness at the
 concrete prime (KoalaBear, `SP1Prime`): the **boundary-only shard** — all 25 instruction tables and
-26 of the 28 boundary/provider tables have zero rows, and the boundary verifier row carries a
+26 of the 29 boundary/provider tables have zero rows, and the boundary verifier row carries a
 public State record with **equal initial and final endpoints** (clk `(0, 1)`, pc `0x10000` at both
 ends, committed in the W3 D5-A split-limb form), so its final-state pull and initial-state push are
 the same State message and cancel exactly.
@@ -23,6 +23,14 @@ whose pushes balance those pulls exactly.  `RangeChip.circuitFor ⟨16, …⟩` 
 with multiplicity 6; `ByteChip.U8Range.circuit` (stable position 25) checks the byte pair `(0, 0)`
 and pushes `⟨3, 0, 0, 0⟩` with multiplicity 2.  Together they cancel the verifier's twelve `-1`
 pulls (four `⟨6, 1, 16, 0⟩`, six `⟨6, 0, 16, 0⟩`, two `⟨3, 0, 0, 0⟩`) message-for-message.
+
+Since the halt wave the verifier row also pulls `⟨exit_code⟩` **ungated** on the fifth (Exit) bus,
+and every shard's Halt table (stable position 53) carries exactly one row pushing the gated hand-off
+pair `is_real · ⟨reduce(x10)⟩` and `(1 - is_real) · ⟨0⟩`.  A shard whose Halt table is empty cannot
+balance the Exit bus at all, so the joint witness carries the mandatory **Halt padding table**: one
+all-zero row, whose `1 - 0 = 1` push of `⟨0⟩` cancels the verifier's `-1` pull of the committed
+`exit_code = 0`.  Its selector being off, each of its other eighteen interactions (State, Byte,
+Program, Memory) sits at multiplicity zero and so moves no other bus's balance.
 
 The committed guest program is the minimal **one-instruction** program `JAL x0, 0` (a self-jump) at
 `0x10000`, decoded from canonical prover data.  The original sketch used the ROM-free
@@ -152,11 +160,12 @@ theorem anchorData_canonicalEncoding : Commit.CanonicalEncoding (p := SP1Prime) 
   · rw [anchorData_imageRows]
     simp
 
-/-! ## The joint witness: 51 zero-row tables plus the two Byte provider tables
+/-! ## The joint witness: 51 zero-row tables, the two Byte providers, and the Halt padding row
 
-Every table except the two byte providers has zero rows. The provider rows are honest witnesses of
-their circuits: input cells first (`ProvableType` order, including the explicit multiplicity), then
-the `rangeCheck n` subcircuits' local bit-decomposition cells in emission order. -/
+Every table except the two byte providers and the Halt table has zero rows. The provider rows are
+honest witnesses of their circuits: input cells first (`ProvableType` order, including the explicit
+multiplicity), then the `rangeCheck n` subcircuits' local bit-decomposition cells in emission
+order. -/
 
 /-- A zero-row table for one ensemble component. -/
 def emptyTableOf (c : Component (ZMod SP1Prime)) : Table (ZMod SP1Prime) where
@@ -166,8 +175,8 @@ def emptyTableOf (c : Component (ZMod SP1Prime)) : Table (ZMod SP1Prime) where
   data := anchorData
   uniform_width := by simp
 
-/-- The 53 zero-row tables in the stable ensemble layout — the all-empty template the joint
-witness patches at the two byte-provider positions. -/
+/-- The 54 zero-row tables in the stable ensemble layout — the all-empty template the joint
+witness patches at the two byte-provider positions and the Halt position. -/
 noncomputable def emptyTables : List (Table (ZMod SP1Prime)) :=
   (sp1Ensemble (p := SP1Prime)).tables.map emptyTableOf
 
@@ -181,7 +190,7 @@ theorem emptyTables_data : ∀ t ∈ emptyTables, t.data = anchorData := by
   obtain ⟨c, -, rfl⟩ := List.mem_map.mp ht
   rfl
 
-theorem emptyTables_length : emptyTables.length = 53 := by
+theorem emptyTables_length : emptyTables.length = 54 := by
   simp only [emptyTables, List.length_map, sp1Ensemble_tables, List.length_append]
   rfl
 
@@ -209,19 +218,39 @@ def range16Table : Table (ZMod SP1Prime) where
   data := anchorData
   uniform_width := by intro row hrow; fin_cases hrow <;> rfl
 
-/-- The 53 mapped tables of the joint shard: the all-empty template with the two byte-provider
-positions patched (25 = `U8Range`, 47 = `Range16`, matching `sp1ProviderTables` order). -/
+/-- The all-zero Halt row: the `size HaltChip.Inputs = 25` input cells (the halt circuit declares
+`localLength := 0`, so it owns no witness cells beyond them), i.e. `HaltChip.paddingInputs` in
+physical form. -/
+def haltPaddingRow : Array (ZMod SP1Prime) := Array.replicate 25 0
+
+/-- The mandatory Halt table (stable position 53): exactly one padding row. Its selector is off, so
+the composed `CPUState`/`RegisterAccessCols` Byte pulls, the State pair, the ECALL Program fetch and
+the six register Memory records are all emitted at multiplicity zero; only the anti-gated
+`1 - is_real = 1` Exit push of `⟨0⟩` is live, and that is what balances the boundary verifier's
+ungated `⟨exit_code⟩` pull. -/
+def haltPaddingTable : Table (ZMod SP1Prime) where
+  component := ⟨HaltChip.circuit⟩
+  width := 25
+  table := [haltPaddingRow]
+  data := anchorData
+  uniform_width := by intro row hrow; fin_cases hrow; rfl
+
+/-- The 54 mapped tables of the joint shard: the all-empty template with the two byte-provider
+positions and the Halt position patched (25 = `U8Range`, 47 = `Range16`, 53 = `Halt`, matching
+`sp1ProviderTables` order). -/
 noncomputable def jointTables : List (Table (ZMod SP1Prime)) :=
-  (emptyTables.set 25 u8RangeTable).set 47 range16Table
+  ((emptyTables.set 25 u8RangeTable).set 47 range16Table).set 53 haltPaddingTable
 
 theorem mem_jointTables {t : Table (ZMod SP1Prime)} (ht : t ∈ jointTables) :
-    t ∈ emptyTables ∨ t = u8RangeTable ∨ t = range16Table := by
+    t ∈ emptyTables ∨ t = u8RangeTable ∨ t = range16Table ∨ t = haltPaddingTable := by
   rcases List.mem_or_eq_of_mem_set ht with h | rfl
   · rcases List.mem_or_eq_of_mem_set h with h | rfl
-    exacts [Or.inl h, Or.inr (Or.inl rfl)]
-  · exact Or.inr (Or.inr rfl)
+    · rcases List.mem_or_eq_of_mem_set h with h | rfl
+      exacts [Or.inl h, Or.inr (Or.inl rfl)]
+    · exact Or.inr (Or.inr (Or.inl rfl))
+  · exact Or.inr (Or.inr (Or.inr rfl))
 
-theorem jointTables_length : jointTables.length = 53 := by
+theorem jointTables_length : jointTables.length = 54 := by
   simp only [jointTables, List.length_set]
   exact emptyTables_length
 
@@ -265,8 +294,35 @@ theorem flatMap_set_set_of_nil {α β : Type*} {l : List α} {f : α → List β
         exact ih (by omega) (by simpa using hj)
           fun y hy => hnil y (List.mem_cons_of_mem _ hy)
 
-/-- **The joint shard**: 51 zero-row tables plus the two byte-provider tables, the shared canonical
-committed program data, and the equal-endpoints public boundary. -/
+/-- Generic: `flatMap` over a triple-`set` list (positions `i < j < k`) whose other elements all map
+to `[]` is the three patched images in position order. -/
+theorem flatMap_set_set_set_of_nil {α β : Type*} {l : List α} {f : α → List β} {i j k : ℕ}
+    {a b c : α} (hij : i < j) (hjk : j < k) (hk : k < l.length)
+    (hnil : ∀ x ∈ l, f x = []) :
+    (((l.set i a).set j b).set k c).flatMap f = f a ++ (f b ++ f c) := by
+  induction l generalizing i j k with
+  | nil => simp at hk
+  | cons x xs ih =>
+    cases k with
+    | zero => omega
+    | succ m =>
+      cases j with
+      | zero => omega
+      | succ n =>
+        cases i with
+        | zero =>
+          simp only [List.set_cons_zero, List.set_cons_succ, List.flatMap_cons]
+          congr 1
+          exact flatMap_set_set_of_nil (by omega) (by simpa using hk)
+            fun y hy => hnil y (List.mem_cons_of_mem _ hy)
+        | succ q =>
+          simp only [List.set_cons_succ, List.flatMap_cons, hnil x List.mem_cons_self,
+            List.nil_append]
+          exact ih (by omega) (by omega) (by simpa using hk)
+            fun y hy => hnil y (List.mem_cons_of_mem _ hy)
+
+/-- **The joint shard**: 51 zero-row tables plus the two byte-provider tables and the Halt padding
+table, the shared canonical committed program data, and the equal-endpoints public boundary. -/
 noncomputable def jointWitness : SupportedCoreNativeWitness SP1Prime where
   tables := jointTables
   data := anchorData
@@ -275,19 +331,24 @@ noncomputable def jointWitness : SupportedCoreNativeWitness SP1Prime where
   same_circuits := by
     intro i hi
     rcases eq_or_ne i 25 with rfl | h25
-    · simp only [jointTables, List.getElem_set_ne (by omega : (47 : ℕ) ≠ 25),
-        List.getElem_set_self]
+    · simp only [jointTables, List.getElem_set_ne (by omega : (53 : ℕ) ≠ 25),
+        List.getElem_set_ne (by omega : (47 : ℕ) ≠ 25), List.getElem_set_self]
       rfl
     rcases eq_or_ne i 47 with rfl | h47
+    · simp only [jointTables, List.getElem_set_ne (by omega : (53 : ℕ) ≠ 47),
+        List.getElem_set_self]
+      rfl
+    rcases eq_or_ne i 53 with rfl | h53
     · simp only [jointTables, List.getElem_set_self]
       rfl
-    · simp only [jointTables, List.getElem_set_ne (Ne.symm h47),
-        List.getElem_set_ne (Ne.symm h25)]
+    · simp only [jointTables, List.getElem_set_ne (Ne.symm h53),
+        List.getElem_set_ne (Ne.symm h47), List.getElem_set_ne (Ne.symm h25)]
       simp [emptyTables, emptyTableOf]
   same_data := by
     intro t ht
-    rcases mem_jointTables ht with h | rfl | rfl
+    rcases mem_jointTables ht with h | rfl | rfl | rfl
     · exact emptyTables_data t h
+    · rfl
     · rfl
     · rfl
 
@@ -295,12 +356,13 @@ noncomputable def jointWitness : SupportedCoreNativeWitness SP1Prime where
 @[simp] theorem jointWitness_data : jointWitness.data = anchorData := rfl
 @[simp] theorem jointWitness_publicInput : jointWitness.publicInput = pv := rfl
 
-/-- Positions other than the two byte providers keep zero rows — in particular the stable
-provider/boundary positions 48/49/50 consumed by the semantic boundary bindings. -/
+/-- Positions other than the two byte providers and the Halt table keep zero rows — in particular
+the stable provider/boundary positions 48/49/50 consumed by the semantic boundary bindings. -/
 theorem jointTables_table_nil_of_ne (i : ℕ) (hi : i < jointTables.length)
-    (h25 : i ≠ 25) (h47 : i ≠ 47) : jointTables[i].table = [] := by
+    (h25 : i ≠ 25) (h47 : i ≠ 47) (h53 : i ≠ 53) : jointTables[i].table = [] := by
   have hmem : jointTables[i] ∈ emptyTables := by
-    simp only [jointTables, List.getElem_set_ne (Ne.symm h47), List.getElem_set_ne (Ne.symm h25)]
+    simp only [jointTables, List.getElem_set_ne (Ne.symm h53), List.getElem_set_ne (Ne.symm h47),
+      List.getElem_set_ne (Ne.symm h25)]
     exact List.getElem_mem _
   exact emptyTables_table_eq_nil _ hmem
 

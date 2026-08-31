@@ -422,6 +422,9 @@ TARGETS = [
      r"witness_realDecodedInstructionRows_opcodeNeEcall)\b"),
     ("SP1Clean/Soundness/HaltExecution.lean",
      r"theorem\s+(haltedSail_of_haltGrounding|haltedExecution_of_haltGrounding)\b"),
+    # The first whole-execution claim: one shard that both boots and halts.
+    ("SP1Clean/Soundness/BootHalt.lean",
+     r"theorem\s+(supported_core_boot_to_halt_single_shard)\b"),
     # Exact v6.4.0 table/profile guards and the public ArkLib-facing Core AIR capstone.  These are
     # release headlines: adding a new capstone file must not silently leave it outside the census.
     ("SP1Clean/FormalModel/CoreProfile.lean",
