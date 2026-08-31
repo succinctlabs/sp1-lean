@@ -15,7 +15,7 @@ adapter may add padding and then recompute this value; the unpadded native compi
 
 namespace SP1Clean.Soundness
 
-open SP1Clean.Channels (stateChannel byteChannel programChannel memoryChannel)
+open SP1Clean.Channels (stateChannel byteChannel programChannel memoryChannel exitChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 25 < p)]
 
@@ -25,6 +25,7 @@ structure NativeTraceFootprint where
   byte : ℕ
   program : ℕ
   memory : ℕ
+  exit : ℕ
 deriving DecidableEq, Repr
 
 namespace NativeTraceFootprint
@@ -34,7 +35,8 @@ def Fits (footprint : NativeTraceFootprint) (characteristic : ℕ) : Prop :=
   footprint.state < characteristic ∧
     footprint.byte < characteristic ∧
     footprint.program < characteristic ∧
-    footprint.memory < characteristic
+    footprint.memory < characteristic ∧
+    footprint.exit < characteristic
 
 /-- Measure the four channels of the actual generated native witness. -/
 noncomputable def ofTrace (trace : SupportedCoreTraceWitness p) : NativeTraceFootprint where
@@ -42,6 +44,7 @@ noncomputable def ofTrace (trace : SupportedCoreTraceWitness p) : NativeTraceFoo
   byte := (trace.witness.allTablesWitness.interactionsWith byteChannel.toRaw).length
   program := (trace.witness.allTablesWitness.interactionsWith programChannel.toRaw).length
   memory := (trace.witness.allTablesWitness.interactionsWith memoryChannel.toRaw).length
+  exit := (trace.witness.allTablesWitness.interactionsWith exitChannel.toRaw).length
 
 theorem fits_of_balancedChannels (trace : SupportedCoreTraceWitness p)
     (balanced : trace.witness.BalancedChannels) : (ofTrace trace).Fits p := by
@@ -53,10 +56,12 @@ theorem fits_of_balancedChannels (trace : SupportedCoreTraceWitness p)
     simp [sp1Ensemble_channels])
   have memoryBalanced := balanced memoryChannel.toRaw (by
     simp [sp1Ensemble_channels])
+  have exitBalanced := balanced exitChannel.toRaw (by
+    simp [sp1Ensemble_channels])
   have primePos : 0 < p := (Fact.out : p.Prime).pos
   have charNe : ringChar (ZMod p) ≠ 0 := by
     simpa only [ZMod.ringChar_zmod_n] using (Nat.ne_of_gt primePos)
-  refine ⟨?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_⟩
   · simpa only [ofTrace, Fits, ZMod.ringChar_zmod_n] using
       stateBalanced.1.resolve_right charNe
   · simpa only [ofTrace, ZMod.ringChar_zmod_n] using
@@ -65,6 +70,8 @@ theorem fits_of_balancedChannels (trace : SupportedCoreTraceWitness p)
       programBalanced.1.resolve_right charNe
   · simpa only [ofTrace, ZMod.ringChar_zmod_n] using
       memoryBalanced.1.resolve_right charNe
+  · simpa only [ofTrace, ZMod.ringChar_zmod_n] using
+      exitBalanced.1.resolve_right charNe
 
 end NativeTraceFootprint
 

@@ -24,12 +24,16 @@ namespace SP1Clean
 
 /-- Tag for each cross-chip interaction. Mirrors SP1's `InteractionKind`
 (`crates/hypercube/src/lookup/interaction.rs`). We carry the buses this project models; others
-are listed so the discriminator covers SP1's full topology. -/
+are listed so the discriminator covers SP1's full topology. `Exit` is the one native-only bus:
+SP1 binds `public_values.exit_code` by direct chip-level public-values access, which Clean's
+flat-AIR reserves to the verifier, so the native ensemble routes that binding over its own
+channel (`Channels.exitChannel`). -/
 inductive InteractionKind where
   | Memory
   | Byte
   | Program
   | State
+  | Exit
   deriving DecidableEq, Repr, Inhabited
 
 /-- A single interaction-bus contribution: which bus, which named table within it, the entry (the
@@ -496,17 +500,31 @@ private lemma count_filter_kind (x : LookupAccess) (K : InteractionKind) (l : Lo
     exact List.count_eq_zero_of_not_mem fun hmem => hxK (by simpa using (List.mem_filter.mp hmem).2)
 
 /-- A `LookupAccessList` is a permutation of `(filter State) ++ (filter Byte) ++ (filter Memory) ++
-(filter Program)` — its four-way partition by `InteractionKind`. -/
+(filter Program) ++ (filter Exit)` — its five-way partition by `InteractionKind`. -/
 theorem perm_filter_by_kind (l : LookupAccessList) :
     l.Perm (l.filter (fun a => a.1 = InteractionKind.State) ++
               l.filter (fun a => a.1 = InteractionKind.Byte) ++
               l.filter (fun a => a.1 = InteractionKind.Memory) ++
-              l.filter (fun a => a.1 = InteractionKind.Program)) := by
+              l.filter (fun a => a.1 = InteractionKind.Program) ++
+              l.filter (fun a => a.1 = InteractionKind.Exit)) := by
   rw [List.perm_iff_count]
   intro x
   simp only [List.count_append, count_filter_kind]
   rcases x with ⟨k, rest⟩
   cases k <;> simp
+
+/-- The four-kind partition of an access list with no Exit entries — the Faithful anchors' form:
+extracted Rust interactions never carry the native-only Exit kind, so their Exit filter reduces to
+`[]` by `rfl` and the historical four-block partition survives. -/
+theorem perm_filter_by_kind_of_exit_nil (l : LookupAccessList)
+    (hexit : l.filter (fun a => a.1 = InteractionKind.Exit) = []) :
+    l.Perm (l.filter (fun a => a.1 = InteractionKind.State) ++
+              l.filter (fun a => a.1 = InteractionKind.Byte) ++
+              l.filter (fun a => a.1 = InteractionKind.Memory) ++
+              l.filter (fun a => a.1 = InteractionKind.Program)) := by
+  have h := perm_filter_by_kind l
+  rwa [hexit, List.append_nil] at h
+
 
 /-- **The access at a key**, carrying a chosen multiplicity. The shared primitive of both reasons
 a bus balances: a hand-off spends it at `±1`, a closure at a recounted total. -/
@@ -833,9 +851,16 @@ closure leaves the unselected buses completely alone, so adding providers cannot
 Memory balance that held before.
 -/
 
-/-- Every key the skeleton touches on a selectable bus, without duplicates. -/
+/-- Every key the skeleton actually *demands* on a selectable bus, without duplicates.
+
+Zero-multiplicity accesses are dropped first (`active`).  A padded chip row emits its whole
+interaction list gated to multiplicity zero, and such an access contributes to neither LogUp nor
+the signed balance — so its key is not a demand, and a provider that recounted it would be
+supplying a row nothing asked for.  Skipping them is also what keeps the closure insensitive to
+padding: the Halt table is always exactly one row, so on an ordinary shard its padding row's
+Program fetch would otherwise manufacture a ROM demand no compiled instruction backs. -/
 def closingKeys (skeleton : LookupAccessList) (select : LookupKey → Bool) : List LookupKey :=
-  ((skeleton.map keyOf).filter select).dedup
+  (((active skeleton).map keyOf).filter select).dedup
 
 theorem closingKeys_nodup (skeleton : LookupAccessList) (select : LookupKey → Bool) :
     (closingKeys skeleton select).Nodup := List.nodup_dedup _
@@ -852,6 +877,7 @@ theorem mem_closingKeys_of_multiplicitySum_ne_zero (skeleton : LookupAccessList)
   rw [closingKeys, List.mem_dedup, List.mem_filter]
   refine ⟨?_, hsel⟩
   by_contra hmem
+  rw [← multiplicitySum_active] at h
   exact h (multiplicitySum_eq_zero_of_keyOf_ne fun a ha hka => hmem (hka ▸ List.mem_map_of_mem ha))
 
 /-- The closure never touches a bus it was not asked to supply. This is what makes it safe to add:

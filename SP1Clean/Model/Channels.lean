@@ -86,6 +86,18 @@ def byteChannel : Channel (ZMod p) ByteRow where
   name := "SP1Byte"
   Guarantees msg _ := ByteRowSpec msg
 
+/-- The Exit channel — the native halt table's exit-code bus. It has no SP1 `InteractionKind`
+counterpart: SP1's syscall chip constrains `public_values.exit_code` by direct chip-level
+public-values access, which Clean's flat-AIR reserves to the designated verifier — so the native
+ensemble factors that binding through one channel. The verifier pulls `⟨exit_code⟩` **ungated**
+(its row is exactly the public input and can witness no gate cell); a real halt row pushes its
+reduced `x10` word, a padding halt row pushes `⟨0⟩`, and balance alone forces the exit semantics
+(see `ExitMsg`). `Guarantees := True` — like the State bus, the channel is purely structural: the
+binding is a multiset fact, not a per-message predicate. -/
+def exitChannel : Channel (ZMod p) ExitMsg where
+  name := "SP1Exit"
+  Guarantees _ _ := True
+
 open Classical in
 /-- **Subcircuit interactions, kept in `interactionsWith` form.** Combines Clean's
 `Operations.interactionsWith_subcircuit` (which exposes the raw `FlatOperation.interactions … |>.filter`)
@@ -176,6 +188,39 @@ private lemma rawChannel_eq_false_of_name_ne {rc1 rc2 : RawChannel (ZMod p)}
     ((programChannel (p := p)).toRaw = (byteChannel (p := p)).toRaw) = False :=
   rawChannel_eq_false_of_name_ne (by
     simp only [Channel.toRaw_name, programChannel, byteChannel]; decide)
+-- Exit vs the four established buses — both orders, for the halt table's filter conditions.
+@[circuit_norm] lemma exitChannel_eq_byteChannel_false :
+    ((exitChannel (p := p)).toRaw = (byteChannel (p := p)).toRaw) = False :=
+  rawChannel_eq_false_of_name_ne (by
+    simp only [Channel.toRaw_name, exitChannel, byteChannel]; decide)
+@[circuit_norm] lemma byteChannel_eq_exitChannel_false :
+    ((byteChannel (p := p)).toRaw = (exitChannel (p := p)).toRaw) = False :=
+  rawChannel_eq_false_of_name_ne (by
+    simp only [Channel.toRaw_name, byteChannel, exitChannel]; decide)
+@[circuit_norm] lemma exitChannel_eq_stateChannel_false :
+    ((exitChannel (p := p)).toRaw = (stateChannel (p := p)).toRaw) = False :=
+  rawChannel_eq_false_of_name_ne (by
+    simp only [Channel.toRaw_name, exitChannel, stateChannel]; decide)
+@[circuit_norm] lemma stateChannel_eq_exitChannel_false :
+    ((stateChannel (p := p)).toRaw = (exitChannel (p := p)).toRaw) = False :=
+  rawChannel_eq_false_of_name_ne (by
+    simp only [Channel.toRaw_name, stateChannel, exitChannel]; decide)
+@[circuit_norm] lemma exitChannel_eq_programChannel_false :
+    ((exitChannel (p := p)).toRaw = (programChannel (p := p)).toRaw) = False :=
+  rawChannel_eq_false_of_name_ne (by
+    simp only [Channel.toRaw_name, exitChannel, programChannel]; decide)
+@[circuit_norm] lemma programChannel_eq_exitChannel_false :
+    ((programChannel (p := p)).toRaw = (exitChannel (p := p)).toRaw) = False :=
+  rawChannel_eq_false_of_name_ne (by
+    simp only [Channel.toRaw_name, programChannel, exitChannel]; decide)
+@[circuit_norm] lemma exitChannel_eq_memoryChannel_false :
+    ((exitChannel (p := p)).toRaw = (memoryChannel (p := p)).toRaw) = False :=
+  rawChannel_eq_false_of_name_ne (by
+    simp only [Channel.toRaw_name, exitChannel, memoryChannel]; decide)
+@[circuit_norm] lemma memoryChannel_eq_exitChannel_false :
+    ((memoryChannel (p := p)).toRaw = (exitChannel (p := p)).toRaw) = False :=
+  rawChannel_eq_false_of_name_ne (by
+    simp only [Channel.toRaw_name, memoryChannel, exitChannel]; decide)
 
 -- Reusable disequalities for the State exposure proofs.  Keeping these once at the channel boundary
 -- avoids every chip reopening the `RawChannel` record merely to filter its non-State interactions.

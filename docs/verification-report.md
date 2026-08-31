@@ -14,7 +14,7 @@
 This repository contains a machine-checked verification, in the Lean 4 proof assistant, that
 **each of the 25 instruction chips of SP1 v6.4.0's supported Core profile soundly implements the
 official RISC-V instruction-set semantics** — proven against the Sail-generated RV64 model and
-composed into a machine-level soundness theorem over a native 53-table ensemble with explicitly
+composed into a machine-level soundness theorem over a native 54-table ensemble with explicitly
 disclosed boundary premises (§8; the exact-upstream refinement boundary is §8.3). The
 verification is built on the public
 [Clean](https://github.com/Verified-zkEVM/clean) zkVM DSL and is structured so that every claim is
@@ -25,11 +25,13 @@ The deliverables:
 
 - **D1 — Native chip formalization.** All 25 supported instruction chips (the RV64IM ALU,
   control-flow, and memory core) are implemented as Clean `GeneralFormalCircuit`s with semantic
-  specifications, plus 28 provider/boundary tables, forming the 53-table `sp1Ensemble`
+  specifications, plus 29 provider/boundary tables, forming the 54-table `sp1Ensemble`
   (`SP1Clean/Soundness/SP1Ensemble.lean`). The provider suffix is six Byte-op tables, 17 Range
-  tables for widths `0..16`, Program, MemoryInit, MemoryFinalize, MemoryBump, and StateBump.
+  tables for widths `0..16`, Program, MemoryInit, MemoryFinalize, MemoryBump, StateBump, and Halt.
   All 17 widths are needed: honest shift rows emit live Range requests outside the former
-  `8/13/14/16` subset.
+  `8/13/14/16` subset. The Halt table is this repository's own — it implements the `HALT` arm of
+  SP1's `SyscallInstrsChip`, whose other arms and global syscall bus the supported profile
+  excludes — and it is the one table without a faithfulness anchor (§8.2).
 - **D2 — Per-chip soundness, completeness, and ISA refinement.** Every chip carries closed
   soundness *and* completeness proofs against a semantic `Spec`, and a Sail bridge (`advance`)
   showing its rows realize genuine steps of the official RV64 interpreter.
@@ -47,9 +49,14 @@ The deliverables:
   local-execution capstone is now visibly a projection of this reusable result.
 - **D5 — The headline theorem.** `supported_core_native_sound`
   (`SP1Clean/Soundness/AIR.lean`): every constraint-satisfying, channel-balanced witness of the
-  53-table ensemble, with an explicit boundary premise, yields a genuine finite,
-  normally-retiring run of the official (SP1-configured, §3.2) Sail RV64 interpreter between the
-  public program-counter/clock endpoints — with no machine-model parameter (§8).
+  54-table ensemble, with an explicit boundary premise, yields a genuine finite,
+  normally-retiring run of the official (SP1-configured, §3.2) Sail RV64 interpreter — either
+  between the public program-counter/clock endpoints, or ending in a genuine `SP1Halted` state
+  whose `a0` is the committed exit code, with the AIR's own Exit-channel algebra deciding which
+  (§8.2) — and with no machine-model parameter (§8). One corollary,
+  `supported_core_boot_to_halt_single_shard`, adds a boot boundary and states the first
+  whole-program fact: entry point with zeroed registers to a halting state carrying the committed
+  exit code, on a single shard.
 - **D6 — Conformance testing against the real prover.** A dump-anchored pipeline reconstructs
   every event row of all 25 chips from the circuits' own witness generators and matches it
   cell-for-cell against full trace matrices dumped from SP1's actual Rust prover at SP1's field,
@@ -73,7 +80,7 @@ The deliverables:
   (`SP1Clean/Soundness/NativeCompleteness.lean`) maps an admissible supported
   `Machine.EventExecutionTrace` to `SupportedCoreNativeRelation` with no proof argument in the map.
   It compiles all 25 instruction families, schedules State/Memory refreshes, constructs Memory
-  boundaries, recounts Byte/Range/Program demand from the literal Clean ledger, and builds all 53
+  boundaries, recounts Byte/Range/Program demand from the literal Clean ledger, and builds all 54
   tables plus the verifier row with the circuits' own generators.  Constraints and all four Clean
   channel balances are conclusions. Its explicit admissible source is still narrower than the
   shared bounded ordinary target: registry-wide event validity, initial-Memory content, physical
@@ -83,7 +90,7 @@ The deliverables:
   composes D3 with the native side, which Alex Hicks's 2026-08 PR #110 review found were never
   joined inside Lean. From valid witnesses of the pinned execution and memory-boundary clusters,
   **a caller-supplied `CanonicalPreprocessedInventory`, plus named preprocessing, memory-boundary,
-  and public-limb transport contracts**, it constructs all 53 native tables plus the verifier row
+  and public-limb transport contracts**, it constructs all 54 native tables plus the verifier row
   and proves the complete local constraint system. Exact
   Byte/Range/Program multiplicities are recounted from the actual Clean interaction ledger of the
   verifier, 25 transported instruction tables, MemoryInit/MemoryFinalize, and both bumps rather than
@@ -373,7 +380,7 @@ where `ChipFaithful` demands, for **every** Rust row, on that reconstructed phys
    constraint system holds (bidirectional on the codec image — the native circuit neither weakens
    nor strengthens the Rust AIR there); and
 2. *interactions*: on every locally-accepted row, the native circuit's active interaction multiset
-   is a **permutation** of the Rust row's active interaction multiset (all four buses, projected
+   is a **permutation** of the Rust row's active interaction multiset (all four instruction buses, projected
    with multiplicities).
 
 The quantifier is deliberately over extracted Rust rows. Six flag-hinted chips reconstruct a
@@ -481,7 +488,7 @@ them.
 
 ### 6.1 Channels carry what SP1 constrains — nothing more
 
-Each of the four buses is a plain Clean `Channel` whose row-local guarantee is exactly what SP1's
+Each of the five buses is a plain Clean `Channel` whose row-local guarantee is exactly what SP1's
 receiving table enforces (`Model/Channels.lean`):
 
 | Channel | Row guarantee | SP1 counterpart |
@@ -577,7 +584,7 @@ for a boundary-only witness over a real one-instruction program.
 zero-event canonical execution shard and invokes both native completeness capstones. Separately,
 `ActiveTraceNonVacuity.lean` hand-assembles a genuinely active semantic trace record for
 `JAL x0, 0`; its instruction-event count and decoded physical instruction-row count are both one,
-and matching native provider occurrences balance all four buses. Completeness circuit-generates the
+and matching native provider occurrences balance all five buses. Completeness circuit-generates the
 physical AIR rows, then derives both a native AIR witness and an official-Sail local execution. This
 last test is the active-row assembly regression, not a full or verified trace generator.
 `ActiveNativeCompleteness.lean` closes the concrete seam between those anchors: it proves one
@@ -594,7 +601,10 @@ follow-up work; (ii) the shard-local initial state comes from the boundary bindi
 No cross-shard stitching (the relation exists — `SP1ExecutionRelation`, with full-state
 continuity between consecutive execution shards, last-shard canonical-halt, and ledger
 authentication fields — but its soundness theorem is intentionally not declared). No syscall
-host-behavior semantics beyond the `SyscallHandler` interface. No boot/ELF-loading claim.
+host-behavior semantics beyond `ExecutableSyscallHandler.haltOnly`, the concrete handler for the
+one claimed syscall; every other syscall evaluates to `none`, i.e. outside the profile. Boot
+reachability appears in exactly one place — the single-shard corollary
+`supported_core_boot_to_halt_single_shard` (§8.2) — and nowhere in the shard-level statements.
 
 A deterministic native ensemble-completeness theorem is now declared (§7.4). It covers the entire
 admissible native compiler image, not yet every witness of the shared bounded ordinary semantic
@@ -629,7 +639,7 @@ real no-wrap condition, the length of each actual channel interaction list being
    existential AIR trace; and
 3. the footprint bound above.
 
-From those hypotheses the theorem derives every constraint, all four channel balances, public-input
+From those hypotheses the theorem derives every constraint, all five channel balances, public-input
 equality, and `SemanticBoundaryBinding`.  The State and Memory channels use temporal hand-off
 permutations; Byte/Range/Program use canonical provider closure.  The older lower-level
 `supported_core_generated_trace_*` theorem remains available for an already built trace, under names
@@ -682,7 +692,7 @@ def SupportedCoreNativeRelation :
 ```
 
 - `SupportedCoreEnsembleRelation`: the public input matches, **all** row constraints hold over
-  **all** 53 tables (+ the state-boundary verifier), and **all** channels balance — verified for
+  **all** 54 tables (+ the state-boundary verifier), and **all** channels balance — verified for
   this report quantifier-by-quantifier down into Clean's `FlatEnsemble` (∀-tables, ∀-rows;
   no existential slips).
 - `SP1SemanticBoundaryRelation` (= `SemanticBoundaryBinding`): there is an initial Sail state
@@ -723,12 +733,46 @@ Read precisely: for every statement and every witness in the native relation, **
 shard-local run witness — a genuine finite `try_step` run of the official Sail RV64 interpreter,
 on the committed program, in which every step retires normally (`SailRetireChain` — the trap,
 illegal-instruction, wait, and extension-failure exits are excluded), starting from a
-`ShardStartState` (public initial PC, committed ROM loaded, platform configured), ending at the
-public final PC, and taking exactly `(finalClk − initClk)/8` instructions — together with a
+`ShardStartState` (public initial PC, committed ROM loaded, platform configured) — together with a
 well-formed Memory boundary, populated per canonically-addressed, genesis-backed committed
 finalize record, whose cells agree with real location content in the initial and final Sail
 states (`exists_populated_memoryBoundary` from the walk's exported value currency at the
-committed final clock). There is no
+committed final clock).
+
+The run itself comes in one of two shapes, and **which one is decided by the AIR's own algebra**:
+
+- an `OrdinaryRun` — the run ends at the public final PC, takes exactly `(finalClk − initClk)/8`
+  instructions, and the committed `exit_code` is `0`; or
+- a `HaltedRun` — the normally-retiring prefix reaches a genuine `SP1Halted` state (the PC at a
+  committed `ECALL` word of the guest ROM, `t0` holding the canonical `SyscallCode::HALT`, `a0`
+  holding the committed exit code), and the public endpoint is that state parked at SP1's terminal
+  `haltPc` one 264-tick syscall window later.
+
+The disjunction costs no hypothesis. The ensemble's fifth channel, Exit, has exactly two parties:
+the state-boundary verifier pulls `⟨exit_code⟩` **ungated**, and each row of the Halt table (the
+native replacement for SP1's `HALT` ECALL arm, ensemble position 53) pushes either its reduced
+`a0` word or, when padding, the zero code. Balance alone then forces exactly one physical Halt row
+and pins the committed exit code to `0` or to `reduce(a0)` accordingly, which is the case split
+`supported_core_witness_grounding` performs. Two facts are disclosed with it: the Halt chip carries no
+`ChipFaithful` anchor — its Rust oracle is extracted like every other
+(`Extracted/SystemOracle/SyscallInstrs.lean`), but whole-row assertion and interaction equality is
+false between a single arm and the multi-arm dispatcher SP1 actually compiles, which also sends on
+a global syscall bus the supported profile's channels exclude — and the halt row pins `a0`'s upper
+three limbs to zero — a 16-bit exit-code profile restriction that is ours rather than upstream's.
+SP1's halt arm bounds `op_b` to a valid field element (upper limbs zero, limb 1 compared against
+`32512 = 0x7F00`), capping `reduce(op_b)` at exactly `p - 1`, so its single committed cell never
+wraps; our narrower pin exists only because `HaltChip` omits that compare.
+
+One corollary steps outside the shard: `supported_core_boot_to_halt_single_shard`
+(`SP1Clean/Soundness/BootHalt.lean`) adds a *boot* semantic boundary (`BootBoundaryFacts`:
+`IsInitialState` at the committed entry PC, SP1's zeroed integer register file, boot clock `1`)
+and a live Halt row, and concludes a whole-program fact — from the entry point with zeroed
+registers, `steps` normally-retiring interpreter steps reach an `SP1Halted` state carrying the
+committed exit code, with committed terminal PC `haltPc` and committed final clock
+`1 + 8·steps + 264`. It is single-shard, and it has no *constructed* inhabitant yet: the
+deterministic completeness compiler still emits only the padding Halt row.
+
+There is no
 machine-model parameter and no schedule hypothesis; the model-scheduled form is the corollary
 `supported_core_native_sound_scheduled` via the no-strength-lost adapter
 `supportedCoreLocalExecution_of_sailRelation`. Axiom census: `propext`, `Classical.choice`,
@@ -780,7 +824,7 @@ reserved; conditional results remain visibly named as conditional.
 The exact/native construction beneath that still-open semantic refinement is now explicit at its
 local boundary. `Composition/CoreEnsemble.lean` consumes valid exact execution and
 memory-boundary witnesses, a caller-supplied `CanonicalPreprocessedInventory`, and named
-preprocessing, memory-boundary, and public-limb contracts, constructs exactly the native 53 tables
+preprocessing, memory-boundary, and public-limb contracts, constructs exactly the native 54 tables
 and verifier row, and proves every local constraint.
 The Byte/Range/Program provider counts are reconstructed from the actual Clean interaction ledger of
 the verifier, 25 transported instruction tables, MemoryInit/MemoryFinalize, and both bumps rather
@@ -873,7 +917,7 @@ rows, per-family decode facts, and the joint hypothesis bundle:
   prove the strengthened ∃-instruction form derivable from the weak ∀-state one.
 - The **joint anchor** (`SP1CleanTest/Audit/JointNonVacuity.lean`): a fully proved witness of
   the entire `SupportedCoreNativeRelation` at SP1's prime — a one-`JAL` statement with equal
-  boundary endpoints, the 53-table witness with zero-row chip/provider tables, canonical
+  boundary endpoints, the 54-table witness with zero-row chip/provider tables, canonical
   committed prover data, and every `InitialBoundaryFacts` field discharged, including a real
   (non-vacuous) `SailCodeMemoryCompatible` proof via the jal step machinery. The capstone
   applied to it yields the zero-step execution; a satisfying *non-empty* shard witness is the
@@ -884,7 +928,7 @@ rows, per-family decode facts, and the joint hypothesis bundle:
   used in §7.4 is not vacuously true of an unsatisfiable relation.
 - The **active assembly anchor** (`SP1CleanTest/Audit/ActiveTraceNonVacuity.lean`): a hand-assembled
   semantic trace record for JAL-x0 whose instruction-event count and decoded physical instruction-row
-  count are both one, with matching native provider occurrences and all four buses balanced. The
+  count are both one, with matching native provider occurrences and all five buses balanced. The
   generated-trace assembly circuit-generates its physical AIR rows, then passes the witness through
   `supported_core_native_sound` to the plain-Sail relation. It is not a full or
   verified trace generator.
@@ -1137,7 +1181,7 @@ Stated plainly:
 6. **Native ensemble completeness has an explicit admissible semantic source** (§7.4): the
    proof-independent all-25 compiler constructs an AIR witness satisfying
    `SupportedCoreNativeRelation`; constraints, canonical provider closure, refresh placement, and
-   all four channel balances are proved.  Admissibility still records the per-chip event-validity,
+   all five channel balances are proved.  Admissibility still records the per-chip event-validity,
    initial-Memory, Program-row projection, and actual-footprint facts not yet derived for
    a general bounded ordinary Sail execution. `NativeCompletenessNonVacuity.lean` jointly inhabits
    every premise in the zero-event canonical execution case; `ActiveNativeCompleteness.lean` joins
@@ -1150,7 +1194,7 @@ Stated plainly:
    `CanonicalPreprocessedInventory`, plus named preprocessing, memory-boundary, and public-limb
    transport contracts. Under those hypotheses it constructs the
    redistributed Byte/Range/Program providers, MemoryInit/MemoryFinalize, and both bump tables.
-   `CoreEnsemble.lean` assembles those 53 native tables plus the verifier row and proves their
+   `CoreEnsemble.lean` assembles those 54 native tables plus the verifier row and proves their
    complete local constraints. **R4:** the native provider suffix has all 17 Range widths `0..16`,
    closing the balance hole for honest shift rows that request widths outside `8/13/14/16`.
    **R5:** Byte/Range/Program counts are recounted from the actual Clean interactions of

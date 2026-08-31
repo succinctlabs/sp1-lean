@@ -76,6 +76,19 @@ theorem AddChip.selectorBinary_of_shallow
   exact bool_of_mul_pred shallow
 
 omit [Fact (2 ^ 24 < p)] in
+/-- The halt row's shallow inline gate forces its selector binary — a pure constraint fact,
+independent of the guarantee grounding the full `haltTable_spec` needs (halt-table wave). -/
+theorem HaltChip.selectorBinary_of_shallow [Fact (2 ^ 17 < p)]
+    (input : Var HaltChip.Inputs (ZMod p)) (offset : ℕ)
+    (env : Environment (ZMod p))
+    (shallow : ConstraintsHold.Shallow env ((HaltChip.main input).operations offset)) :
+    Expression.eval env input.is_real = 0 ∨ Expression.eval env input.is_real = 1 := by
+  -- The gate is halt's first operation, so `.1` projects it without normalizing the rest of the
+  -- composed `main` (the whole-`main` `simp` blows the `whnf` budget).
+  apply bool_of_mul_pred
+  simpa only [circuit_norm] using shallow.1
+
+omit [Fact (2 ^ 24 < p)] in
 /-- Evaluation of Add's input selector, exposed once for downstream typed-interaction proofs. -/
 theorem AddChip.eval_isReal (env : Environment (ZMod p))
     (input : Var AddChip.Inputs (ZMod p)) :

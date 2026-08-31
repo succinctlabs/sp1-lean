@@ -61,7 +61,7 @@ an explicit Rust-facing projection, never a second native ledger definition.
 | `Proofs/` | circuit soundness/completeness and Sail bridges |
 | `Faithful/` | whole-chip comparisons on canonical native rows reconstructed from extracted Rust rows |
 | `Soundness/` | machine registry, typed decoding, grounding, and capstones |
-| `Composition/` | the composed exact→native artifact: transport, provider redistribution, the 53-table assembly |
+| `Composition/` | the composed exact→native artifact: transport, provider redistribution, the 54-table assembly |
 | `SP1CleanTest/` | compiler-trusted executable conformance tests, isolated from the main library |
 
 `SP1Clean.lean` imports the complete main proof library (`scripts/check_root_index.sh` gates that it
@@ -99,14 +99,18 @@ auditor should expect exactly these:
    one of the two structural reasons stated in that file's module docstring (hint/helper-dependent
    preconditions, or a Native-resident contract block per item 2).
 
-4. **Two live time models.** The fixed eight-tick micro-time layer
+4. **Two time vocabularies, one engine.** The timed grounding walk is duration-generic
+   (`TimedGrounding.walkT` over a `Semantics.Timeline` — the bus clock at the start of each
+   semantic step, windows at least eight ticks wide), so mixed ordinary/syscall (8/264-tick)
+   walks are expressible; the ordinary walk is literally its `Timeline.ordinary` instantiation
+   through the `…_ordinary` bridges (`microValueT_ordinary` down to `groundedT_ordinary`).  What
+   remains deliberately dual is the *vocabulary*: the fixed eight-tick micro-time layer
    (`Model/Semantics/MicroTime.lean` — `ordinaryClkInc`/`ramEffectOffset`/`regEffectOffset`, the
-   Rust `CLK_INC`/`MemoryAccessPosition` constants) coexists with the general
-   `Machine.SP1MachineModel.schedule` event model (`Model/Machine/Schedule.lean`). The capstone
-   bridges them through its `UsesOrdinarySchedule` hypothesis rather than by retiring either:
-   the schedule model is what the syscall (264-tick) rows need, while the micro-time layer is the
-   proved register/RAM interpretation the ordinary-row grounding engine consumes. Unifying them is
-   roadmap work, not release polish.
+   Rust `CLK_INC`/`MemoryAccessPosition` constants) is what the per-chip layers speak and prove,
+   and the `Machine.SP1MachineModel.schedule` event model (`Model/Machine/Schedule.lean`) is what
+   the shard-event semantics speaks; the scheduled corollary's `UsesOrdinarySchedule` hypothesis
+   bridges the statement level.  The constructive `Timeline` ↔ `Machine.clockAt` bridge lands
+   with the halt-row work that first exercises a non-uniform timeline.
 
 ## One instruction chip
 
@@ -195,19 +199,19 @@ Opcode families and the `rd = x0` guard are derived from the neutral identity's 
 than stored again. `InstructionChipId.all` drives the Clean table list, typed row decoder, opcode
 coverage, Sail dispatch, and faithfulness coverage. Its order is a witness-format decision.
 
-`SP1Ensemble.lean` adds 28 proof-oriented provider/boundary tables to form a 53-table Clean ensemble:
+`SP1Ensemble.lean` adds 29 proof-oriented provider/boundary tables to form a 54-table Clean ensemble:
 six Byte-op providers at positions 25–30, one fixed Range provider for every width `0..16` at
-31–47, Program at 48, MemoryInit/MemoryFinalize at 49/50, and the W3 system tables MemoryBump and
-StateBump at 51/52. The complete Range family is semantic, not padding: shift consumers emit widths
+31–47, Program at 48, MemoryInit/MemoryFinalize at 49/50, the W3 system tables MemoryBump and
+StateBump at 51/52, and the Halt table at 53. The complete Range family is semantic, not padding: shift consumers emit widths
 outside the former `8/13/14/16` subset, so that subset could not balance an honest shift trace.
 These provider circuits are not asserted to be row-wise copies of the exact upstream Core system
 tables. They are the small native interface used to prove the instruction execution theorem;
 `Composition/ProviderSegment.lean` consumes a caller-supplied, source-backed
 `CanonicalPreprocessedInventory` together with the exact memory-boundary and bump rows, and
-`CoreEnsemble.lean` proves the complete 53-table local constraint system.
+`CoreEnsemble.lean` proves the complete 54-table local constraint system.
 
 The redistribution does not copy Byte/Range/Program multiplicities from the exact 34-table
-execution cluster. That cluster counts system/public consumers that the native 53-table slice does
+execution cluster. That cluster counts system/public consumers that the native 54-table slice does
 not contain. Instead, transport projects the actual Clean interactions of the verifier, 25
 transported instruction tables, MemoryInit/MemoryFinalize, MemoryBump, and StateBump — every native
 table except the three preprocessing-provider families — into a skeleton ledger and recounts it.
@@ -230,15 +234,38 @@ contract retains all-channel interaction-count bounds and State/Memory integer b
 
 ## Structural buses and semantic grounding
 
-The four Clean channels communicate only the algebra SP1 actually constrains:
+The five Clean channels communicate only the algebra SP1 actually constrains:
 
 - State: timestamp and PC edges;
 - Program: decoded instruction rows;
 - Memory: location, timestamp, and word limbs;
-- Byte: byte/range lookup messages.
+- Byte: byte/range lookup messages;
+- Exit: the committed exit code, as a single reduced field cell.
 
 Local guarantees are structural. In particular, State does not claim reachability and Program does not
-claim commitment merely because a message appears.
+claim commitment merely because a message appears; Exit's local guarantee is `True`, because the
+whole content of that bus is its *balance*.
+
+### The Halt table and the Exit hand-off
+
+The 25 instruction chips carry SP1's ordinary `try_step` semantics; SP1's own ECALL path runs
+through `SyscallInstrsChip` and the global syscall tables, which the supported profile excludes. The
+Halt table at position 53 is the native ensemble's explicit, auditable replacement for exactly the
+`HALT` arm (`Machine.ExecutableSyscallHandler.haltOnly`): one real row per halting shard, which
+pulls the pre-syscall `(clk, pc)` and pushes `(clk + 264, pc = haltPc)` on the State bus, pulls the
+committed `ECALL x5, x10, x11` from the Program bus, reads `t0`/`a0`/`a1` through the standard
+register-access pairs, and constrains `t0 = 0` (`SyscallCode::HALT`).
+
+Its Exit push is what ties that row to the public statement. The state-boundary verifier pulls
+`⟨exit_code⟩` **ungated**, and every physical Halt row pushes either its reduced `a0` word (when
+live) or the zero code (when padding). Balance alone then forces three things, with no new premise
+and no widening of the public-values record: the Halt table has exactly one physical row; an
+ordinary shard's committed `exit_code` is `0`; and a halting shard's is `reduce(a0)`. That is the
+dichotomy `supported_core_witness_grounding` case-splits on, and it is why the halting conclusion
+needs no extra hypothesis at the capstone. The halt row additionally pins `a0`'s upper three limbs
+to zero — a **disclosed 16-bit exit-code profile restriction** (ours, not upstream's: SP1 instead
+bounds `op_b` to a valid field element, so its decode never wraps), without which the single committed
+field cell cannot decode back to `a0`, since SP1's own reduce wraps modulo a prime below `2^32`.
 
 The whole-machine proof derives meaning in this order:
 

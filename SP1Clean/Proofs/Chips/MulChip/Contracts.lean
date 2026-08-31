@@ -141,4 +141,68 @@ theorem MulChip.selectorOneHot_of_shallowConstraints
   rw [MulChip.directOutput_eq]
   simpa only [MulChip.selectors, MulChip.SelectorOneHot, selectorVars, circuit_norm] using oneHot
 
+/-! ## Physical row view and the ECALL opcode exclusion -/
+
+/-- The completed MUL columns at one physical component row. -/
+noncomputable def MulChip.physicalCols (env : Environment (ZMod p)) :
+    MulChip.Columns (ZMod p) :=
+  (⟨MulChip.circuit (p := p)⟩ : Component (ZMod p)).rowOutput env
+
+/-- The completed MUL row view at one physical component row. -/
+noncomputable def MulChip.physicalView (env : Environment (ZMod p)) : Trace.RowView (ZMod p) :=
+  MulChip.rowView
+    ((⟨MulChip.circuit (p := p)⟩ : Component (ZMod p)).rowInput env)
+    (MulChip.physicalCols env)
+
+/-- Small-literal disequality against the `ECALL` discriminant `50`, via `ZMod.val` injectivity. -/
+private theorem mulOpcodeLiteral_ne_ecall {k : ℕ} (hk : k < 2 ^ 17) (hne : k ≠ 50) :
+    ((k : ℕ) : ZMod p) ≠ (50 : ZMod p) := by
+  intro h
+  have hp := Fact.out (p := 2 ^ 17 < p)
+  apply hne
+  have hval := congrArg ZMod.val h
+  rwa [ZMod.val_natCast_of_lt (by omega),
+    show (50 : ZMod p) = ((50 : ℕ) : ZMod p) from by norm_cast,
+    ZMod.val_natCast_of_lt (show (50 : ℕ) < p by omega)] at hval
+
+/-- A real physical MUL row's Program-bus opcode is never the `ECALL` discriminant `50`
+(the committed-fragment re-base's per-chip strengthening fact). -/
+theorem MulChip.physicalViewOpcode_ne_ecall (env : Environment (ZMod p))
+    (constraints :
+      (⟨MulChip.circuit (p := p)⟩ : Component (ZMod p)).operations.ConstraintsHold env)
+    (real : (MulChip.physicalView env).is_real = 1) :
+    (MulChip.physicalView env).opcode ≠ (50 : ZMod p) := by
+  let input : Var MulChip.Inputs (ZMod p) := varFromOffset MulChip.Inputs 0
+  let offset := size MulChip.Inputs
+  have shallow := shallowConstraints_of_componentConstraints (MulChip.circuit (p := p)) env
+    constraints
+  have inputEq : Eval.eval env input =
+      (⟨MulChip.circuit (p := p)⟩ : Component (ZMod p)).rowInput env :=
+    eval_varFromOffset_valueFromOffset MulChip.Inputs 0 env
+  have viewIsReal : (MulChip.physicalView env).is_real = (Eval.eval env input).is_real := by
+    simpa only [MulChip.physicalView, MulChip.rowView] using
+      congrArg (fun value : MulChip.Inputs (ZMod p) => value.is_real) inputEq.symm
+  have realInput : Expression.eval env input.is_real = 1 := by
+    have realValue : (Eval.eval env input).is_real = 1 := viewIsReal.symm.trans real
+    rwa [MulChip.eval_isReal] at realValue
+  have oneHot := MulChip.selectorOneHot_of_shallowConstraints input offset env shallow realInput
+  have outputEq : Eval.eval env ((MulChip.circuit (p := p)).output input offset) =
+      MulChip.physicalCols env := by
+    simp only [input, offset, MulChip.physicalCols, Component.rowOutput, circuit_norm]
+  rw [MulChip.eval_selectors, outputEq] at oneHot
+  simp only [MulChip.physicalView, MulChip.rowView]
+  simp only [MulChip.SelectorOneHot, MulChip.selectors] at oneHot
+  rcases oneHot with ⟨h1, h2, h3, h4, h5⟩ | ⟨h1, h2, h3, h4, h5⟩ | ⟨h1, h2, h3, h4, h5⟩ |
+    ⟨h1, h2, h3, h4, h5⟩ | ⟨h1, h2, h3, h4, h5⟩
+  · rw [h1, h2, h3, h4, h5]
+    simpa using mulOpcodeLiteral_ne_ecall (k := 11) (by norm_num) (by norm_num)
+  · rw [h1, h2, h3, h4, h5]
+    simpa using mulOpcodeLiteral_ne_ecall (k := 12) (by norm_num) (by norm_num)
+  · rw [h1, h2, h3, h4, h5]
+    simpa using mulOpcodeLiteral_ne_ecall (k := 13) (by norm_num) (by norm_num)
+  · rw [h1, h2, h3, h4, h5]
+    simpa using mulOpcodeLiteral_ne_ecall (k := 14) (by norm_num) (by norm_num)
+  · rw [h1, h2, h3, h4, h5]
+    simpa using mulOpcodeLiteral_ne_ecall (k := 24) (by norm_num) (by norm_num)
+
 end SP1Clean.Soundness

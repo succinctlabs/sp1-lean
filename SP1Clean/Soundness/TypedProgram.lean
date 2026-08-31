@@ -786,8 +786,10 @@ theorem witness_verifierProgramInteractions_eq_nil
   apply List.map_eq_nil_iff.mp
   rw [typedTableInteractionsWith_raw]
   apply Table.interactionsWith_nil_of_channel_not_mem
-  change programChannel.toRaw ∉ [stateChannel.toRaw, Channels.byteChannel.toRaw]
-  simp [Channels.programChannel_eq_stateChannel_false, Channels.programChannel_eq_byteChannel_false]
+  change programChannel.toRaw ∉
+    [stateChannel.toRaw, Channels.byteChannel.toRaw, Channels.exitChannel.toRaw]
+  simp [Channels.programChannel_eq_stateChannel_false, Channels.programChannel_eq_byteChannel_false,
+    Channels.programChannel_eq_exitChannel_false]
 
 /-- Every provider-table position except the committed Program provider has no Program-channel
 interactions.  This is positional on purpose: it connects the stable witness index used by
@@ -796,10 +798,11 @@ theorem witness_nonProgramProviderTable_programInteractions_eq_nil
     (witness : EnsembleWitness (sp1Ensemble (p := p))) (i : ℕ)
     (lower : instructionTableCount ≤ i) (upper : i < ensembleTableCount)
     (witnessBound : i < witness.tables.length)
-    (notProgram : i ≠ programProviderIndex) :
+    (notProgram : i ≠ programProviderIndex) (notHalt : i ≠ haltIndex) :
     typedTableInteractionsWith witness.tables[i] programChannel = [] := by
   change 25 ≤ i at lower
-  change i < 53 at upper
+  change i < 54 at upper
+  change i ≠ 53 at notHalt
   apply List.map_eq_nil_iff.mp
   rw [typedTableInteractionsWith_raw]
   apply Table.interactionsWith_nil_of_channel_not_mem
@@ -820,6 +823,7 @@ theorem witness_nonProgramProviderTable_programInteractions_eq_nil
   interval_cases i
   all_goals first
   | exact (notProgram (by rfl)).elim
+  | exact (notHalt (by rfl)).elim
   | (change programChannel.toRaw ∉ [byteChannel.toRaw];
      simp [Channels.programChannel_eq_byteChannel_false])
   | (change programChannel.toRaw ∉ [memoryChannel.toRaw];
@@ -834,30 +838,35 @@ theorem witness_nonProgramProviderTable_programInteractions_eq_nil
      simp [Channels.programChannel_eq_byteChannel_false,
        Channels.programChannel_eq_stateChannel_false])
 
-/-- The whole provider suffix's Program interactions are exactly those of the physical table at the
-stable Program-provider index.  No semantic property is used here; this is a structural consequence
-of the ensemble table order and each component's declared channels. -/
+/-- The whole provider suffix's Program interactions are exactly those of the physical table at
+the stable Program-provider index followed by the Halt table's gated ECALL fetch pulls.  No
+semantic property is used here; this is a structural consequence of the ensemble table order and
+each component's declared channels. -/
 theorem witness_providerProgramInteractions_eq
     (witness : EnsembleWitness (sp1Ensemble (p := p))) (table : Table (ZMod p))
     (tableAt : witness.tables[programProviderIndex]? = some table) :
     (witness.tables.drop 25).flatMap
         (typedTableInteractionsWith · programChannel) =
-      typedTableInteractionsWith table programChannel := by
-  have tablesLength : witness.tables.length = 53 := by
+      typedTableInteractionsWith table programChannel ++
+        typedTableInteractionsWith (haltTable witness) programChannel := by
+  have tablesLength : witness.tables.length = 54 := by
     rw [← witness.same_length]
     simp [sp1Ensemble_tables, sp1Tables_length, sp1ProviderTables_length]
   obtain ⟨_, tableEq⟩ := List.getElem?_eq_some_iff.mp tableAt
   subst table
   have interactionsAtOther (i : ℕ) (lower : instructionTableCount ≤ i)
       (upper : i < ensembleTableCount) (bound : i < witness.tables.length)
-      (notProgram : i ≠ programProviderIndex) :
+      (notProgram : i ≠ programProviderIndex) (notHalt : i ≠ haltIndex) :
       typedTableInteractionsWith witness.tables[i] programChannel = [] :=
-    witness_nonProgramProviderTable_programInteractions_eq_nil witness i lower upper bound notProgram
+    witness_nonProgramProviderTable_programInteractions_eq_nil witness i lower upper bound
+      notProgram notHalt
   repeat rw [List.drop_eq_getElem_cons (by omega)]
   rw [List.drop_eq_nil_of_le (by omega)]
   simp only [List.flatMap_cons, List.flatMap_nil, List.append_nil]
-  simp [interactionsAtOther, instructionTableCount, ensembleTableCount,
-    programProviderIndex, byteProviderTableCount, rangeProviderTableCount]
+  rw [show witness.tables[53] = haltTable witness from rfl]
+  simp [interactionsAtOther, instructionTableCount, ensembleTableCount, haltIndex,
+    stateSilentProviderTableCount, programProviderIndex, byteProviderTableCount,
+    rangeProviderTableCount]
 
 /-- The decoded instruction prefix's Program interactions are exactly one semantic gated pull per
 physical row. -/
@@ -904,7 +913,9 @@ theorem DecodedInstructionRow.programTruth_of_active
     (constraints : witness.Constraints) (balanced : witness.BalancedChannels)
     (providerBound : ProgramProviderBound witness)
     (decodedMem : decoded ∈ decodedInstructionRows (p := p) witness.tables)
-    (active : (decoded.toChipRow witness.data).is_real = 1) :
+    (active : (decoded.toChipRow witness.data).is_real = 1)
+    (opcodeNe : (programAccess (decoded.toChipRow witness.data).view).toRow.opcode ≠
+      ((Opcode.ECALL).toNat : ZMod p)) :
     ProgTruth (programMessageOfView (decoded.toChipRow witness.data).view) witness.data := by
   let consumers :=
     decodedWitnessInstructionInteractionsWith witness.data witness.tables programChannel
@@ -917,23 +928,46 @@ theorem DecodedInstructionRow.programTruth_of_active
     exact List.mem_flatMap.mpr ⟨decoded, decodedMem, by simp [target]⟩
   have targetPull : target.mult = -1 := by
     simp [target, active]
-  have consumerShape : ∀ interaction ∈ consumers,
+  -- The halt table's gated ECALL fetch pulls join the consumer side of the provider matching
+  -- (halt-table wave): its pulls carry `mult ∈ {0, -1}` exactly like the instruction fetches.
+  let haltPulls := typedTableInteractionsWith (haltTable witness) programChannel
+  have consumerShape : ∀ interaction ∈ consumers ++ haltPulls,
       interaction.mult = 0 ∨ interaction.mult = -1 := by
-    exact decodedWitnessProgramInteractions_pullShape witness constraints
+    intro interaction interactionMem
+    rcases List.mem_append.mp interactionMem with h | h
+    · exact decodedWitnessProgramInteractions_pullShape witness constraints interaction h
+    · dsimp only [haltPulls] at h
+      rw [haltTable_typedProgram] at h
+      obtain ⟨row, rowMem, hmem⟩ := List.mem_flatMap.mp h
+      rw [List.mem_singleton] at hmem
+      subst hmem
+      rcases witness_haltRows_selectorBinary witness constraints row rowMem with h0 | h1
+      · left; rw [TypedInteraction.pulledIfValue_mult, h0, neg_zero]
+      · right; rw [TypedInteraction.pulledIfValue_mult, h1]
   have channelBalanced := typedInteractions_balanced witness balanced programChannel
     (by simp [sp1Ensemble_channels])
   let table := programProviderTable witness
   have tableAt := programProviderTable_getElem? witness
   have ensembleShape : typedEnsembleInteractionsWith witness programChannel =
-      consumers ++ typedTableInteractionsWith table programChannel := by
+      consumers ++ (typedTableInteractionsWith table programChannel ++ haltPulls) := by
     rw [typedEnsembleInteractionsWith_partition,
       witness_verifierProgramInteractions_eq_nil,
       witness_providerProgramInteractions_eq witness table tableAt]
     rfl
   rw [ensembleShape] at channelBalanced
+  have channelBalanced' :
+      BalancedInteractions
+        (((consumers ++ haltPulls) ++ typedTableInteractionsWith table programChannel).map
+          TypedInteraction.raw) :=
+    balancedInteractions_of_perm channelBalanced
+      (List.Perm.map _
+        (((List.perm_append_comm ..).append_left consumers).trans
+          (List.Perm.of_eq (List.append_assoc consumers haltPulls _).symm)))
   obtain ⟨provider, providerMem, messageEq, providerNonzero⟩ :=
-    provider_matches_active_pull consumers (typedTableInteractionsWith table programChannel)
-      channelBalanced consumerShape target targetMem targetPull
+    provider_matches_active_pull (consumers ++ haltPulls)
+      (typedTableInteractionsWith table programChannel)
+      channelBalanced' consumerShape target
+      (List.mem_append.mpr (Or.inl targetMem)) targetPull
   have rawMem : provider.raw ∈ table.interactionsWith programChannel.toRaw := by
     rw [← typedTableInteractionsWith_raw]
     exact List.mem_map_of_mem providerMem
@@ -943,42 +977,96 @@ theorem DecodedInstructionRow.programTruth_of_active
   have truth := providerBound provider.raw rawMem (by
     simpa only [TypedInteraction.mult] using providerNonzero)
   have reboundEq : rebound = provider := TypedInteraction.raw_injective rfl
-  change ProgTruth rebound.message witness.data at truth
+  change Semantics.CommittedProgTruth rebound.message witness.data at truth
   rw [reboundEq] at truth
   rw [messageEq] at truth
-  simpa only [target, TypedInteraction.pulledIfValue_message] using truth
+  have committed : Semantics.CommittedProgTruth
+      (programMessageOfView (decoded.toChipRow witness.data).view) witness.data := by
+    simpa only [target, TypedInteraction.pulledIfValue_message] using truth
+  exact committed.progTruth_of_opcode_ne
+    (by simpa only [rowOfMsg_programMessageOfView] using opcodeNe)
 
-/-- Program grounding after erasing the retained dependent descriptor: every active canonical
-`ChipRow` is decoded from the program named by the semantic statement binding. -/
-theorem witness_realDecodedChipRows_programDecoded
+/-- **The halt row's committed `ECALL` fetch.**  An active Halt row's Program-bus pull is matched
+by an active committed-provider push, and the received row's opcode is the pinned `ECALL`
+discriminant, so the committed guest program holds the literal `ECALL` word at the halt pc and the
+pulled row is the transpiled `ECALL` shape (`committedInROM.ecall_of_opcode`). -/
+theorem witness_haltRow_ecallTruth
     (witness : EnsembleWitness (sp1Ensemble (p := p)))
     (constraints : witness.Constraints) (balanced : witness.BalancedChannels)
-    (providerBound : ProgramProviderBound witness) (program : Target.GuestProgram)
-    (programCommitted : Commit.StatementFor witness.data program) :
-    ∀ row ∈ realDecodedChipRows witness.data witness.tables,
-      Target.decodedInROM program (programAccess row.view).toRow := by
-  intro row rowMem
-  rw [realDecodedChipRows, decodedChipRows, List.mem_filter] at rowMem
-  simp only [decide_eq_true_eq] at rowMem
-  obtain ⟨decoded, decodedMem, rfl⟩ := List.mem_map.mp rowMem.1
-  have truth := decoded.programTruth_of_active witness constraints balanced providerBound decodedMem
-    rowMem.2
-  have decodedTruth := truth.2
-  rw [programCommitted.2] at decodedTruth
-  simpa only [rowOfMsg_programMessageOfView] using decodedTruth
-
-/-- Exhaustive reordering preserves committed-program decode truth row by row. -/
-theorem witness_orderedRows_programDecoded
-    (witness : EnsembleWitness (sp1Ensemble (p := p)))
-    (constraints : witness.Constraints) (balanced : witness.BalancedChannels)
-    (providerBound : ProgramProviderBound witness) (program : Target.GuestProgram)
-    (programCommitted : Commit.StatementFor witness.data program)
-    (orderedRows : List (ChipRow p))
-    (exhaustive : orderedRows.Perm (realDecodedChipRows witness.data witness.tables)) :
-    ∀ row ∈ orderedRows,
-      Target.decodedInROM program (programAccess row.view).toRow := by
-  intro row rowMem
-  exact witness_realDecodedChipRows_programDecoded witness constraints balanced providerBound program
-    programCommitted row (exhaustive.mem_iff.mp rowMem)
+    (providerBound : ProgramProviderBound witness)
+    {row : Array (ZMod p)} (rowMem : row ∈ realHaltRows witness) :
+    (Commit.progOf witness.data).fetchWord
+        (Target.pcBitsOfRow (rowOfMsg
+          (HaltChip.programMessage (haltRow (haltTable witness) row)))) =
+        some Target.ECALL_ENC ∧
+      rowOfMsg (HaltChip.programMessage (haltRow (haltTable witness) row)) =
+        Target.ecallProgramRow (Target.rowPcVec (rowOfMsg
+          (HaltChip.programMessage (haltRow (haltTable witness) row)))) := by
+  obtain ⟨rowTableMem, active⟩ := mem_realHaltRows witness rowMem
+  let consumers :=
+    decodedWitnessInstructionInteractionsWith witness.data witness.tables programChannel
+  let haltPulls := typedTableInteractionsWith (haltTable witness) programChannel
+  let target := TypedInteraction.pulledIfValue programChannel
+    (haltRow (haltTable witness) row).is_real
+    (HaltChip.programMessage (haltRow (haltTable witness) row))
+  have targetMem : target ∈ haltPulls := by
+    dsimp only [haltPulls]
+    rw [haltTable_typedProgram]
+    exact List.mem_flatMap.mpr ⟨row, rowTableMem, by simp [target]⟩
+  have targetPull : target.mult = -1 := by
+    simp [target, active]
+  have consumerShape : ∀ interaction ∈ consumers ++ haltPulls,
+      interaction.mult = 0 ∨ interaction.mult = -1 := by
+    intro interaction interactionMem
+    rcases List.mem_append.mp interactionMem with h | h
+    · exact decodedWitnessProgramInteractions_pullShape witness constraints interaction h
+    · dsimp only [haltPulls] at h
+      rw [haltTable_typedProgram] at h
+      obtain ⟨row', rowMem', hmem⟩ := List.mem_flatMap.mp h
+      rw [List.mem_singleton] at hmem
+      subst hmem
+      rcases witness_haltRows_selectorBinary witness constraints row' rowMem' with h0 | h1
+      · left; rw [TypedInteraction.pulledIfValue_mult, h0, neg_zero]
+      · right; rw [TypedInteraction.pulledIfValue_mult, h1]
+  have channelBalanced := typedInteractions_balanced witness balanced programChannel
+    (by simp [sp1Ensemble_channels])
+  let table := programProviderTable witness
+  have tableAt := programProviderTable_getElem? witness
+  have ensembleShape : typedEnsembleInteractionsWith witness programChannel =
+      consumers ++ (typedTableInteractionsWith table programChannel ++ haltPulls) := by
+    rw [typedEnsembleInteractionsWith_partition,
+      witness_verifierProgramInteractions_eq_nil,
+      witness_providerProgramInteractions_eq witness table tableAt]
+    rfl
+  rw [ensembleShape] at channelBalanced
+  have channelBalanced' :
+      BalancedInteractions
+        (((consumers ++ haltPulls) ++ typedTableInteractionsWith table programChannel).map
+          TypedInteraction.raw) :=
+    balancedInteractions_of_perm channelBalanced
+      (List.Perm.map _
+        (((List.perm_append_comm ..).append_left consumers).trans
+          (List.Perm.of_eq (List.append_assoc consumers haltPulls _).symm)))
+  obtain ⟨provider, providerMem, messageEq, providerNonzero⟩ :=
+    provider_matches_active_pull (consumers ++ haltPulls)
+      (typedTableInteractionsWith table programChannel)
+      channelBalanced' consumerShape target
+      (List.mem_append.mpr (Or.inr targetMem)) targetPull
+  have rawMem : provider.raw ∈ table.interactionsWith programChannel.toRaw := by
+    rw [← typedTableInteractionsWith_raw]
+    exact List.mem_map_of_mem providerMem
+  let rebound : TypedInteraction programChannel :=
+    { raw := provider.raw
+      channel_eq := table.channel_eq_of_mem_interactionsWith rawMem }
+  have truth := providerBound provider.raw rawMem (by
+    simpa only [TypedInteraction.mult] using providerNonzero)
+  have reboundEq : rebound = provider := TypedInteraction.raw_injective rfl
+  change Semantics.CommittedProgTruth rebound.message witness.data at truth
+  rw [reboundEq] at truth
+  rw [messageEq] at truth
+  have committed : Semantics.CommittedProgTruth
+      (HaltChip.programMessage (haltRow (haltTable witness) row)) witness.data := by
+    simpa only [target, TypedInteraction.pulledIfValue_message] using truth
+  exact committed.2.ecall_of_opcode rfl
 
 end SP1Clean.Soundness

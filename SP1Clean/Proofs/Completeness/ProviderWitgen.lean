@@ -5,6 +5,7 @@ import SP1Clean.Proofs.Chips.MemoryProviderChip
 import SP1Clean.Proofs.Chips.MemoryFinalizeChip
 import SP1Clean.Proofs.Chips.StateBumpChip.Formal
 import SP1Clean.Proofs.Chips.MemoryBumpChip.Formal
+import SP1Clean.Proofs.Chips.HaltChip.Witgen
 import ToClean.Gadgets.ComputableWitnesses
 
 /-! # Honest witness generation for the provider/boundary tables

@@ -3658,8 +3658,9 @@ private theorem divRemInteractionsFaithful
   simp only [divRemChipOracle, ChipOracle.accesses,
     ChipOracle.nativeInteractions]
   refine List.Perm.trans ?_
-    (LookupAccessList.perm_filter_by_kind
-      (LookupAccessList.active rustAccesses)).symm
+    (LookupAccessList.perm_filter_by_kind_of_exit_nil
+      (LookupAccessList.active rustAccesses)
+      (Extracted.active_map_toAccess_exit_filter _)).symm
   simp only [LookupAccessList.active] at hStateActive
   simp only [LookupAccessList.active] at hByteActive
   simp only [LookupAccessList.active] at hMemoryActive

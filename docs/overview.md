@@ -16,7 +16,7 @@ v6.4.0 upstream AIR is separately represented by complete extracted assertion an
 All 25 native instruction chips are proved faithful to their corresponding upstream tables. The two
 exact clusters, **when paired with a caller-supplied `CanonicalPreprocessedInventory` and the named
 preprocessing, memory-boundary, and public-limb transport contracts**, now construct the complete
-local 53-table native artifact and verifier
+local 54-table native artifact and verifier
 row, with every local constraint proved. The remaining top-level work is global: derive the
 provider-recount preconditions, all-channel count bounds, and State/Memory balance from
 exact-Core/ArkLib extraction; authenticate the caller-supplied source-backed inventory and its program
@@ -43,11 +43,13 @@ Its source relation has two visible parts:
 
 1. `SupportedCoreEnsembleRelation`
    - the witness public input equals the statement;
-   - every native Clean table constraint holds — the ensemble has 53 tables: the 25 instruction
-     chips plus 28 provider/boundary tables (six Byte-op providers, 17 Range providers for every
-     width `0..16`, the Program-ROM provider, the two Memory init/finalize boundary tables, and the
-     two SP1 system tables MemoryBump and StateBump); and
-   - all four Clean channels balance.
+   - every native Clean table constraint holds — the ensemble has 54 tables: the 25 instruction
+     chips plus 29 provider/boundary tables (six Byte-op providers, 17 Range providers for every
+     width `0..16`, the Program-ROM provider, the two Memory init/finalize boundary tables, the
+     two SP1 system tables MemoryBump and StateBump, and the Halt table that witnesses a halting
+     shard's `HALT` ECALL); and
+   - all five Clean channels balance — State, Byte, Program, Memory, and the Exit hand-off that
+     binds the committed `exit_code`.
 2. `SP1SemanticBoundaryRelation`, regrouped for reading:
    - three commitment facts — the program is well formed, bound to the shared prover data, and
      the committed prover data carries the public initial clock;
@@ -89,13 +91,14 @@ The machine-model-scheduled form of the conclusion is recovered by the corollary
 It does not say that the initial state is reachable from boot, that the final row halts, that shards
 compose, or that a cryptographic verifier accepted a proof. Those are deliberately separate claims.
 
-Two time views coexist under this statement by design. The general
-`Machine.SP1MachineModel.schedule` event model covers both the ordinary 8-tick and syscall 264-tick
-windows; the fixed eight-tick micro-time layer (`ordinaryClkInc`/`ramEffectOffset`/
-`regEffectOffset`, named for the Rust `CLK_INC` and `MemoryAccessPosition` constants they track) is
-the proved register/RAM interpretation the ordinary-row grounding engine consumes. The scheduled
-corollary's `UsesOrdinarySchedule` hypothesis is the explicit bridge (the headline states the
-eight-tick count directly); unifying the two models is roadmap work
+The timed grounding engine is duration-generic: the walk is stated over a `Timeline` (the bus
+clock at the start of each semantic step, windows at least eight ticks wide), so mixed
+ordinary/syscall (8/264-tick) shards are expressible, and the uniform eight-tick walk this
+statement uses is its `Timeline.ordinary` instantiation. The fixed micro-time constants
+(`ordinaryClkInc`/`ramEffectOffset`/`regEffectOffset`, named for the Rust `CLK_INC` and
+`MemoryAccessPosition` constants they track) remain the vocabulary the per-chip layers prove;
+the scheduled corollary's `UsesOrdinarySchedule` hypothesis bridges to the
+`Machine.SP1MachineModel.schedule` event model at the statement level
 (`architecture.md` § deliberate layering exceptions).
 
 ## Current coverage
@@ -107,8 +110,8 @@ eight-tick count directly); unifying the two models is roadmap work
 | Whole-chip Rust AIR faithfulness | 25 / 25 supported instruction tables | proved |
 | Grounding contracts used by the native capstone | 25 / 25 descriptors | proved |
 | Exact upstream Core shard | paired 34-table execution + 6-table Memory-boundary clusters | complete list-level source relation present |
-| Exact clusters + named transport contracts → local native ensemble artifact | 53 tables + verifier | constructed; all local constraints proved |
-| Active hand-assembled semantic trace → circuit-generated native AIR → Sail anchor | 1 JAL-x0 row | one event and one decoded physical instruction row; four-bus balance, native relation, and local execution proved for any supplied ordinary-schedule model |
+| Exact clusters + named transport contracts → local native ensemble artifact | 54 tables + verifier | constructed; all local constraints proved |
+| Active hand-assembled semantic trace → circuit-generated native AIR → Sail anchor | 1 JAL-x0 row | one event and one decoded physical instruction row; five-bus balance, native relation, and local execution proved for any supplied ordinary-schedule model |
 | Whole-chip Rust trace conformance (dump-anchored gate) | 25 chips | executable test evidence, not a theorem premise |
 | Exact upstream AIR to Sail | paired 34+6-table shard witness | open 12-field AIR bundle plus explicit external context; conditional combinator only |
 | Cross-shard boot-to-halt execution | full shard ledger | relation specified; theorem not yet declared |
@@ -128,14 +131,56 @@ constructs both Memory boundaries, and closes Byte/Range/Program demand from the
 ledger. Provider balance is proved directly in the field, so the old `2 * multiplicity ≤ p`
 restriction is gone; only the actual interaction-list footprint `< p` remains.
 
-`supported_core_native_functionalCompleteness` proves the resulting 53-table witness satisfies the
+`supported_core_native_functionalCompleteness` proves the resulting 54-table witness satisfies the
 same native relation consumed by soundness on `SupportedCoreNativeAdmissibleShardRelation`.
 That source restricts the common bounded shard relation by named residual semantic readiness facts
 and the physical `< p` footprint for the deterministic compiler output. Both
 directions use the same `CoreProfile.WithinOrdinaryRowLimit` policy, and
-`supported_core_native_shard_sound` targets that same bounded semantic relation. The remaining
-scope gap is exactly `NativeShardTraceTotal`, not missing tables, bump placement, provider
-closure, a second execution carrier, or an existential trace generator.
+`supported_core_native_shard_sound` targets that same bounded semantic relation. The semantic
+shard language also contains **halting shards** — the shared case's third branch, a supported
+ordinary prefix ending in the canonical HALT syscall under the concrete
+`ExecutableSyscallHandler.haltOnly` host semantics, with `HaltsWith` binding the committed
+exit-code cell. **Soundness now covers both branches**: `supported_core_native_shard_sound` case-splits
+on whether the Halt table carries a live row, and `supported_core_native_sound` concludes the
+`OrdinaryRun`/`HaltedRun` dichotomy of `SupportedCoreSailRelation` — for a halting shard, a
+normally-retiring prefix reaching a genuine `SP1Halted` state (the pc at a committed `ECALL` word,
+`t0` holding the canonical `HALT` code, `a0` the committed exit code), parked at SP1's terminal
+`haltPc` one 264-tick syscall window later. The deterministic **compiler** does not yet emit the
+terminal halt row (`NativeTraceReady.syscallFree`), so the totality-conditional correctness and
+language-equality statements remain relative to the syscall-free sub-language
+(`SupportedCoreNativeOrdinaryShardRelation` ↔ `SupportedCoreOrdinaryShardExecutionRelation`).
+Within that sub-language the remaining scope gap is exactly `NativeShardTraceTotal`, not missing
+tables, bump placement, provider closure, a second execution carrier, or an existential trace
+generator.
+
+The Exit hand-off is what makes the dichotomy decidable from the algebra alone: the state-boundary
+verifier pulls `⟨exit_code⟩` **ungated**, and every Halt-table row pushes either its reduced `a0`
+word (when live) or the zero code (when padding), so balance forces exactly one physical Halt row,
+`exit_code = 0` on an ordinary shard, and `exit_code = reduce(a0)` on a halting one. The halt row
+additionally pins `a0`'s upper three limbs to zero — a disclosed 16-bit exit-code profile
+restriction, so that the single committed field cell decodes back to `a0`. The restriction is ours
+and narrower than upstream's: SP1's halt arm instead bounds `op_b` to a valid field element, which
+caps its reduction at `p - 1` so the decode never wraps.
+
+### The first whole-execution claim
+
+`supported_core_boot_to_halt_single_shard` (`SP1Clean/Soundness/BootHalt.lean`) is the one place
+where the two ends of a shard are the two ends of a program. Its premise
+`SupportedCoreBootHaltRelation` is the ensemble algebra plus a **boot** semantic boundary
+(`BootBoundaryFacts`: `IsInitialState` at the committed entry pc, SP1's zeroed integer register
+file, boot clock `1`) plus a live Halt row; its conclusion is entirely in Sail/`GuestProgram`
+vocabulary:
+
+> from the program's entry point with zeroed registers, `steps` normally-retiring
+> official-interpreter steps reach a genuine `SP1Halted` state whose `a0` is the committed public
+> exit code, with committed terminal pc `haltPc` and committed final clock `1 + 8·steps + 264`.
+
+It is a **single-shard** statement. Composing shards along an authenticated ledger
+(`EventShardLayout`, `LastExecutionHalts`, `SP1ExecutionRelation`) is a separate,
+recursion-dependent target. And it is not yet demonstrably inhabited: the deterministic compiler
+emits only the padding Halt row, so no *constructed* witness satisfies the live-halt-row
+restriction. Producing one — the compiler's terminal halt row, with `t0`/`a0` read from the
+trace's final state — is the named next step.
 
 `ChipFaithful` is a whole-row statement. For every adversarial Rust row it proves equivalence between:
 
@@ -216,7 +261,7 @@ preprocessing, memory-boundary, and public-limb transport contracts assemble the
 provider, bump, and verifier rows and prove
 their local constraints. Its Byte/Range/Program multiplicities are recounted from the actual Clean
 interaction ledger of the verifier, 25 instruction tables, MemoryInit/MemoryFinalize, and both bumps,
-not copied from the full exact cluster: the latter includes consumers that the native 53-table slice
+not copied from the full exact cluster: the latter includes consumers that the native 54-table slice
 intentionally omits. The raw exact Byte/Range/Program assertion lists are empty.
 `CoreAIR.PreprocessedBinding` only records the named matrix/PCS-opening premise, to be discharged by
 ArkLib; it proves neither row-local meaning nor provider selection. `PreprocessedProviderContract`

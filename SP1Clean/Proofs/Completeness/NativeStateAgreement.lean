@@ -34,6 +34,13 @@ theorem SupportedCoreTraceWitness.stateBumpTable_witness
     stateSilentProviderTableCount, InstructionChipId.all, ProviderTableId.all,
     ByteProviderId.all]
 
+/-- Canonical closure keeps the exact physical Halt table. -/
+@[simp] theorem SupportedCoreTraceWitness.canonicalClosure_haltTable
+    (trace : SupportedCoreTraceWitness p) :
+    haltTable trace.canonicalClosure.witness = haltTable trace.witness := by
+  rw [trace.canonicalClosure.haltTable_witness, trace.haltTable_witness]
+  rfl
+
 /-- Canonical closure keeps the exact physical StateBump table, not merely its occurrence list. -/
 @[simp] theorem SupportedCoreTraceWitness.canonicalClosure_stateBumpTable
     (trace : SupportedCoreTraceWitness p) :
@@ -533,7 +540,8 @@ theorem NativeTraceReady.stateLedgerPerm
       ready.stateProjection).ledger_perm_handoff
     (witness_decodedInstructionRows_selectorBinary _
       (ready.constraints publicWellFormed))
-    (nativeTrace_stateBumpSelectorBinary statement execution) ready.stateChronology
+    (nativeTrace_stateBumpSelectorBinary statement execution)
+    ((nativeTrace statement execution).haltTablePadding).2 ready.stateChronology
 
 /-- The generated native witness has exactly one active instruction row per semantic transition.
 

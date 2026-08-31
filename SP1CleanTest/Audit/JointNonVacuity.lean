@@ -11,7 +11,7 @@ The external PR110 report's Finding 3 asks whether the capstone's **full** hypot
 **jointly** satisfiable, or whether some conjunction of
 boundary fields is silently contradictory.  This file exhibits a fully proved witness at the
 concrete prime (KoalaBear, `SP1Prime`): the **boundary-only shard** — all 25 instruction tables and
-26 of the 28 boundary/provider tables have zero rows, and the boundary verifier row carries a
+26 of the 29 boundary/provider tables have zero rows, and the boundary verifier row carries a
 public State record with **equal initial and final endpoints** (clk `(0, 1)`, pc `0x10000` at both
 ends, committed in the W3 D5-A split-limb form), so its final-state pull and initial-state push are
 the same State message and cancel exactly.
@@ -23,6 +23,14 @@ whose pushes balance those pulls exactly.  `RangeChip.circuitFor ⟨16, …⟩` 
 with multiplicity 6; `ByteChip.U8Range.circuit` (stable position 25) checks the byte pair `(0, 0)`
 and pushes `⟨3, 0, 0, 0⟩` with multiplicity 2.  Together they cancel the verifier's twelve `-1`
 pulls (four `⟨6, 1, 16, 0⟩`, six `⟨6, 0, 16, 0⟩`, two `⟨3, 0, 0, 0⟩`) message-for-message.
+
+Since the halt wave the verifier row also pulls `⟨exit_code⟩` **ungated** on the fifth (Exit) bus,
+and every shard's Halt table (stable position 53) carries exactly one row pushing the gated hand-off
+pair `is_real · ⟨reduce(x10)⟩` and `(1 - is_real) · ⟨0⟩`.  A shard whose Halt table is empty cannot
+balance the Exit bus at all, so the joint witness carries the mandatory **Halt padding table**: one
+all-zero row, whose `1 - 0 = 1` push of `⟨0⟩` cancels the verifier's `-1` pull of the committed
+`exit_code = 0`.  Its selector being off, each of its other eighteen interactions (State, Byte,
+Program, Memory) sits at multiplicity zero and so moves no other bus's balance.
 
 The committed guest program is the minimal **one-instruction** program `JAL x0, 0` (a self-jump) at
 `0x10000`, decoded from canonical prover data.  The original sketch used the ROM-free
@@ -52,7 +60,7 @@ namespace SP1Clean.Audit.JointNonVacuity
 open Air.Flat Circuit
 open SP1Clean SP1Clean.TraceGenTests
 open SP1Clean.Soundness SP1Clean.Soundness.Target SP1Clean.Execution
-open SP1Clean.Channels (stateChannel byteChannel programChannel memoryChannel)
+open SP1Clean.Channels (stateChannel byteChannel programChannel memoryChannel exitChannel)
 open Sail LeanRV64D LeanRV64D.Functions
 
 /-! ## The committed program: `JAL x0, 0` at `0x10000`
@@ -79,7 +87,8 @@ both ends), in the split-limb field order `clk_0_16, clk_16_24, clk_24_32, clk_3
 pc2` per end.  The recombination projections then give `init_clk_high = 0`, `init_clk_low = 1`
 (and the same finally), so the verifier row's final-state pull and initial-state push are the same
 State message with cancelling multiplicities, exactly as before the split. -/
-def pv : SP1StateBoundary (ZMod SP1Prime) := ⟨1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0⟩
+def pv : SP1StateBoundary (ZMod SP1Prime) :=
+  ⟨1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1, Vector.replicate 32 0⟩
 
 /-- The public statement of the boundary-only shard. -/
 def stmt : SupportedCoreStatement SP1Prime := ⟨anchorProgram, pv⟩
@@ -151,11 +160,12 @@ theorem anchorData_canonicalEncoding : Commit.CanonicalEncoding (p := SP1Prime) 
   · rw [anchorData_imageRows]
     simp
 
-/-! ## The joint witness: 51 zero-row tables plus the two Byte provider tables
+/-! ## The joint witness: 51 zero-row tables, the two Byte providers, and the Halt padding row
 
-Every table except the two byte providers has zero rows. The provider rows are honest witnesses of
-their circuits: input cells first (`ProvableType` order, including the explicit multiplicity), then
-the `rangeCheck n` subcircuits' local bit-decomposition cells in emission order. -/
+Every table except the two byte providers and the Halt table has zero rows. The provider rows are
+honest witnesses of their circuits: input cells first (`ProvableType` order, including the explicit
+multiplicity), then the `rangeCheck n` subcircuits' local bit-decomposition cells in emission
+order. -/
 
 /-- A zero-row table for one ensemble component. -/
 def emptyTableOf (c : Component (ZMod SP1Prime)) : Table (ZMod SP1Prime) where
@@ -165,8 +175,8 @@ def emptyTableOf (c : Component (ZMod SP1Prime)) : Table (ZMod SP1Prime) where
   data := anchorData
   uniform_width := by simp
 
-/-- The 53 zero-row tables in the stable ensemble layout — the all-empty template the joint
-witness patches at the two byte-provider positions. -/
+/-- The 54 zero-row tables in the stable ensemble layout — the all-empty template the joint
+witness patches at the two byte-provider positions and the Halt position. -/
 noncomputable def emptyTables : List (Table (ZMod SP1Prime)) :=
   (sp1Ensemble (p := SP1Prime)).tables.map emptyTableOf
 
@@ -180,7 +190,7 @@ theorem emptyTables_data : ∀ t ∈ emptyTables, t.data = anchorData := by
   obtain ⟨c, -, rfl⟩ := List.mem_map.mp ht
   rfl
 
-theorem emptyTables_length : emptyTables.length = 53 := by
+theorem emptyTables_length : emptyTables.length = 54 := by
   simp only [emptyTables, List.length_map, sp1Ensemble_tables, List.length_append]
   rfl
 
@@ -208,19 +218,39 @@ def range16Table : Table (ZMod SP1Prime) where
   data := anchorData
   uniform_width := by intro row hrow; fin_cases hrow <;> rfl
 
-/-- The 53 mapped tables of the joint shard: the all-empty template with the two byte-provider
-positions patched (25 = `U8Range`, 47 = `Range16`, matching `sp1ProviderTables` order). -/
+/-- The all-zero Halt row: the `size HaltChip.Inputs = 25` input cells (the halt circuit declares
+`localLength := 0`, so it owns no witness cells beyond them), i.e. `HaltChip.paddingInputs` in
+physical form. -/
+def haltPaddingRow : Array (ZMod SP1Prime) := Array.replicate 25 0
+
+/-- The mandatory Halt table (stable position 53): exactly one padding row. Its selector is off, so
+the composed `CPUState`/`RegisterAccessCols` Byte pulls, the State pair, the ECALL Program fetch and
+the six register Memory records are all emitted at multiplicity zero; only the anti-gated
+`1 - is_real = 1` Exit push of `⟨0⟩` is live, and that is what balances the boundary verifier's
+ungated `⟨exit_code⟩` pull. -/
+def haltPaddingTable : Table (ZMod SP1Prime) where
+  component := ⟨HaltChip.circuit⟩
+  width := 25
+  table := [haltPaddingRow]
+  data := anchorData
+  uniform_width := by intro row hrow; fin_cases hrow; rfl
+
+/-- The 54 mapped tables of the joint shard: the all-empty template with the two byte-provider
+positions and the Halt position patched (25 = `U8Range`, 47 = `Range16`, 53 = `Halt`, matching
+`sp1ProviderTables` order). -/
 noncomputable def jointTables : List (Table (ZMod SP1Prime)) :=
-  (emptyTables.set 25 u8RangeTable).set 47 range16Table
+  ((emptyTables.set 25 u8RangeTable).set 47 range16Table).set 53 haltPaddingTable
 
 theorem mem_jointTables {t : Table (ZMod SP1Prime)} (ht : t ∈ jointTables) :
-    t ∈ emptyTables ∨ t = u8RangeTable ∨ t = range16Table := by
+    t ∈ emptyTables ∨ t = u8RangeTable ∨ t = range16Table ∨ t = haltPaddingTable := by
   rcases List.mem_or_eq_of_mem_set ht with h | rfl
   · rcases List.mem_or_eq_of_mem_set h with h | rfl
-    exacts [Or.inl h, Or.inr (Or.inl rfl)]
-  · exact Or.inr (Or.inr rfl)
+    · rcases List.mem_or_eq_of_mem_set h with h | rfl
+      exacts [Or.inl h, Or.inr (Or.inl rfl)]
+    · exact Or.inr (Or.inr (Or.inl rfl))
+  · exact Or.inr (Or.inr (Or.inr rfl))
 
-theorem jointTables_length : jointTables.length = 53 := by
+theorem jointTables_length : jointTables.length = 54 := by
   simp only [jointTables, List.length_set]
   exact emptyTables_length
 
@@ -264,8 +294,35 @@ theorem flatMap_set_set_of_nil {α β : Type*} {l : List α} {f : α → List β
         exact ih (by omega) (by simpa using hj)
           fun y hy => hnil y (List.mem_cons_of_mem _ hy)
 
-/-- **The joint shard**: 51 zero-row tables plus the two byte-provider tables, the shared canonical
-committed program data, and the equal-endpoints public boundary. -/
+/-- Generic: `flatMap` over a triple-`set` list (positions `i < j < k`) whose other elements all map
+to `[]` is the three patched images in position order. -/
+theorem flatMap_set_set_set_of_nil {α β : Type*} {l : List α} {f : α → List β} {i j k : ℕ}
+    {a b c : α} (hij : i < j) (hjk : j < k) (hk : k < l.length)
+    (hnil : ∀ x ∈ l, f x = []) :
+    (((l.set i a).set j b).set k c).flatMap f = f a ++ (f b ++ f c) := by
+  induction l generalizing i j k with
+  | nil => simp at hk
+  | cons x xs ih =>
+    cases k with
+    | zero => omega
+    | succ m =>
+      cases j with
+      | zero => omega
+      | succ n =>
+        cases i with
+        | zero =>
+          simp only [List.set_cons_zero, List.set_cons_succ, List.flatMap_cons]
+          congr 1
+          exact flatMap_set_set_of_nil (by omega) (by simpa using hk)
+            fun y hy => hnil y (List.mem_cons_of_mem _ hy)
+        | succ q =>
+          simp only [List.set_cons_succ, List.flatMap_cons, hnil x List.mem_cons_self,
+            List.nil_append]
+          exact ih (by omega) (by omega) (by simpa using hk)
+            fun y hy => hnil y (List.mem_cons_of_mem _ hy)
+
+/-- **The joint shard**: 51 zero-row tables plus the two byte-provider tables and the Halt padding
+table, the shared canonical committed program data, and the equal-endpoints public boundary. -/
 noncomputable def jointWitness : SupportedCoreNativeWitness SP1Prime where
   tables := jointTables
   data := anchorData
@@ -274,19 +331,24 @@ noncomputable def jointWitness : SupportedCoreNativeWitness SP1Prime where
   same_circuits := by
     intro i hi
     rcases eq_or_ne i 25 with rfl | h25
-    · simp only [jointTables, List.getElem_set_ne (by omega : (47 : ℕ) ≠ 25),
-        List.getElem_set_self]
+    · simp only [jointTables, List.getElem_set_ne (by omega : (53 : ℕ) ≠ 25),
+        List.getElem_set_ne (by omega : (47 : ℕ) ≠ 25), List.getElem_set_self]
       rfl
     rcases eq_or_ne i 47 with rfl | h47
+    · simp only [jointTables, List.getElem_set_ne (by omega : (53 : ℕ) ≠ 47),
+        List.getElem_set_self]
+      rfl
+    rcases eq_or_ne i 53 with rfl | h53
     · simp only [jointTables, List.getElem_set_self]
       rfl
-    · simp only [jointTables, List.getElem_set_ne (Ne.symm h47),
-        List.getElem_set_ne (Ne.symm h25)]
+    · simp only [jointTables, List.getElem_set_ne (Ne.symm h53),
+        List.getElem_set_ne (Ne.symm h47), List.getElem_set_ne (Ne.symm h25)]
       simp [emptyTables, emptyTableOf]
   same_data := by
     intro t ht
-    rcases mem_jointTables ht with h | rfl | rfl
+    rcases mem_jointTables ht with h | rfl | rfl | rfl
     · exact emptyTables_data t h
+    · rfl
     · rfl
     · rfl
 
@@ -294,19 +356,20 @@ noncomputable def jointWitness : SupportedCoreNativeWitness SP1Prime where
 @[simp] theorem jointWitness_data : jointWitness.data = anchorData := rfl
 @[simp] theorem jointWitness_publicInput : jointWitness.publicInput = pv := rfl
 
-/-- Positions other than the two byte providers keep zero rows — in particular the stable
-provider/boundary positions 48/49/50 consumed by the semantic boundary bindings. -/
+/-- Positions other than the two byte providers and the Halt table keep zero rows — in particular
+the stable provider/boundary positions 48/49/50 consumed by the semantic boundary bindings. -/
 theorem jointTables_table_nil_of_ne (i : ℕ) (hi : i < jointTables.length)
-    (h25 : i ≠ 25) (h47 : i ≠ 47) : jointTables[i].table = [] := by
+    (h25 : i ≠ 25) (h47 : i ≠ 47) (h53 : i ≠ 53) : jointTables[i].table = [] := by
   have hmem : jointTables[i] ∈ emptyTables := by
-    simp only [jointTables, List.getElem_set_ne (Ne.symm h47), List.getElem_set_ne (Ne.symm h25)]
+    simp only [jointTables, List.getElem_set_ne (Ne.symm h53), List.getElem_set_ne (Ne.symm h47),
+      List.getElem_set_ne (Ne.symm h25)]
     exact List.getElem_mem _
   exact emptyTables_table_eq_nil _ hmem
 
 /-! ## Conjunct 1a: constraints
 
-The 51 zero-row tables are constraint-satisfied vacuously.  The verifier row and the three concrete
-provider rows are discharged by the executable whole-circuit constraint check (the
+The 51 zero-row tables are constraint-satisfied vacuously.  The verifier row, the three concrete
+provider rows and the Halt padding row are discharged by the executable whole-circuit check (the
 `NonVacuityReal.lean` bridge, replicated here): no static lookups, and every flattened `assertZero`
 expression — the `rangeCheck` bit decompositions included — evaluates to zero on the concrete
 cells. -/
@@ -337,7 +400,7 @@ theorem jointWitness_constraints : jointWitness.Constraints := by
       (size SP1PublicIO)).ConstraintsHold (.fromInput pv anchorData)
     exact constraintsHold_of_check (by native_decide)
   · intro t ht row hrow
-    rcases mem_jointTables ht with h | rfl | rfl
+    rcases mem_jointTables ht with h | rfl | rfl | rfl
     · rw [emptyTables_table_eq_nil t h] at hrow
       exact absurd hrow (List.not_mem_nil)
     · fin_cases hrow
@@ -345,13 +408,18 @@ theorem jointWitness_constraints : jointWitness.Constraints := by
     · fin_cases hrow
       · exact constraintsHold_of_check (by native_decide)
       · exact constraintsHold_of_check (by native_decide)
+    · fin_cases hrow
+      exact constraintsHold_of_check (by native_decide)
 
-/-! ## Conjunct 1b: four-bus balance
+/-! ## Conjunct 1b: five-bus balance
 
 Zero-row tables contribute no interactions.  On the State channel the verifier contributes exactly
 the final-pull/initial-push pair, which cancels with initial = final endpoints; on the Byte channel
 its twelve `-1` limb-range pulls cancel against the two provider tables' pushes (multiplicities
-`4 + 6 + 2`); Program and Memory stay empty. -/
+`4 + 6 + 2`); on the Exit channel its ungated `-1` pull of `⟨exit_code⟩ = ⟨0⟩` cancels against the
+Halt padding row's anti-gated `+1` push of `⟨0⟩`; Program and Memory stay empty.  The Halt padding
+row's remaining eighteen interactions are all gated off, so on the other four buses it only appends
+multiplicity-zero entries. -/
 
 /-- A pull/push pair of one message balances: the multiplicities cancel pointwise. -/
 theorem balancedInteractions_pair {F : Type} [FiniteField F] [DecidableEq F]
@@ -382,6 +450,14 @@ theorem balancedInteractions_nil {F : Type} [FiniteField F] [DecidableEq F]
     · exact Or.inr h
   · intro msg
     rfl
+
+/-- Multiplicity-zero interactions move no message's balance. -/
+theorem balanceOf_eq_zero_of_mult_zero {l : List (Interaction (ZMod SP1Prime))}
+    (h : ∀ i ∈ l, i.mult = 0) (msg : Array (ZMod SP1Prime)) : balanceOf l msg = 0 := by
+  rw [balanceOf]
+  refine List.sum_eq_zero fun m hm => ?_
+  obtain ⟨i, hi, rfl⟩ := List.mem_map.mp hm
+  exact h i (List.mem_of_mem_filter hi)
 
 theorem sp1Prime_char_pos_facts :
     (2 : ℕ) < ringChar (ZMod SP1Prime) ∧ (0 : ℕ) < ringChar (ZMod SP1Prime) := by
@@ -456,19 +532,68 @@ theorem emptyTables_interactionsWith_nil (ch : RawChannel (ZMod SP1Prime)) :
   obtain ⟨c, -, rfl⟩ := List.mem_map.mp ht
   rfl
 
-/-- The whole-shard channel view splits into the verifier row plus the two provider tables (in
-stable position order), the 51 zero-row tables contributing nothing. -/
+/-- The whole-shard channel view splits into the verifier row plus the two provider tables and the
+Halt padding table (in stable position order), the 51 zero-row tables contributing nothing. -/
 theorem jointWitness_interactionsWith_split (ch : RawChannel (ZMod SP1Prime)) :
     jointWitness.interactionsWith ch =
       jointWitness.verifierTable.interactionsWith ch ++
-        (u8RangeTable.interactionsWith ch ++ range16Table.interactionsWith ch) := by
+        (u8RangeTable.interactionsWith ch ++
+          (range16Table.interactionsWith ch ++ haltPaddingTable.interactionsWith ch)) := by
   show (jointWitness.verifierTable :: jointWitness.tables).flatMap (·.interactionsWith ch) = _
   rw [List.flatMap_cons]
-  congr 1
-  show jointTables.flatMap (·.interactionsWith ch) = _
-  rw [jointTables]
-  exact flatMap_set_set_of_nil (by omega) (by rw [emptyTables_length]; omega)
-    fun t ht => emptyTables_interactionsWith_nil ch t ht
+  show _ ++ jointTables.flatMap (·.interactionsWith ch) = _
+  rw [jointTables, flatMap_set_set_set_of_nil (f := (·.interactionsWith ch)) (by omega) (by omega)
+    (by rw [emptyTables_length]; omega) fun t ht => emptyTables_interactionsWith_nil ch t ht]
+
+/-! ### The Halt padding row's per-channel views
+
+The padding row emits nineteen interactions.  Eighteen are gated by `is_real = 0` and so carry
+multiplicity zero; the nineteenth is the anti-gated Exit push of `⟨0⟩` at multiplicity `1 - 0 = 1`.
+The first fact is checked executably over the (computable) whole-row interaction list; the Exit view
+is recovered from the halt circuit's own exposed-channel closed form. -/
+
+/-- Executable check: every Halt padding-row interaction outside the Exit bus is gated off. -/
+theorem haltPaddingTable_zeroOrExit :
+    haltPaddingTable.interactions.all
+      (fun i => decide (i.mult = 0) || (i.channel.name == "SP1Exit")) = true := by native_decide
+
+/-- Executable check: the padding row emits nineteen interactions in total. -/
+theorem haltPaddingTable_interactions_length : haltPaddingTable.interactions.length = 19 := by
+  native_decide
+
+/-- On any non-Exit channel the Halt padding table contributes only multiplicity-zero entries. -/
+theorem haltPaddingTable_mult_zero {ch : RawChannel (ZMod SP1Prime)} (hname : ch.name ≠ "SP1Exit") :
+    ∀ i ∈ haltPaddingTable.interactionsWith ch, i.mult = 0 := by
+  intro i hi
+  rw [Table.interactionsWith_eq_filter] at hi
+  obtain ⟨hmem, hch⟩ := List.mem_filter.mp hi
+  have hchannel : i.channel = ch := by simpa using hch
+  rcases Bool.or_eq_true _ _ |>.mp (List.all_eq_true.mp haltPaddingTable_zeroOrExit i hmem) with
+    hzero | hexit
+  · exact of_decide_eq_true hzero
+  · exact absurd (hchannel ▸ beq_iff_eq.mp hexit : ch.name = "SP1Exit") hname
+
+/-- A channel view is a sublist of the whole interaction list, so it is bounded by its length. -/
+theorem haltPaddingTable_interactionsWith_length (ch : RawChannel (ZMod SP1Prime)) :
+    (haltPaddingTable.interactionsWith ch).length ≤ 19 := by
+  rw [Table.interactionsWith_eq_filter, ← haltPaddingTable_interactions_length]
+  exact List.length_filter_le _ _
+
+/-- Appending the Halt padding row's view of a non-Exit channel preserves balance: each of its
+entries is gated off, so it shifts no message's balance, and its length is bounded by the row's
+nineteen interactions. -/
+theorem balancedInteractions_append_halt {l : List (Interaction (ZMod SP1Prime))}
+    (hlen : l.length < 100) (hbal : ∀ msg, balanceOf l msg = 0)
+    {ch : RawChannel (ZMod SP1Prime)} (hname : ch.name ≠ "SP1Exit") :
+    BalancedInteractions (l ++ haltPaddingTable.interactionsWith ch) := by
+  have hchar : (119 : ℕ) < ringChar (ZMod SP1Prime) := by
+    rw [ZMod.ringChar_zmod_n]; norm_num [SP1Prime]
+  refine ⟨Or.inl ?_, fun msg => ?_⟩
+  · have h19 := haltPaddingTable_interactionsWith_length ch
+    rw [List.length_append]
+    omega
+  · rw [balanceOf_append, hbal msg,
+      balanceOf_eq_zero_of_mult_zero (haltPaddingTable_mult_zero hname), add_zero]
 
 /-! ### The verifier row's per-channel views -/
 
@@ -496,6 +621,17 @@ theorem jointWitness_verifierMemory_nil :
     jointWitness.verifierTable.interactionsWith memoryChannel.toRaw = [] := by
   have h := congrArg (List.map TypedInteraction.raw)
     (witness_verifierMemoryInteractions_eq_nil (p := SP1Prime) jointWitness)
+  rw [typedTableInteractionsWith_raw] at h
+  simpa using h
+
+/-- The verifier row's Exit view: the single ungated `⟨exit_code⟩` pull (the erasure of
+`witness_verifierExitInteractions_eq` at the joint witness).  The committed `exit_code` is `0`, so
+this is a `-1` pull of `⟨0⟩`. -/
+theorem jointWitness_verifierExit :
+    jointWitness.verifierTable.interactionsWith exitChannel.toRaw =
+      [exitChannel.pulledIfValue 1 (⟨pv.exit_code⟩ : Channels.ExitMsg (ZMod SP1Prime))] := by
+  have h := congrArg (List.map TypedInteraction.raw)
+    (witness_verifierExitInteractions_eq (p := SP1Prime) jointWitness)
   rw [typedTableInteractionsWith_raw] at h
   simpa using h
 
@@ -538,7 +674,7 @@ theorem sp1StateVerifierMain_byteInteractions (pi : Var SP1PublicIO (ZMod SP1Pri
 
 /-- A public boundary whose two middle timestamp bytes are pairwise distinct at both ends. -/
 def asymmetricClockBoundary : SP1PublicIO (ZMod SP1Prime) :=
-  ⟨0, 1, 2, 0, 0, 1, 0, 0, 3, 4, 0, 0, 1, 0⟩
+  ⟨0, 1, 2, 0, 0, 1, 0, 0, 3, 4, 0, 0, 1, 0, 0, 1, Vector.replicate 32 0⟩
 
 /-- Evaluated verifier Byte interactions for the asymmetric-clock regression. -/
 def asymmetricClockVerifierByteInteractions : List (Interaction (ZMod SP1Prime)) :=
@@ -575,41 +711,104 @@ theorem jointWitness_verifierByte :
   rw [sp1StateVerifierMain_byteInteractions]
 
 theorem jointWitness_byteInteractions :
-    jointWitness.interactionsWith byteChannel.toRaw = byteInteractions := by
+    jointWitness.interactionsWith byteChannel.toRaw =
+      byteInteractions ++ haltPaddingTable.interactionsWith byteChannel.toRaw := by
   rw [jointWitness_interactionsWith_split, jointWitness_verifierByte,
     table_interactionsWith_eq_interactions u8RangeTable_channels,
     table_interactionsWith_eq_interactions range16Table_channels]
+  simp only [byteInteractions, List.append_assoc]
+
+/-- The verifier's twelve pulls and the two provider tables' pushes cancel message-for-message. -/
+theorem byteInteractions_balanced : BalancedInteractions byteInteractions := by
+  refine balancedInteractions_of_member_balance ?_ (by native_decide)
+  rw [show byteInteractions.length = 15 from by native_decide, ZMod.ringChar_zmod_n]
+  norm_num [SP1Prime]
+
+/-! ### The Exit bus
+
+The verifier's ungated `-1` pull of `⟨exit_code⟩ = ⟨0⟩` against the Halt padding row's two pushes:
+the reduced-`x10` push at multiplicity `is_real = 0` and the padding push of `⟨0⟩` at multiplicity
+`1 - is_real = 1`. -/
+
+/-- The Halt padding table's Exit view: the halt circuit's two exposed Exit pushes, evaluated at the
+all-zero row.  Recovering it through the circuit's own `interactionsWith_exit_eq` closed form is
+what keeps the list computable (`interactionsWith` itself filters over an undecidable channel
+equality). -/
+def haltExitInteractions : List (Interaction (ZMod SP1Prime)) :=
+  [(exitChannel.pushedIf
+      (varFromOffset HaltChip.Inputs 0 : Var HaltChip.Inputs (ZMod SP1Prime)).is_real
+      (HaltChip.exitMsg (varFromOffset HaltChip.Inputs 0))).toRaw,
+   (exitChannel.pushedIf
+      (1 - (varFromOffset HaltChip.Inputs 0 : Var HaltChip.Inputs (ZMod SP1Prime)).is_real)
+      (HaltChip.exitPaddingMsg (p := SP1Prime))).toRaw].map
+    (AbstractInteraction.eval (haltPaddingTable.environment haltPaddingRow))
+
+theorem haltPaddingTable_exit :
+    haltPaddingTable.interactionsWith exitChannel.toRaw = haltExitInteractions := by
+  show [haltPaddingRow].flatMap _ = _
+  rw [List.flatMap_singleton, Operations.interactionValuesWith_eq_map,
+    Component.interactionsWith_eq]
+  change List.map (AbstractInteraction.eval (haltPaddingTable.environment haltPaddingRow))
+    (((HaltChip.main
+      (varFromOffset HaltChip.Inputs 0 : Var HaltChip.Inputs (ZMod SP1Prime))).operations
+        (size HaltChip.Inputs)).interactionsWith exitChannel.toRaw) = _
+  rw [HaltChip.interactionsWith_exit_eq]
+  rfl
+
+/-- The evaluated Exit-channel contribution of the joint shard, as one executable list. -/
+def exitInteractions : List (Interaction (ZMod SP1Prime)) :=
+  [exitChannel.pulledIfValue 1 (⟨pv.exit_code⟩ : Channels.ExitMsg (ZMod SP1Prime))] ++
+    haltExitInteractions
+
+theorem jointWitness_exitInteractions :
+    jointWitness.interactionsWith exitChannel.toRaw = exitInteractions := by
+  rw [jointWitness_interactionsWith_split, jointWitness_verifierExit,
+    u8RangeTable_interactionsWith_nil (of_eq_false Channels.exitChannel_eq_byteChannel_false),
+    range16Table_interactionsWith_nil (of_eq_false Channels.exitChannel_eq_byteChannel_false),
+    haltPaddingTable_exit, List.nil_append, List.nil_append]
   rfl
 
 theorem jointWitness_balanced : jointWitness.BalancedChannels := by
   intro channel hchannel
   rw [sp1Ensemble_channels] at hchannel
   simp only [List.mem_cons, List.not_mem_nil, or_false] at hchannel
-  rcases hchannel with rfl | rfl | rfl | rfl
+  rcases hchannel with rfl | rfl | rfl | rfl | rfl
   · show BalancedInteractions (jointWitness.interactionsWith stateChannel.toRaw)
     rw [jointWitness_interactionsWith_split, jointWitness_verifierState,
       u8RangeTable_interactionsWith_nil (of_eq_false Channels.stateChannel_eq_byteChannel_false),
       range16Table_interactionsWith_nil (of_eq_false Channels.stateChannel_eq_byteChannel_false),
-      List.append_nil, List.append_nil]
-    exact balancedInteractions_pair (by native_decide) (neg_add_cancel 1)
-      (Or.inl sp1Prime_char_pos_facts.1)
+      List.nil_append, List.nil_append]
+    exact balancedInteractions_append_halt (by norm_num)
+      (balancedInteractions_pair (by native_decide) (neg_add_cancel 1)
+        (Or.inl sp1Prime_char_pos_facts.1)).2
+      (by simp only [Channel.toRaw_name, Channels.stateChannel]; decide)
   · show BalancedInteractions (jointWitness.interactionsWith byteChannel.toRaw)
     rw [jointWitness_byteInteractions]
-    refine balancedInteractions_of_member_balance ?_ (by native_decide)
-    rw [show byteInteractions.length = 15 from by native_decide, ZMod.ringChar_zmod_n]
-    norm_num [SP1Prime]
+    exact balancedInteractions_append_halt
+      (by rw [show byteInteractions.length = 15 from by native_decide]; norm_num)
+      byteInteractions_balanced.2
+      (by simp only [Channel.toRaw_name, Channels.byteChannel]; decide)
   · show BalancedInteractions (jointWitness.interactionsWith programChannel.toRaw)
     rw [jointWitness_interactionsWith_split, jointWitness_verifierProgram_nil,
       u8RangeTable_interactionsWith_nil (of_eq_false Channels.programChannel_eq_byteChannel_false),
       range16Table_interactionsWith_nil
-        (of_eq_false Channels.programChannel_eq_byteChannel_false)]
-    exact balancedInteractions_nil (Or.inl sp1Prime_char_pos_facts.2)
+        (of_eq_false Channels.programChannel_eq_byteChannel_false),
+      List.nil_append, List.nil_append]
+    exact balancedInteractions_append_halt (by norm_num) (fun _ => rfl)
+      (by simp only [Channel.toRaw_name, Channels.programChannel]; decide)
   · show BalancedInteractions (jointWitness.interactionsWith memoryChannel.toRaw)
     rw [jointWitness_interactionsWith_split, jointWitness_verifierMemory_nil,
       u8RangeTable_interactionsWith_nil (of_eq_false Channels.memoryChannel_eq_byteChannel_false),
       range16Table_interactionsWith_nil
-        (of_eq_false Channels.memoryChannel_eq_byteChannel_false)]
-    exact balancedInteractions_nil (Or.inl sp1Prime_char_pos_facts.2)
+        (of_eq_false Channels.memoryChannel_eq_byteChannel_false),
+      List.nil_append, List.nil_append]
+    exact balancedInteractions_append_halt (by norm_num) (fun _ => rfl)
+      (by simp only [Channel.toRaw_name, Channels.memoryChannel]; decide)
+  · show BalancedInteractions (jointWitness.interactionsWith exitChannel.toRaw)
+    rw [jointWitness_exitInteractions]
+    refine balancedInteractions_of_member_balance ?_ (by native_decide)
+    rw [show exitInteractions.length = 3 from by native_decide, ZMod.ringChar_zmod_n]
+    norm_num [SP1Prime]
 
 /-! ## The concrete initial Sail state
 
@@ -728,14 +927,17 @@ theorem anchorState_romLoaded : RomLoaded anchorProgram anchorState := by
 theorem programProviderTable_table_nil :
     (programProviderTable (p := SP1Prime) jointWitness).table = [] :=
   jointTables_table_nil_of_ne 35 (by rw [jointTables_length]; omega) (by omega) (by omega)
+    (by omega)
 
 theorem memoryInitProviderTable_table_nil :
     (memoryInitProviderTable (p := SP1Prime) jointWitness).table = [] :=
   jointTables_table_nil_of_ne 36 (by rw [jointTables_length]; omega) (by omega) (by omega)
+    (by omega)
 
 theorem memoryFinalizeProviderTable_table_nil :
     (memoryFinalizeProviderTable (p := SP1Prime) jointWitness).table = [] :=
   jointTables_table_nil_of_ne 37 (by rw [jointTables_length]; omega) (by omega) (by omega)
+    (by omega)
 
 theorem jointWitness_programProviderBound :
     ProgramProviderBound (p := SP1Prime) jointWitness := by
@@ -913,9 +1115,9 @@ theorem anchorBoundaryFacts : InitialBoundaryFacts stmt jointWitness anchorState
 
 /-- **Joint non-vacuity of the capstone's hypothesis bundle.**  The boundary-only shard with equal
 public State endpoints satisfies the complete `SupportedCoreNativeRelation` at the concrete prime:
-the raw ensemble relation (constraints + four-bus balance, the Byte bus balanced by the two honest
-provider tables) and the semantic boundary binding (with the committed one-instruction program and
-the concrete configured initial state).  Those two conjuncts are the whole relation — the memory
+the raw ensemble relation (constraints + five-bus balance, the Byte bus balanced by the two honest
+provider tables and the Exit bus by the mandatory Halt padding row) and the semantic boundary
+binding (with the committed one-instruction program and the concrete configured initial state).  Those two conjuncts are the whole relation — the memory
 pull-timestamp range fact that used to ride along as a third companion is now derived inside the
 capstone from the per-location Memory balance.  Applying `supported_core_native_sound` to this
 witness yields the honest 0-step local Sail execution between the equal endpoints. -/

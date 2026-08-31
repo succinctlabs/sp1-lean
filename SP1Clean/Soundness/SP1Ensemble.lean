@@ -9,13 +9,14 @@ import SP1Clean.Proofs.Chips.MemoryProviderChip
 import SP1Clean.Proofs.Chips.MemoryFinalizeChip
 import SP1Clean.Proofs.Chips.StateBumpChip.Formal
 import SP1Clean.Proofs.Chips.MemoryBumpChip.Formal
+import SP1Clean.Proofs.Chips.HaltChip.Formal
 import SP1Clean.FormalModel.Contracts.PublicValues
 import Clean.Air.FlatEnsemble
 
 /-! # The supported native SP1 machine as a plain Clean `Ensemble`
 
-This module packages the 25 supported instruction tables and 28 native provider/boundary tables over
-the four SP1 buses, together with the pull-final/push-init State verifier. It also proves the
+This module packages the 25 supported instruction tables and 29 native provider/boundary tables over
+the five native buses, together with the pull-final/push-init State verifier. It also proves the
 physical-table alignment and typed-interaction partition used by the timed grounding capstone in
 `Soundness/AIR.lean`.
 
@@ -105,19 +106,26 @@ def sp1StateVerifierMain (pi : Var SP1PublicIO (ZMod p)) : Circuit (ZMod p) Unit
     (⟨6, pi.final_pc1, Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
   Channels.byteChannel.pull
     (⟨6, pi.final_pc2, Expression.const ((16 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
+  -- The exit binding (halt-table wave): the verifier's row is exactly the public input
+  -- (`verifier_length_zero`), so it can witness no gate cell — the pull is **ungated**. The halt
+  -- table pushes the reduced `x10` word when real and the zero code when padding; balance then
+  -- forces `exit_code = reduce(a0)` on halting shards and `exit_code = 0` on ordinary shards.
+  Channels.exitChannel.pull (⟨pi.exit_code⟩ : Channels.ExitMsg (Expression (ZMod p)))
 
 instance sp1StateVerifierElaborated :
     ElaboratedCircuit (ZMod p) SP1PublicIO unit sp1StateVerifierMain where
   localLength _ := 0
   output _ _ := ()
-  channelsWithGuarantees := [Channels.stateChannel.toRaw, Channels.byteChannel.toRaw]
+  channelsWithGuarantees :=
+    [Channels.stateChannel.toRaw, Channels.byteChannel.toRaw, Channels.exitChannel.toRaw]
   channelsLawful := by
-    simp [circuit_norm, sp1StateVerifierMain, Channels.stateChannel, Channels.byteChannel]
+    simp [circuit_norm, sp1StateVerifierMain, Channels.stateChannel, Channels.byteChannel,
+      Channels.exitChannel]
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma sp1StateVerifier_channelsWithGuarantees_eq :
     ((sp1StateVerifierElaborated (p := p)).channelsWithGuarantees : List (RawChannel (ZMod p)))
-      = [Channels.stateChannel.toRaw, Channels.byteChannel.toRaw] :=
+      = [Channels.stateChannel.toRaw, Channels.byteChannel.toRaw, Channels.exitChannel.toRaw] :=
   rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma sp1StateVerifier_localLength_eq (x : Var SP1PublicIO (ZMod p)) :
@@ -134,7 +142,7 @@ theorem sp1StateVerifier_soundness :
   circuit_proof_start
   haveI : Fact (2 ^ 17 < p) := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
   simp only [circuit_norm, SP1StateBoundary.LimbBounds, Channels.stateChannel,
-    Channels.byteChannel] at h_holds ⊢
+    Channels.byteChannel, Channels.exitChannel] at h_holds ⊢
   obtain ⟨i016, i3248, ipair, ipc0, ipc1, ipc2, f016, f3248, fpair, fpc0, fpc1, fpc2⟩ := h_holds
   exact ⟨(byteRowSpec_range _ h16p').mp (by rw [Nat.cast_ofNat]; exact i016),
     ((byteRowSpec_u8range_pair _ _).mp ipair).2,
@@ -164,7 +172,7 @@ theorem sp1StateVerifier_completeness :
   simp only [sp1StateVerifierProverAssumptions, SP1StateBoundary.LimbBounds] at h_assumptions
   obtain ⟨i016, i1624, i2432, i3248, ipc0, ipc1, ipc2,
     f016, f1624, f2432, f3248, fpc0, fpc1, fpc2⟩ := h_assumptions
-  simp only [circuit_norm, Channels.stateChannel, Channels.byteChannel]
+  simp only [circuit_norm, Channels.stateChannel, Channels.byteChannel, Channels.exitChannel]
   exact ⟨(byteRowSpec_range _ h16p').mpr i016,
     (byteRowSpec_range _ h16p').mpr i3248,
     (byteRowSpec_u8range_pair _ _).mpr ⟨i2432, i1624⟩,
@@ -191,19 +199,27 @@ def sp1StateVerifier : GeneralFormalCircuit (ZMod p) SP1PublicIO unit where
   completeness := sp1StateVerifier_completeness
   channelsWithRequirements := []
   requirementsChannelsLawful := fun pi offset => by
-    simp only [circuit_norm, sp1StateVerifierMain, Channels.stateChannel, Channels.byteChannel]
+    simp only [circuit_norm, sp1StateVerifierMain, Channels.stateChannel, Channels.byteChannel,
+      Channels.exitChannel]
     intro channel h
-    rcases h with h | h | h
-    exacts [Or.inl h, Or.inl h, Or.inr h]
+    tauto
   exposedChannels := fun pi _ =>
     expose Channels.stateChannel
       [ Channels.stateChannel.pulled ⟨pi.final_clk_high, pi.final_clk_low, pi.final_pc0, pi.final_pc1, pi.final_pc2⟩,
-        Channels.stateChannel.pushed ⟨pi.init_clk_high, pi.init_clk_low, pi.init_pc0, pi.init_pc1, pi.init_pc2⟩ ]
+        Channels.stateChannel.pushed ⟨pi.init_clk_high, pi.init_clk_low, pi.init_pc0, pi.init_pc1, pi.init_pc2⟩ ] ++
+    expose Channels.exitChannel
+      [ Channels.exitChannel.pulled (⟨pi.exit_code⟩ : Channels.ExitMsg (Expression (ZMod p))) ]
   exposedChannels_eq := by
     intro pi offset
-    rw [Operations.exposedChannelsLawful_expose]
-    simp only [sp1StateVerifierMain, circuit_norm,
-      Channels.byteChannel_eq_stateChannel_false, if_false]
+    unfold Operations.ExposedChannelsLawful
+    intro exposed exposedMem
+    simp only [expose, List.mem_append, List.mem_singleton] at exposedMem
+    rcases exposedMem with rfl | rfl <;>
+      simp only [sp1StateVerifierMain, circuit_norm,
+        Channels.byteChannel_eq_stateChannel_false,
+        Channels.byteChannel_eq_exitChannel_false,
+        Channels.stateChannel_eq_exitChannel_false,
+        Channels.exitChannel_eq_stateChannel_false, if_false]
 
 omit [Fact (2 ^ 24 < p)] in
 /-- The verifier's exact syntactic State pair, exposed without unfolding its formal-circuit record. -/
@@ -213,6 +229,15 @@ theorem sp1StateVerifierMain_stateInteractions (pi : Var SP1PublicIO (ZMod p)) (
         ⟨pi.final_clk_high, pi.final_clk_low, pi.final_pc0, pi.final_pc1, pi.final_pc2⟩).toRaw,
        (Channels.stateChannel.pushed
         ⟨pi.init_clk_high, pi.init_clk_low, pi.init_pc0, pi.init_pc1, pi.init_pc2⟩).toRaw] := by
+  simp [sp1StateVerifierMain, circuit_norm]
+
+omit [Fact (2 ^ 24 < p)] in
+/-- The verifier's exact syntactic Exit pull — the ungated `⟨exit_code⟩` consumption the halt
+table's pushes balance against. -/
+theorem sp1StateVerifierMain_exitInteractions (pi : Var SP1PublicIO (ZMod p)) (offset : ℕ) :
+    ((sp1StateVerifierMain pi).operations offset).interactionsWith Channels.exitChannel.toRaw =
+      [(Channels.exitChannel.pulled
+        (⟨pi.exit_code⟩ : Channels.ExitMsg (Expression (ZMod p)))).toRaw] := by
   simp [sp1StateVerifierMain, circuit_norm]
 
 /-! ## The SP1 machine as a plain Clean `Ensemble` -/
@@ -263,14 +288,16 @@ def providerTableFor : ProviderTableId → Component (ZMod p)
   | .memoryFinalize => ⟨MemoryFinalizeChip.circuit⟩
   | .memoryBump => ⟨MemoryBumpChip.circuit⟩
   | .stateBump => ⟨StateBumpChip.circuit⟩
+  | .halt => ⟨HaltChip.circuit⟩
 
-/-- The 28 in-circuit boundary/provider tables: six `ByteChip` opcode tables, the complete
+/-- The 29 in-circuit boundary/provider tables: six `ByteChip` opcode tables, the complete
 17-member fixed-width Range family, the program-ROM provider, the two memory boundary tables
-(init-push + finalize-pull, W11 Phase 4), and — W3, external report Finding 2 — the two SP1 system
-tables MemoryBump (position 51: the register-record timestamp refreshes) and StateBump (position
-52: the clock/pc re-limbing rows that lift the ~2^21-row shard cap and the 64 KiB pc-boundary
-restriction). Every pusher proves its pushes' channel `Guarantees` in-circuit, which is what grounds
-the chips' byte/program/memory pulls at the capstone. -/
+(init-push + finalize-pull, W11 Phase 4), the two SP1 system tables MemoryBump (position 51: the
+register-record timestamp refreshes) and StateBump (position 52: the clock/pc re-limbing rows that
+lift the ~2^21-row shard cap and the 64 KiB pc-boundary restriction) — W3, external report Finding
+2 — and the Halt table (position 53: the halting shard's ECALL witness row, the semantics-gap
+campaign's PR 2.4). Every pusher proves its pushes' channel `Guarantees` in-circuit, which is what
+grounds the chips' byte/program/memory pulls at the capstone. -/
 def sp1ProviderTables : List (Component (ZMod p)) :=
   ProviderTableId.all.map (providerTableFor (p := p))
 
@@ -283,7 +310,7 @@ theorem sp1ProviderTables_explicit :
         sp1RangeProviderTables ++
       [⟨ProgramProviderChip.circuit⟩, ⟨MemoryProviderChip.circuit⟩,
        ⟨MemoryFinalizeChip.circuit⟩, ⟨MemoryBumpChip.circuit⟩,
-       ⟨StateBumpChip.circuit⟩] := by
+       ⟨StateBumpChip.circuit⟩, ⟨HaltChip.circuit⟩] := by
   rfl
 
 /-- Pointwise positional coverage, including out-of-bounds provider positions. -/
@@ -293,14 +320,14 @@ theorem sp1ProviderTables_explicit :
   simp [sp1ProviderTables]
 
 /-- Regression guard: the boundary/provider table count (6 byte + 17 range + program + 2 memory +
-2 bump). -/
-theorem sp1ProviderTables_length : (sp1ProviderTables (p := p)).length = 28 := by
+2 bump + halt). -/
+theorem sp1ProviderTables_length : (sp1ProviderTables (p := p)).length = 29 := by
   simp [sp1ProviderTables]
 
-/-- Every boundary/provider circuit except the last — the StateBump table at position 52 — stays
-off the State channel; StateBump is, by design, the sole provider-segment State contributor.
-Stated over the `take 27` prefix so the typed State decomposition can split the provider tail into
-a nil prefix and the bump table. -/
+/-- Every boundary/provider circuit before the bump/halt tail — positions 25–51 — stays off the
+State channel; StateBump (52) and Halt (53) are, by design, the only provider-segment State
+contributors. Stated over the `take 27` prefix so the typed State decomposition can split the
+provider tail into a nil prefix and the two-table State tail. -/
 theorem sp1ProviderTables_stateChannel_not_mem :
     ∀ component ∈ (sp1ProviderTables (p := p)).take stateSilentProviderTableCount,
       Channels.stateChannel.toRaw ∉ component.circuit.channels := by
@@ -313,15 +340,17 @@ theorem sp1ProviderTables_stateChannel_not_mem :
       ProgramProviderChip.circuit, MemoryProviderChip.circuit, MemoryFinalizeChip.circuit,
       MemoryBumpChip.circuit, circuit_norm]
 
-/-- **The SP1 machine as a plain Clean `Ensemble`**: the 25 chips + the 28 boundary/provider tables,
-the four gated buses (State first — the trail's main channel), and the pull-final/push-init boundary
-verifier. Its `Statement` (per-table constraints + per-channel balance) is everything the capstone
-consumes; the per-channel soundness facts are proven separately (see the module doc). -/
+/-- **The SP1 machine as a plain Clean `Ensemble`**: the 25 chips + the 29 boundary/provider tables,
+the five native buses (State first — the trail's main channel; Exit last — the halt table's
+exit-code hand-off), and the pull-final/push-init boundary verifier. Its `Statement` (per-table
+constraints + per-channel balance) is everything the capstone consumes; the per-channel soundness
+facts are proven separately (see the module doc). -/
 def sp1Ensemble : Ensemble (ZMod p) SP1PublicIO where
   tables := sp1Tables ++ sp1ProviderTables
   channels :=
     [Channels.stateChannel.toRaw, Channels.byteChannel.toRaw,
-     Channels.programChannel.toRaw, Channels.memoryChannel.toRaw]
+     Channels.programChannel.toRaw, Channels.memoryChannel.toRaw,
+     Channels.exitChannel.toRaw]
   verifier := sp1StateVerifier
   verifier_length_zero := fun _ => rfl
 
@@ -330,7 +359,8 @@ def sp1Ensemble : Ensemble (ZMod p) SP1PublicIO where
 @[circuit_norm] lemma sp1Ensemble_channels :
     (sp1Ensemble (p := p)).channels =
       [Channels.stateChannel.toRaw, Channels.byteChannel.toRaw,
-       Channels.programChannel.toRaw, Channels.memoryChannel.toRaw] := rfl
+       Channels.programChannel.toRaw, Channels.memoryChannel.toRaw,
+       Channels.exitChannel.toRaw] := rfl
 @[circuit_norm] lemma sp1Ensemble_verifier :
     (sp1Ensemble (p := p)).verifier = sp1StateVerifier := rfl
 
@@ -346,7 +376,7 @@ theorem witness_instructionTables_aligned
       (witness.tables.take 25) := by
   unfold InstructionTablesAligned
   rw [List.forall₂_iff_get]
-  have tablesLength : witness.tables.length = 53 := by
+  have tablesLength : witness.tables.length = 54 := by
     rw [← witness.same_length]
     simp [sp1Ensemble_tables, sp1Tables_length,
       sp1ProviderTables_length]
@@ -377,7 +407,7 @@ theorem witness_instructionTables_aligned
 
 /-- Every canonical decoded instruction row satisfies the constraints of its exact physical Clean
 table row.  This is the common starting point for row-local AIR facts; downstream proofs never need
-to reopen `same_circuits` or reason positionally about the 53-table witness again. -/
+to reopen `same_circuits` or reason positionally about the 54-table witness again. -/
 theorem decodedInstructionRow_constraints
     (witness : EnsembleWitness (sp1Ensemble (p := p)))
     (constraints : witness.Constraints) (decoded : DecodedInstructionRow p)

@@ -2,6 +2,7 @@ import SP1Clean.Faithful.CoreAIR
 import SP1Clean.Faithful.MemoryBumpChip
 import SP1Clean.Faithful.StateBumpChip
 import SP1Clean.Composition.Table
+import SP1Clean.Proofs.Chips.HaltChip.Witgen
 import ToClean.Air.TableBuild
 
 /-! # Exact Core system tables transported to native Clean tables
@@ -185,26 +186,37 @@ theorem transportStateBumpTable_accesses
 
 /-! ## The exact execution witness supplies the premises -/
 
-/-- The two exact system tables transported in their native ensemble order: MemoryBump first,
-StateBump second (positions 51 and 52 of the fifty-three-table ensemble). -/
+/-- The exact v6.4.0 cluster has no Halt table (its syscall path runs through `SyscallInstrs` +
+the global syscall tables, outside the transported profile), so the exact→native transport
+supplies the native ensemble's mandatory one-padding-row Halt table directly. Its `⟨0⟩` Exit push
+balances the boundary verifier's ungated `⟨exit_code⟩` pull, which is what restricts this
+conditional transport to shards committing `exit_code = 0` — halting shards rejoin when the
+syscall cluster itself is transported (roadmap Track 3). -/
+def extractedHaltTable (data : ProverData (ZMod p)) : Table (ZMod p) :=
+  Table.build HaltChip.component (HaltChip.haltTraceInputs []) data (ProverHint.empty (ZMod p))
+
+/-- The three exact-side system tables transported in their native ensemble order: MemoryBump
+first, StateBump second, the manufactured padding Halt table last (positions 51–53 of the
+fifty-four-table ensemble). -/
 def extractedBumpTables (witness : CoreAIR.Witness (CoreAIR.Current.Row p))
     (data : ProverData (ZMod p)) : List (Table (ZMod p)) :=
   [ transportMemoryBumpTable (witness.trace.rows .memoryBump) data,
-    transportStateBumpTable (witness.trace.rows .stateBump) data ]
+    transportStateBumpTable (witness.trace.rows .stateBump) data,
+    extractedHaltTable data ]
 
-/-- The transported segment has exactly the two native bump components, in ensemble order. -/
+/-- The transported segment has exactly the three native system components, in ensemble order. -/
 theorem extractedBumpTables_components
     (witness : CoreAIR.Witness (CoreAIR.Current.Row p)) (data : ProverData (ZMod p)) :
     (extractedBumpTables witness data).map (·.component) =
-      [⟨MemoryBumpChip.circuit⟩, ⟨StateBumpChip.circuit⟩] := rfl
+      [⟨MemoryBumpChip.circuit⟩, ⟨StateBumpChip.circuit⟩, ⟨HaltChip.circuit⟩] := rfl
 
-/-- Both transported tables share the caller-selected committed prover data. -/
+/-- All transported tables share the caller-selected committed prover data. -/
 theorem extractedBumpTables_data
     (witness : CoreAIR.Witness (CoreAIR.Current.Row p)) (data : ProverData (ZMod p)) :
     ∀ table ∈ extractedBumpTables witness data, table.data = data := by
   intro table hmem
   simp only [extractedBumpTables, List.mem_cons, List.not_mem_nil, or_false] at hmem
-  rcases hmem with rfl | rfl <;> rfl
+  rcases hmem with rfl | rfl | rfl <;> rfl
 
 /-- **Closed exact-system transport.** A valid exact execution-cluster witness supplies all native
 constraints for both bump tables; there is no additional semantic or preprocessing premise. -/
@@ -220,15 +232,17 @@ theorem extractedBumpTables_constraints {Digest : Type}
     fun _ _ rowMem => (CoreAIR.Current.system binds).localValid_of_relationFor valid rowMem
   intro table hmem
   simp only [extractedBumpTables, List.mem_cons, List.not_mem_nil, or_false] at hmem
-  rcases hmem with rfl | rfl
+  rcases hmem with rfl | rfl | rfl
   · exact transportMemoryBumpTable_constraints statement.publicValues _ data
       (fun row hrow => rowValid .memoryBump row hrow)
   · exact transportStateBumpTable_constraints statement.publicValues _ data
       (fun row hrow => rowValid .stateBump row hrow)
+  · exact HaltChip.traceTable_constraints _ _ _ (HaltChip.haltTraceInputs_spec [])
 
 /-- The complete native access list of the transported bump segment is exactly the projected exact
-Rust access list of those two tables.  This is the segment-level balance-preservation statement
-needed when the whole execution cluster is assembled. -/
+Rust access list of those two tables, followed by the manufactured padding Halt table's own native
+accesses (the exact cluster has no Halt table to compare against).  This is the segment-level
+balance-preservation statement needed when the whole execution cluster is assembled. -/
 theorem extractedBumpTables_accesses {Digest : Type}
     (statement : SP1ShardStatement (ZMod p) Digest)
     (witness : CoreAIR.Witness (CoreAIR.Current.Row p))
@@ -237,9 +251,10 @@ theorem extractedBumpTables_accesses {Digest : Type}
       ((witness.trace.rows .memoryBump).flatMap fun row =>
           (CoreAIR.Current.interactions statement.publicValues .memoryBump row).map
             Extracted.Interaction.toAccess) ++
-        ((witness.trace.rows .stateBump).flatMap fun row =>
+        (((witness.trace.rows .stateBump).flatMap fun row =>
           (CoreAIR.Current.interactions statement.publicValues .stateBump row).map
-            Extracted.Interaction.toAccess) := by
+            Extracted.Interaction.toAccess) ++
+          tableNativeAccesses (extractedHaltTable data)) := by
   simp only [extractedBumpTables, List.flatMap_cons, List.flatMap_nil, List.append_nil]
   rw [transportMemoryBumpTable_accesses, transportStateBumpTable_accesses]
 

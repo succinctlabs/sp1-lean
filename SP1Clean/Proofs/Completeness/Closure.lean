@@ -125,7 +125,7 @@ closure leaves them untouched rather than quietly perturbing them.
 def preprocessedKey (key : LookupAccessList.LookupKey) : Bool :=
   match key.1 with
   | .Byte | .Program => true
-  | .Memory | .State => false
+  | .Memory | .State | .Exit => false
 
 /-- The provider ledger this trace's consumers demand: one recounted access per touched
 Byte/Program key. -/

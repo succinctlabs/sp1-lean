@@ -80,7 +80,8 @@ structure ExactNativeGlobalContract {Digest : Type}
   are deliberately absent: `exactNativeAllCleanAccesses_preprocessedBalance` derives them from the
   native recount contract. -/
   remainingIntegerBalance : ∀ channel,
-    (channel = Channels.stateChannel.toRaw ∨ channel = Channels.memoryChannel.toRaw) →
+    (channel = Channels.stateChannel.toRaw ∨ channel = Channels.memoryChannel.toRaw ∨
+      channel = Channels.exitChannel.toRaw) →
     SP1Clean.LookupAccessList.isConsistentBalanced
       (((exactNativeEnsembleWitness statement executionWitness memoryBoundaryWitness inventory data hint
         ).interactionsWith channel).map Interaction.toAccess)
@@ -97,10 +98,13 @@ private theorem instructionComponent_channels_subset
     (component : Air.Flat.Component (ZMod p))
     (componentMem : component ∈ Soundness.sp1Tables (p := p)) :
     component.circuit.channels ⊆ (Soundness.sp1Ensemble (p := p)).channels := by
-  rw [Soundness.sp1Ensemble_channels]
   simp only [Soundness.sp1Tables, List.mem_map] at componentMem
   obtain ⟨chip, chipMem, rfl⟩ := componentMem
-  exact Soundness.supportedChip_usesSupportedBusChannels chip chipMem
+  refine List.Subset.trans (Soundness.supportedChip_usesSupportedBusChannels chip chipMem) ?_
+  rw [Soundness.sp1Ensemble_channels]
+  intro c hc
+  simp only [List.mem_cons, List.not_mem_nil, or_false] at hc ⊢
+  tauto
 
 /-- Every native provider/boundary component also declares only the four ensemble channels. -/
 private theorem providerComponent_channels_subset
@@ -121,7 +125,7 @@ private theorem providerComponent_channels_subset
   · fin_cases componentMem <;>
       simp [GeneralFormalCircuit.channels, ProgramProviderChip.circuit,
         MemoryProviderChip.circuit, MemoryFinalizeChip.circuit, MemoryBumpChip.circuit,
-        StateBumpChip.circuit, circuit_norm]
+        StateBumpChip.circuit, HaltChip.circuit, circuit_norm]
 
 /-- Every component of the concrete native ensemble is statically confined to its four channels. -/
 private theorem ensembleComponent_channels_subset
@@ -133,7 +137,8 @@ private theorem ensembleComponent_channels_subset
   · change (Soundness.sp1StateVerifier (p := p)).channels ⊆ _
     rw [GeneralFormalCircuit.channels,
       show (Soundness.sp1StateVerifier (p := p)).channelsWithGuarantees =
-        [Channels.stateChannel.toRaw, Channels.byteChannel.toRaw] from rfl,
+        [Channels.stateChannel.toRaw, Channels.byteChannel.toRaw,
+         Channels.exitChannel.toRaw] from rfl,
       show (Soundness.sp1StateVerifier (p := p)).channelsWithRequirements = [] from rfl,
       Soundness.sp1Ensemble_channels]
     simp
@@ -181,11 +186,12 @@ private theorem channel_eq_byte_of_mem_of_kind
     channel = Channels.byteChannel.toRaw := by
   rw [Soundness.sp1Ensemble_channels] at channelMem
   simp only [List.mem_cons, List.not_mem_nil, or_false] at channelMem
-  rcases channelMem with rfl | rfl | rfl | rfl
+  rcases channelMem with rfl | rfl | rfl | rfl | rfl
   · simp [kindOf, Channel.toRaw_name, Channels.stateChannel] at kindEq
   · rfl
   · simp [kindOf, Channel.toRaw_name, Channels.programChannel] at kindEq
   · simp [kindOf, Channel.toRaw_name, Channels.memoryChannel] at kindEq
+  · simp [kindOf, Channel.toRaw_name, Channels.exitChannel] at kindEq
 
 /-- Within the registered four-channel universe, `kindOf = Program` identifies Program. -/
 private theorem channel_eq_program_of_mem_of_kind
@@ -195,11 +201,12 @@ private theorem channel_eq_program_of_mem_of_kind
     channel = Channels.programChannel.toRaw := by
   rw [Soundness.sp1Ensemble_channels] at channelMem
   simp only [List.mem_cons, List.not_mem_nil, or_false] at channelMem
-  rcases channelMem with rfl | rfl | rfl | rfl
+  rcases channelMem with rfl | rfl | rfl | rfl | rfl
   · simp [kindOf, Channel.toRaw_name, Channels.stateChannel] at kindEq
   · simp [kindOf, Channel.toRaw_name, Channels.byteChannel] at kindEq
   · rfl
   · simp [kindOf, Channel.toRaw_name, Channels.memoryChannel] at kindEq
+  · simp [kindOf, Channel.toRaw_name, Channels.exitChannel] at kindEq
 
 /-- If a channel kind uniquely identifies `channel` in the evaluated full interaction list, then
 the channel's access ledger is exactly the corresponding kind-filter of the full access ledger. -/
@@ -332,13 +339,14 @@ theorem exactNativeEnsembleWitness_balancedChannels {Digest : Type}
     have channelCase := channelMem
     rw [Soundness.sp1Ensemble_channels] at channelCase
     simp only [List.mem_cons, List.not_mem_nil, or_false] at channelCase
-    rcases channelCase with state | byte | program | memory
+    rcases channelCase with state | byte | program | memory | exit
     · exact global.remainingIntegerBalance channel (Or.inl state)
     · exact exactNativeEnsembleWitness_preprocessedIntegerBalance statement executionWitness
         memoryBoundaryWitness inventory data hint recount channel (Or.inl byte)
     · exact exactNativeEnsembleWitness_preprocessedIntegerBalance statement executionWitness
         memoryBoundaryWitness inventory data hint recount channel (Or.inr program)
-    · exact global.remainingIntegerBalance channel (Or.inr memory)
+    · exact global.remainingIntegerBalance channel (Or.inr (Or.inl memory))
+    · exact global.remainingIntegerBalance channel (Or.inr (Or.inr exit))
   change BalancedInteractions
     ((exactNativeEnsembleWitness statement executionWitness memoryBoundaryWitness inventory data hint
       ).allTablesWitness.interactionsWith channel)

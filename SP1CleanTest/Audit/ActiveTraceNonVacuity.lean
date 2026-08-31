@@ -22,7 +22,7 @@ namespace SP1Clean.Audit.ActiveTraceNonVacuity
 open Air.Flat Circuit
 open SP1Clean SP1Clean.TraceGen SP1Clean.TraceGenTests SP1Clean.Soundness
 open SP1Clean.Execution
-open SP1Clean.Channels (stateChannel byteChannel programChannel memoryChannel)
+open SP1Clean.Channels (stateChannel byteChannel programChannel memoryChannel exitChannel)
 open SP1Clean.Ledger (SignedMults pushedMessages pulledMessages)
 open SP1Clean.Audit.JointNonVacuity
 open SP1Clean.Audit.TraceNonVacuity (anchorHint)
@@ -115,6 +115,9 @@ def activeProviderOccurrences : (id : ProviderTableId) → List id.Occurrence
   | .memoryFinalize => [activeMemoryFinalize]
   | .memoryBump => []
   | .stateBump => []
+  -- `Occurrence .halt = Empty`: the Halt table still carries its mandatory single padding row,
+  -- whose anti-gated `⟨0⟩` Exit push balances the boundary verifier's ungated `⟨exit_code⟩` pull.
+  | .halt => []
 
 /-! ## The hand-assembled trace source -/
 
@@ -283,6 +286,7 @@ theorem activeTrace_wellFormed : activeTrace.WellFormed where
         change True
         trivial
     | memoryBump | stateBump => simp [activeTrace, activeProviderOccurrences] at he
+    | halt => exact e.elim
   boundary := boundaryInputs_limbBounds _ _ _ _
 
 /-! ## Circuit-built provider tables -/
@@ -360,7 +364,8 @@ private def activeTableGroup3 : List (Table (ZMod SP1Prime)) :=
 private def activeTableGroup4 : List (Table (ZMod SP1Prime)) :=
   [activeProgramBuilt, activeMemoryInitBuilt, activeMemoryFinalizeBuilt,
    Table.build MemoryBumpChip.component [] anchorData anchorHint,
-   Table.build StateBumpChip.component [] anchorData anchorHint]
+   Table.build StateBumpChip.component [] anchorData anchorHint,
+   TraceNonVacuity.haltBuilt]
 
 private def activeGroupedTables : List (Table (ZMod SP1Prime)) :=
   activeTableGroup0 ++
@@ -445,9 +450,10 @@ private theorem activeTableGroup4_interactionsWith (ch : RawChannel (ZMod SP1Pri
     activeTableGroup4.flatMap (·.interactionsWith ch) =
       activeProgramBuilt.interactionsWith ch ++
         (activeMemoryInitBuilt.interactionsWith ch ++
-          (activeMemoryFinalizeBuilt.interactionsWith ch ++ [])) := by
+          (activeMemoryFinalizeBuilt.interactionsWith ch ++
+            haltPaddingTable.interactionsWith ch)) := by
   simp only [activeTableGroup4, List.flatMap_cons, List.flatMap_nil,
-    TraceNonVacuity.nilTable, List.append_nil]
+    TraceNonVacuity.nilTable, TraceNonVacuity.haltBuilt_eq, List.append_nil, List.nil_append]
 
 theorem activeTrace_interactionsWith_split (ch : RawChannel (ZMod SP1Prime)) :
     activeTrace.witness.interactionsWith ch =
@@ -459,7 +465,8 @@ theorem activeTrace_interactionsWith_split (ch : RawChannel (ZMod SP1Prime)) :
                 (activeRange16Built.interactionsWith ch ++
                   (activeProgramBuilt.interactionsWith ch ++
                     (activeMemoryInitBuilt.interactionsWith ch ++
-                      (activeMemoryFinalizeBuilt.interactionsWith ch ++ [])))))))) := by
+                      (activeMemoryFinalizeBuilt.interactionsWith ch ++
+                        haltPaddingTable.interactionsWith ch)))))))) := by
   show (activeTrace.witness.verifierTable :: activeTrace.tables).flatMap
     (·.interactionsWith ch) = _
   rw [List.flatMap_cons]
@@ -555,6 +562,17 @@ theorem activeTrace_verifierMemory_nil :
   rw [typedTableInteractionsWith_raw] at h
   simpa using h
 
+/-- The verifier row's Exit view: the single ungated `⟨exit_code⟩` pull.  `boundaryInputs` commits
+`exit_code = 0`, so this is a `-1` pull of `⟨0⟩`. -/
+theorem activeTrace_verifierExit :
+    activeTrace.witness.verifierTable.interactionsWith exitChannel.toRaw =
+      [exitChannel.pulledIfValue 1
+        (⟨activeTrace.publicValues.exit_code⟩ : Channels.ExitMsg (ZMod SP1Prime))] := by
+  have h := congrArg (List.map TypedInteraction.raw)
+    (witness_verifierExitInteractions_eq (p := SP1Prime) activeTrace.witness)
+  rw [typedTableInteractionsWith_raw] at h
+  simpa using h
+
 def activeVerifierByteInteractions : List (Interaction (ZMod SP1Prime)) :=
   (verifierBytePulls (varFromOffset SP1PublicIO 0)).map
     (AbstractInteraction.eval (Environment.fromInput activeTrace.publicValues anchorData))
@@ -638,7 +656,13 @@ theorem activeJalBuilt_memoryInteractions :
   apply activeJalBuilt_interactionsWith
   exact JalChip.interactionsWith_memory_eq _ _
 
-/-! ## Four-bus balance -/
+theorem activeJalBuilt_exitInteractions_nil :
+    activeJalBuilt.interactionsWith exitChannel.toRaw = [] := by
+  apply Table.interactionsWith_nil_of_channel_not_mem
+  show exitChannel.toRaw ∉ (JalChip.circuit (p := SP1Prime)).channels
+  simp [GeneralFormalCircuit.channels, JalChip.circuit, circuit_norm]
+
+/-! ## Five-bus balance -/
 
 def activeStateLedger : List (Interaction (ZMod SP1Prime)) :=
   [stateChannel.pulledIfValue 1
@@ -662,8 +686,16 @@ def activeMemoryLedger : List (Interaction (ZMod SP1Prime)) :=
   activeJalMemoryInteractions ++ activeMemoryInitBuilt.interactions ++
     activeMemoryFinalizeBuilt.interactions
 
+/-- The verifier's ungated Exit pull of the committed `exit_code = 0`, followed by the Halt padding
+row's two pushes (the reduced word at multiplicity `0`, the zero code at multiplicity `1`). -/
+def activeExitLedger : List (Interaction (ZMod SP1Prime)) :=
+  [exitChannel.pulledIfValue 1
+      (⟨activeTrace.publicValues.exit_code⟩ : Channels.ExitMsg (ZMod SP1Prime))] ++
+    haltExitInteractions
+
 theorem activeTrace_stateInteractions :
-    activeTrace.witness.interactionsWith stateChannel.toRaw = activeStateLedger := by
+    activeTrace.witness.interactionsWith stateChannel.toRaw =
+      activeStateLedger ++ haltPaddingTable.interactionsWith stateChannel.toRaw := by
   rw [activeTrace_interactionsWith_split, activeTrace_verifierState,
     activeJalBuilt_stateInteractions,
     interactionsWith_nil_of_single_channel activeU8Built byteChannel.toRaw activeU8Built_channels
@@ -680,10 +712,11 @@ theorem activeTrace_stateInteractions :
       activeMemoryInitBuilt_channels (of_eq_false Channels.stateChannel_eq_memoryChannel_false),
     interactionsWith_nil_of_single_channel activeMemoryFinalizeBuilt memoryChannel.toRaw
       activeMemoryFinalizeBuilt_channels (of_eq_false Channels.stateChannel_eq_memoryChannel_false)]
-  simp only [activeStateLedger, List.append_nil]
+  simp only [activeStateLedger, List.nil_append, List.append_assoc]
 
 theorem activeTrace_byteInteractions :
-    activeTrace.witness.interactionsWith byteChannel.toRaw = activeByteLedger := by
+    activeTrace.witness.interactionsWith byteChannel.toRaw =
+      activeByteLedger ++ haltPaddingTable.interactionsWith byteChannel.toRaw := by
   rw [activeTrace_interactionsWith_split, activeTrace_verifierByte,
     activeJalBuilt_byteInteractions,
     table_interactionsWith_eq_interactions activeU8Built_channels,
@@ -696,10 +729,11 @@ theorem activeTrace_byteInteractions :
       activeMemoryInitBuilt_channels (of_eq_false Channels.byteChannel_eq_memoryChannel_false),
     interactionsWith_nil_of_single_channel activeMemoryFinalizeBuilt memoryChannel.toRaw
       activeMemoryFinalizeBuilt_channels (of_eq_false Channels.byteChannel_eq_memoryChannel_false)]
-  simp only [activeByteLedger, List.append_nil, List.append_assoc]
+  simp only [activeByteLedger, List.nil_append, List.append_assoc]
 
 theorem activeTrace_programInteractions :
-    activeTrace.witness.interactionsWith programChannel.toRaw = activeProgramLedger := by
+    activeTrace.witness.interactionsWith programChannel.toRaw =
+      activeProgramLedger ++ haltPaddingTable.interactionsWith programChannel.toRaw := by
   rw [activeTrace_interactionsWith_split, activeTrace_verifierProgram_nil,
     activeJalBuilt_programInteractions,
     interactionsWith_nil_of_single_channel activeU8Built byteChannel.toRaw activeU8Built_channels
@@ -717,10 +751,11 @@ theorem activeTrace_programInteractions :
     interactionsWith_nil_of_single_channel activeMemoryFinalizeBuilt memoryChannel.toRaw
       activeMemoryFinalizeBuilt_channels
       (Ne.symm (of_eq_false Channels.memoryChannel_eq_programChannel_false))]
-  simp only [activeProgramLedger, List.append_nil, List.nil_append]
+  simp only [activeProgramLedger, List.nil_append, List.append_assoc]
 
 theorem activeTrace_memoryInteractions :
-    activeTrace.witness.interactionsWith memoryChannel.toRaw = activeMemoryLedger := by
+    activeTrace.witness.interactionsWith memoryChannel.toRaw =
+      activeMemoryLedger ++ haltPaddingTable.interactionsWith memoryChannel.toRaw := by
   rw [activeTrace_interactionsWith_split, activeTrace_verifierMemory_nil,
     activeJalBuilt_memoryInteractions,
     interactionsWith_nil_of_single_channel activeU8Built byteChannel.toRaw activeU8Built_channels
@@ -735,7 +770,31 @@ theorem activeTrace_memoryInteractions :
       activeProgramBuilt_channels (of_eq_false Channels.memoryChannel_eq_programChannel_false),
     table_interactionsWith_eq_interactions activeMemoryInitBuilt_channels,
     table_interactionsWith_eq_interactions activeMemoryFinalizeBuilt_channels]
-  simp only [activeMemoryLedger, List.append_nil, List.nil_append, List.append_assoc]
+  simp only [activeMemoryLedger, List.nil_append, List.append_assoc]
+
+/-- The shard's Exit view: only the verifier's ungated pull and the Halt padding row's pushes; the
+JAL row and every byte/program/memory provider are silent on the Exit bus. -/
+theorem activeTrace_exitInteractions :
+    activeTrace.witness.interactionsWith exitChannel.toRaw = activeExitLedger := by
+  rw [activeTrace_interactionsWith_split, activeTrace_verifierExit,
+    activeJalBuilt_exitInteractions_nil,
+    interactionsWith_nil_of_single_channel activeU8Built byteChannel.toRaw activeU8Built_channels
+      (of_eq_false Channels.exitChannel_eq_byteChannel_false),
+    interactionsWith_nil_of_single_channel activeRange13Built byteChannel.toRaw
+      activeRange13Built_channels (of_eq_false Channels.exitChannel_eq_byteChannel_false),
+    interactionsWith_nil_of_single_channel activeRange14Built byteChannel.toRaw
+      activeRange14Built_channels (of_eq_false Channels.exitChannel_eq_byteChannel_false),
+    interactionsWith_nil_of_single_channel activeRange16Built byteChannel.toRaw
+      activeRange16Built_channels (of_eq_false Channels.exitChannel_eq_byteChannel_false),
+    interactionsWith_nil_of_single_channel activeProgramBuilt programChannel.toRaw
+      activeProgramBuilt_channels (of_eq_false Channels.exitChannel_eq_programChannel_false),
+    interactionsWith_nil_of_single_channel activeMemoryInitBuilt memoryChannel.toRaw
+      activeMemoryInitBuilt_channels (of_eq_false Channels.exitChannel_eq_memoryChannel_false),
+    interactionsWith_nil_of_single_channel activeMemoryFinalizeBuilt memoryChannel.toRaw
+      activeMemoryFinalizeBuilt_channels
+      (of_eq_false Channels.exitChannel_eq_memoryChannel_false),
+    haltPaddingTable_exit]
+  simp only [activeExitLedger, List.nil_append]
 
 theorem activeStateLedger_length : activeStateLedger.length = 4 := by native_decide
 theorem activeByteLedger_length : activeByteLedger.length = 46 := by native_decide
@@ -765,6 +824,39 @@ theorem activeProgramLedger_perm :
 
 theorem activeMemoryLedger_perm :
     (pushedMessages activeMemoryLedger).Perm (pulledMessages activeMemoryLedger) := by native_decide
+
+theorem activeExitLedger_length : activeExitLedger.length = 3 := by native_decide
+
+theorem activeExitLedger_signed : SignedMults activeExitLedger := by
+  exact (by native_decide : ∀ i ∈ activeExitLedger, i.mult = 0 ∨ i.mult = 1 ∨ i.mult = -1)
+
+theorem activeExitLedger_perm :
+    (pushedMessages activeExitLedger).Perm (pulledMessages activeExitLedger) := by native_decide
+
+/-- The active shard's ledger conditions survive appending the Halt padding row's gated-off view of
+a non-Exit channel: its entries are multiplicity zero, hence signed bits absent from both
+`pushedMessages` and `pulledMessages`, and at most nineteen in number.  (The `anchorTrace` sibling
+is `TraceNonVacuity.balancedOn_append_halt`.) -/
+private theorem activeBalancedOn_append_halt {ch : RawChannel (ZMod SP1Prime)}
+    {l : List (Interaction (ZMod SP1Prime))}
+    (heq : activeTrace.witness.interactionsWith ch = l ++ haltPaddingTable.interactionsWith ch)
+    (hname : ch.name ≠ "SP1Exit") (hlen : l.length < 100) (hbin : SignedMults l)
+    (hperm : (pushedMessages l).Perm (pulledMessages l)) :
+    activeTrace.BalancedOn ch := by
+  have hzero := haltPaddingTable_mult_zero hname
+  refine activeTrace.balancedOn_of_signed_perm ch ?_ ?_ ?_ <;> rw [heq]
+  · have h19 := haltPaddingTable_interactionsWith_length ch
+    have hp : (119 : ℕ) < SP1Prime := by norm_num [SP1Prime]
+    rw [List.length_append]
+    omega
+  · intro i hi
+    rcases List.mem_append.mp hi with h | h
+    · exact hbin i h
+    · exact Or.inl (hzero i h)
+  · rw [Ledger.pushedMessages_append, Ledger.pulledMessages_append,
+      TraceNonVacuity.pushedMessages_nil_of_mult_zero hzero,
+      TraceNonVacuity.pulledMessages_nil_of_mult_zero hzero, List.append_nil, List.append_nil]
+    exact hperm
 
 /-! ### The provider closure, checked against a real shard
 
@@ -822,35 +914,30 @@ theorem activeTrace_balanced : activeTrace.Balanced := by
   intro channel hchannel
   rw [sp1Ensemble_channels] at hchannel
   simp only [List.mem_cons, List.not_mem_nil, or_false] at hchannel
-  rcases hchannel with rfl | rfl | rfl | rfl
-  · apply activeTrace.balancedOn_of_signed_perm stateChannel.toRaw
-    · rw [activeTrace_stateInteractions, activeStateLedger_length]
+  rcases hchannel with rfl | rfl | rfl | rfl | rfl
+  · exact activeBalancedOn_append_halt activeTrace_stateInteractions
+      (by simp only [Channel.toRaw_name, Channels.stateChannel]; decide)
+      (by rw [activeStateLedger_length]; norm_num)
+      activeStateLedger_signed activeStateLedger_perm
+  · exact activeBalancedOn_append_halt activeTrace_byteInteractions
+      (by simp only [Channel.toRaw_name, Channels.byteChannel]; decide)
+      (by rw [activeByteLedger_length]; norm_num)
+      activeByteLedger_signed activeByteLedger_perm
+  · exact activeBalancedOn_append_halt activeTrace_programInteractions
+      (by simp only [Channel.toRaw_name, Channels.programChannel]; decide)
+      (by rw [activeProgramLedger_length]; norm_num)
+      activeProgramLedger_signed activeProgramLedger_perm
+  · exact activeBalancedOn_append_halt activeTrace_memoryInteractions
+      (by simp only [Channel.toRaw_name, Channels.memoryChannel]; decide)
+      (by rw [activeMemoryLedger_length]; norm_num)
+      activeMemoryLedger_signed activeMemoryLedger_perm
+  · apply activeTrace.balancedOn_of_signed_perm exitChannel.toRaw
+    · rw [activeTrace_exitInteractions, activeExitLedger_length]
       norm_num [SP1Prime]
-    · rw [activeTrace_stateInteractions]
-      exact activeStateLedger_signed
-    · rw [activeTrace_stateInteractions]
-      exact activeStateLedger_perm
-  · apply activeTrace.balancedOn_of_signed_perm byteChannel.toRaw
-    · rw [activeTrace_byteInteractions, activeByteLedger_length]
-      norm_num [SP1Prime]
-    · rw [activeTrace_byteInteractions]
-      exact activeByteLedger_signed
-    · rw [activeTrace_byteInteractions]
-      exact activeByteLedger_perm
-  · apply activeTrace.balancedOn_of_signed_perm programChannel.toRaw
-    · rw [activeTrace_programInteractions, activeProgramLedger_length]
-      norm_num [SP1Prime]
-    · rw [activeTrace_programInteractions]
-      exact activeProgramLedger_signed
-    · rw [activeTrace_programInteractions]
-      exact activeProgramLedger_perm
-  · apply activeTrace.balancedOn_of_signed_perm memoryChannel.toRaw
-    · rw [activeTrace_memoryInteractions, activeMemoryLedger_length]
-      norm_num [SP1Prime]
-    · rw [activeTrace_memoryInteractions]
-      exact activeMemoryLedger_signed
-    · rw [activeTrace_memoryInteractions]
-      exact activeMemoryLedger_perm
+    · rw [activeTrace_exitInteractions]
+      exact activeExitLedger_signed
+    · rw [activeTrace_exitInteractions]
+      exact activeExitLedger_perm
 
 /-! ## Semantic provider binding -/
 
@@ -998,12 +1085,12 @@ theorem activeTrace_programProviderBound : ProgramProviderBound activeTrace.witn
     { raw := programChannel.pushedIfValue 1 activeProgramMessage
       channel_eq :=
         (programProviderTable activeTrace.witness).channel_eq_of_mem_interactionsWith member }
-  change Semantics.ProgTruth typed.message anchorData
+  change Semantics.CommittedProgTruth typed.message anchorData
   have message_eq : typed.message = activeProgramMessage := by
     rw [TypedInteraction.message_eq_iff]
     rfl
   rw [message_eq]
-  refine ⟨?_, ?_⟩
+  refine Semantics.ProgTruth.committed ⟨?_, ?_⟩
   · norm_num [Channels.ProgramMsg.RowSpec, activeProgramMessage]
     native_decide
   rw [activeProgramMessage_jalView]

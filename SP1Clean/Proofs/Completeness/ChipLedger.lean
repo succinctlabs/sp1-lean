@@ -152,6 +152,68 @@ theorem stateLedger_eq_channelLedger (trace : SupportedCoreTraceWitness p) :
       (trace.witness.interactionsWith (stateChannel (p := p)).toRaw).map Interaction.toAccess :=
   busLedger_eq_channelLedger trace _ (by simp [sp1Ensemble_channels]) InteractionKind.State rfl
 
+set_option linter.unusedSectionVars false in
+/-- The stable halt position of an assembled witness is its generated Halt table. -/
+theorem SupportedCoreTraceWitness.haltTable_witness
+    (trace : SupportedCoreTraceWitness p) :
+    haltTable trace.witness = trace.providerTableFor .halt := by
+  unfold haltTable SupportedCoreTraceWitness.witness
+  simp [SupportedCoreTraceWitness.tables, SupportedCoreTraceWitness.instructionTables,
+    SupportedCoreTraceWitness.providerTables, haltIndex, instructionTableCount,
+    stateSilentProviderTableCount, InstructionChipId.all, ProviderTableId.all,
+    ByteProviderId.all]
+
+omit [Fact (2 ^ 25 < p)] in
+@[simp] theorem haltRow_buildRow
+    (inputs : List (HaltChip.Inputs (ZMod p)))
+    (input : HaltChip.Inputs (ZMod p)) (data : ProverData (ZMod p))
+    (hint : ProverHint (ZMod p)) :
+    haltRow (Table.build HaltChip.component inputs data hint)
+        (HaltChip.component.buildRow input data hint) = input := by
+  unfold haltRow
+  change HaltChip.component.rowInput
+      (Environment.fromArray (HaltChip.component.buildRow input data hint) data) = input
+  exact HaltChip.component.rowInput_buildRow input data data hint
+
+/-- **The compiled trace's Halt table is exactly the padding row.**  The deterministic compiler
+emits no halt event yet (`Occurrence .halt := Empty`), so its Halt table is the one all-zero
+padding row: the exit hand-off pushes the zero code, which is what balances the state-boundary
+verifier's ungated `⟨exit_code⟩` pull on the ordinary sub-language. -/
+theorem SupportedCoreTraceWitness.haltTablePadding
+    (trace : SupportedCoreTraceWitness p) :
+    (haltTable trace.witness).table.length = 1 ∧
+      ∀ row ∈ (haltTable trace.witness).table,
+        (haltRow (haltTable trace.witness) row).is_real = 0 := by
+  have htab : (haltTable trace.witness).table =
+      [HaltChip.component.buildRow (HaltChip.paddingInputs (p := p)) trace.data trace.hint] := by
+    have hocc : trace.providerOccurrences ProviderTableId.halt = [] := by
+      cases h : trace.providerOccurrences ProviderTableId.halt with
+      | nil => rfl
+      | cons e _ => exact e.elim
+    rw [trace.haltTable_witness]
+    simp only [SupportedCoreTraceWitness.providerTableFor, Table.build_table, hocc]
+    rfl
+  refine ⟨by rw [htab]; rfl, ?_⟩
+  intro row rowMem
+  rw [htab, List.mem_singleton] at rowMem
+  subst rowMem
+  rw [trace.haltTable_witness]
+  change (haltRow (Table.build HaltChip.component
+    (HaltChip.haltTraceInputs (trace.providerOccurrences .halt)) trace.data trace.hint)
+      (HaltChip.component.buildRow (HaltChip.paddingInputs (p := p)) trace.data trace.hint)
+        ).is_real = 0
+  rw [haltRow_buildRow]
+  rfl
+
+/-- The compiled trace has no active Halt row: its Halt table is the padding row. -/
+theorem SupportedCoreTraceWitness.realHaltRows_nil (trace : SupportedCoreTraceWitness p) :
+    realHaltRows trace.witness = [] := by
+  obtain ⟨-, hpad⟩ := trace.haltTablePadding
+  rw [realHaltRows, List.filter_eq_nil_iff]
+  intro row rowMem
+  simp only [decide_eq_true_eq, hpad row rowMem]
+  exact zero_ne_one
+
 /-- The Memory instance — the same fact, and the reason the Memory half of the sweep is not the
 ten-family assembly it looked like. -/
 theorem memoryLedger_eq_channelLedger (trace : SupportedCoreTraceWitness p) :
@@ -205,7 +267,9 @@ theorem active_stateLedger_eq (trace : SupportedCoreTraceWitness p)
         (d.toChipRow trace.witness.data).is_real = 1)
     (hbump : ∀ row ∈ (stateBumpTable trace.witness).table,
       (stateBumpRow (stateBumpTable trace.witness) row).is_real = 0 ∨
-        (stateBumpRow (stateBumpTable trace.witness) row).is_real = 1) :
+        (stateBumpRow (stateBumpTable trace.witness) row).is_real = 1)
+    (hhalt : ∀ row ∈ (haltTable trace.witness).table,
+      (haltRow (haltTable trace.witness) row).is_real = 0) :
     active trace.stateLedger =
       ([accessAt (stateFinalToken trace) (-1), accessAt (stateInitToken trace) 1] ++
         (stateInstrLinks trace).flatMap fun l => linkAccesses l.1 l.2) ++
@@ -240,11 +304,25 @@ theorem active_stateLedger_eq (trace : SupportedCoreTraceWitness p)
     rcases hbump row hrow with h | h <;> rw [h]
     · exact Or.inl h0
     · exact Or.inr h1
+  have hgateHalt : ∀ row ∈ (haltTable trace.witness).table,
+      signedVal (haltRow (haltTable trace.witness) row).is_real = 0 ∨
+        signedVal (haltRow (haltTable trace.witness) row).is_real = 1 := by
+    intro row hrow
+    rw [hhalt row hrow]
+    exact Or.inl h0
+  have hfilterHalt : ((haltTable trace.witness).table.filter fun row =>
+      signedVal (haltRow (haltTable trace.witness) row).is_real = 1) = [] := by
+    rw [List.filter_eq_nil_iff]
+    intro row hrow
+    rw [hhalt row hrow, h0]
+    decide
   simp only [signedVal_neg hp]
   rw [active_flatMap_gatedPair _ _ _ _ hgateInstr,
-    active_flatMap_gatedPair _ _ _ _ hgateBump]
+    active_flatMap_gatedPair _ _ _ _ hgateBump,
+    active_flatMap_gatedPair _ _ _ _ hgateHalt, hfilterHalt]
   simp only [stateInstrLinks, stateBumpLinks, stateInitToken, stateFinalToken,
-    List.flatMap_map, active, List.filter_cons, multOf_accessAt, List.filter_nil]
+    List.flatMap_map, List.flatMap_nil, List.append_nil, active, List.filter_cons,
+    multOf_accessAt, List.filter_nil]
   norm_num
 
 /-- **The State bus's ledger is its tokens' complete lives.**
@@ -263,12 +341,15 @@ theorem stateLedger_perm_handoff (trace : SupportedCoreTraceWitness p)
     (hbump : ∀ row ∈ (stateBumpTable trace.witness).table,
       (stateBumpRow (stateBumpTable trace.witness) row).is_real = 0 ∨
         (stateBumpRow (stateBumpTable trace.witness) row).is_real = 1)
+    (hhalt : ∀ row ∈ (haltTable trace.witness).table,
+      (haltRow (haltTable trace.witness) row).is_real = 0)
     (hchain : IsHandoffChain (stateInitToken trace)
       (stateInstrLinks trace ++ stateBumpLinks trace) (stateFinalToken trace)) :
     (active trace.stateLedger).Perm
       (handoff (stateInitToken trace ::
         (stateInstrLinks trace ++ stateBumpLinks trace).map Prod.snd)) := by
-  rw [active_stateLedger_eq trace hbinary hbump, List.append_assoc, ← List.flatMap_append]
+  rw [active_stateLedger_eq trace hbinary hbump hhalt, List.append_assoc,
+    ← List.flatMap_append]
   exact List.Perm.trans (List.Perm.swap _ _ _)
     (chainLedger_perm_handoff _ _ _ hchain)
 
@@ -308,8 +389,10 @@ theorem memoryLedger_eq (trace : SupportedCoreTraceWitness p) :
             (Channels.memoryChannel (p := p))).map fun i => Interaction.toAccess i.raw) ++
         (((typedTableInteractionsWith (memoryFinalizeProviderTable trace.witness)
               (Channels.memoryChannel (p := p))).map fun i => Interaction.toAccess i.raw) ++
-          ((typedTableInteractionsWith (memoryBumpTable trace.witness)
-              (Channels.memoryChannel (p := p))).map fun i => Interaction.toAccess i.raw))) := by
+          (((typedTableInteractionsWith (memoryBumpTable trace.witness)
+              (Channels.memoryChannel (p := p))).map fun i => Interaction.toAccess i.raw) ++
+            ((typedTableInteractionsWith (haltTable trace.witness)
+              (Channels.memoryChannel (p := p))).map fun i => Interaction.toAccess i.raw)))) := by
   rw [memoryLedger_eq_channelLedger, ← typedEnsembleInteractionsWith_raw,
     typedEnsembleMemoryInteractions_eq]
   simp only [List.map_append, List.map_map, Function.comp_def,
@@ -351,12 +434,14 @@ theorem stateLedger_perm_handoff_singleChain (trace : SupportedCoreTraceWitness 
     (hbump : ∀ row ∈ (stateBumpTable trace.witness).table,
       (stateBumpRow (stateBumpTable trace.witness) row).is_real = 0 ∨
         (stateBumpRow (stateBumpTable trace.witness) row).is_real = 1)
+    (hhalt : ∀ row ∈ (haltTable trace.witness).table,
+      (haltRow (haltTable trace.witness) row).is_real = 0)
     (hchain : IsHandoffChain (stateInitToken trace)
       (stateInstrLinks trace ++ stateBumpLinks trace) (stateFinalToken trace)) :
     (active trace.stateLedger).Perm
       (handoff (chainTokens (stateInitToken trace,
         stateInstrLinks trace ++ stateBumpLinks trace, stateFinalToken trace))) :=
-  stateLedger_perm_handoff trace hbinary hbump hchain
+  stateLedger_perm_handoff trace hbinary hbump hhalt hchain
 
 /-- **The State hand-off in chronological form.**
 
@@ -375,6 +460,8 @@ theorem stateLedger_perm_handoff_chronological (trace : SupportedCoreTraceWitnes
     (hbump : ∀ row ∈ (stateBumpTable trace.witness).table,
       (stateBumpRow (stateBumpTable trace.witness) row).is_real = 0 ∨
         (stateBumpRow (stateBumpTable trace.witness) row).is_real = 1)
+    (hhalt : ∀ row ∈ (haltTable trace.witness).table,
+      (haltRow (haltTable trace.witness) row).is_real = 0)
     (links : List (LookupKey × LookupKey))
     (hregroup : (stateInstrLinks trace ++ stateBumpLinks trace).Perm links)
     (hchain : IsHandoffChain (stateInitToken trace) links (stateFinalToken trace)) :
@@ -385,7 +472,8 @@ theorem stateLedger_perm_handoff_chronological (trace : SupportedCoreTraceWitnes
           fun link => linkAccesses link.1 link.2).Perm
         (links.flatMap fun link => linkAccesses link.1 link.2) :=
     hregroup.flatMap fun _ _ => List.Perm.refl _
-  rw [active_stateLedger_eq trace hbinary hbump, List.append_assoc, ← List.flatMap_append]
+  rw [active_stateLedger_eq trace hbinary hbump hhalt, List.append_assoc,
+    ← List.flatMap_append]
   refine (linkLedgerPerm.append_left _).trans ?_
   exact (List.Perm.swap _ _ _).trans (chainLedger_perm_handoff _ _ _ hchain)
 

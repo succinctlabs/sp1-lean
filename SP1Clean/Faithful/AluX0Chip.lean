@@ -477,7 +477,8 @@ theorem aluX0Chip_interactions_faithful
             signedVal (Expression.eval env (-gate))) :=
     fun gate msg => toAccess_pullIf_program env gate msg
   refine List.Perm.trans (List.Perm.of_eq ?_)
-    (LookupAccessList.perm_filter_by_kind _).symm
+    (LookupAccessList.perm_filter_by_kind_of_exit_nil _
+      (Extracted.map_toAccess_exit_filter _)).symm
   simp only [AluX0Chip.exposedStateInteractions, AluX0Chip.exposedByteInteractions,
     AluX0Chip.exposedMemoryInteractions, AluX0Chip.exposedProgramInteractions,
     List.map_cons, List.map_nil, hStatePull, hStatePush, hBytePull,

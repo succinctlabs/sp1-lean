@@ -24,6 +24,9 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.DivRemChip.contractSoundness
 #print axioms SP1Clean.DivRemChip.soundness
 #print axioms SP1Clean.DivRemChip.circuit
+#print axioms SP1Clean.HaltChip.soundness
+#print axioms SP1Clean.HaltChip.completeness
+#print axioms SP1Clean.HaltChip.circuit
 #print axioms SP1Clean.JalChip.soundness
 #print axioms SP1Clean.JalChip.completeness
 #print axioms SP1Clean.JalChip.circuit
@@ -716,6 +719,7 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Soundness.sp1StateVerifier_completeness
 #print axioms SP1Clean.Soundness.sp1StateVerifier
 #print axioms SP1Clean.Soundness.sp1StateVerifierMain_stateInteractions
+#print axioms SP1Clean.Soundness.sp1StateVerifierMain_exitInteractions
 #print axioms SP1Clean.Soundness.sp1Tables
 #print axioms SP1Clean.Soundness.sp1Tables_length
 #print axioms SP1Clean.Soundness.sp1RangeProviderTables
@@ -735,7 +739,17 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Soundness.supported_core_native_sound
 #print axioms SP1Clean.Soundness.supported_core_native_sound_scheduled
 #print axioms SP1Clean.Soundness.supported_core_native_shard_execution
+#print axioms SP1Clean.Soundness.supported_core_native_shard_execution_halted
 #print axioms SP1Clean.Soundness.supported_core_native_shard_sound
+#print axioms SP1Clean.Soundness.witness_exitMessages_eq
+#print axioms SP1Clean.Soundness.witness_exit_code_zero_of_haltFree
+#print axioms SP1Clean.Soundness.witness_realHaltRows_eq_of_mem
+#print axioms SP1Clean.Soundness.witness_haltTable_table_eq_of_mem
+#print axioms SP1Clean.Soundness.supportedChip_fetchDiscriminantShape
+#print axioms SP1Clean.Soundness.witness_realDecodedInstructionRows_opcodeNeEcall
+#print axioms SP1Clean.Soundness.haltedSail_of_haltGrounding
+#print axioms SP1Clean.Soundness.haltedExecution_of_haltGrounding
+#print axioms SP1Clean.Soundness.supported_core_boot_to_halt_single_shard
 #print axioms SP1Clean.CoreProfile.checkedIn_semanticRevision
 #print axioms SP1Clean.CoreProfile.coreCluster_matchesExtracted
 #print axioms SP1Clean.CoreProfile.coreClusterShapes_matchExtracted
@@ -817,6 +831,8 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Soundness.Target.storeWidthOK
 #print axioms SP1Clean.Soundness.Target.decodedInROM
 #print axioms SP1Clean.Soundness.Target.decodedInROM.decodes
+#print axioms SP1Clean.Soundness.Target.decodedInROM.committed
+#print axioms SP1Clean.Soundness.Target.decodedInROM_opcode_ne_ecall
 #print axioms SP1Clean.Soundness.Target.instrToProgramRow_isCoreAlu_of_opcode_lt
 #print axioms SP1Clean.Soundness.Target.decodedInROM.register_bounds
 #print axioms SP1Clean.Soundness.Target.decodedInROM.immediate_flags_binary
@@ -904,4 +920,5 @@ Run via `lake env lean scripts/axiom_probe.lean` (see `scripts/run_audit.sh`). -
 #print axioms SP1Clean.Soundness.Target.cfgState_get_other
 #print axioms SP1Clean.Soundness.Target.cfgState_pma
 #print axioms SP1Clean.Soundness.Target.cfgState_misa
+#print axioms SP1Clean.Soundness.Target.cfgState_configured
 #print axioms SP1Clean.Soundness.Target.isInitialState_nonvacuous

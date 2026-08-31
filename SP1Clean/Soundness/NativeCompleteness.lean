@@ -42,7 +42,9 @@ theorem NativeTraceReady.balancedChannels
     (ready.wellFormed publicWellFormed) ready.demandServable
     (ready.skeletonNonpositive publicWellFormed) stateKeys memoryKeys
     (ready.stateLedgerPerm publicWellFormed) ready.memoryLedgerPerm
-    (NativeTraceFootprint.interactionLengths fits)
+    ((nativeBaseTrace statement execution).canonicalClosure.haltTablePadding).2
+    ((nativeBaseTrace statement execution).canonicalClosure.haltTablePadding).1
+    ready.exitZero (NativeTraceFootprint.interactionLengths fits)
 
 /-- Functional completeness of the native ensemble on its exact deterministic compiler image.
 The witness map is independent of the proof of admissibility. -/
@@ -80,7 +82,7 @@ noncomputable def supported_core_native_shard_functionalCompleteness
     obtain ⟨semantic, ready, -⟩ := valid
     let execution := witness.evaluatedTrace (supportedCoreShardModel (p := p))
     obtain ⟨-, -, -, -, -, -, -, limit⟩ :=
-      Execution.SupportedCoreShardExecutionValid.evaluatedTrace_facts semantic
+      Execution.SupportedCoreShardExecutionValid.evaluatedTrace_facts semantic ready.syscallFree
     change
       CoreProfile.WithinOrdinaryRowLimit
         (realDecodedInstructionRows (nativeTrace statement execution).witness.data
@@ -101,24 +103,37 @@ theorem supported_core_native_shard_complete :
       (SupportedCoreNativeAdmissibleShardRelation (p := p)) :=
   (supported_core_native_shard_functionalCompleteness (p := p)).complete
 
-/-- Bidirectional correctness on the one shared bounded shard relation, conditional only on the
-transparent compiler-domain closure theorem.  The unqualified correctness name remains reserved
-until `NativeShardTraceTotal` is proved. -/
+/-- Bidirectional correctness on the **syscall-free sub-language** of the shared bounded shard
+relation, conditional only on the transparent compiler-domain closure theorem.  The semantic
+language now also contains halting shards (the shared `.halted` case); native soundness lands in
+the ordinary sub-language because the current ensemble grounds all-ordinary traces, and the
+compiler direction targets exactly that sub-language (`NativeTraceReady.syscallFree`).  Halting
+shards join both directions with the terminal halt row.  The unqualified correctness name remains
+reserved until `NativeShardTraceTotal` is proved. -/
 theorem supported_core_native_shard_correct_of_totality
     (total : NativeShardTraceTotal (p := p)) :
-    WitnessRelation.Correct (SupportedCoreNativeShardRelation (p := p))
-      (Execution.SupportedCoreShardExecutionRelation (p := p)) where
-  sound := supported_core_native_shard_sound
+    WitnessRelation.Correct (SupportedCoreNativeOrdinaryShardRelation (p := p))
+      (Execution.SupportedCoreOrdinaryShardExecutionRelation (p := p)) where
+  sound := by
+    intro statement witness valid
+    obtain ⟨semanticWitness, semantic, ordinary, -⟩ :=
+      supported_core_native_shard_execution statement witness valid
+    exact ⟨semanticWitness, semantic, ordinary⟩
   complete := by
-    intro statement witness semantic
-    exact supported_core_native_shard_complete statement witness
-      ⟨semantic, total statement witness semantic⟩
+    intro statement witness valid
+    obtain ⟨semantic, ordinary⟩ := valid
+    refine ⟨_, (supported_core_native_shard_functionalCompleteness (p := p)).map_valid statement
+      witness ⟨semantic, total statement witness semantic ordinary⟩, ?_⟩
+    exact (nativeTrace statement
+      (witness.evaluatedTrace (supportedCoreShardModel (p := p)))).realHaltRows_nil
 
-/-- Public-language equality is now a direct consequence of the same single totality theorem. -/
+/-- Public-language equality on the syscall-free sub-language, a direct consequence of the same
+single totality theorem. -/
 theorem supported_core_native_shard_language_eq_of_totality
     (total : NativeShardTraceTotal (p := p)) :
-    WitnessRelation.language (SupportedCoreNativeShardRelation (p := p)) =
-      WitnessRelation.language (Execution.SupportedCoreShardExecutionRelation (p := p)) :=
+    WitnessRelation.language (SupportedCoreNativeOrdinaryShardRelation (p := p)) =
+      WitnessRelation.language
+        (Execution.SupportedCoreOrdinaryShardExecutionRelation (p := p)) :=
   (supported_core_native_shard_correct_of_totality total).language_eq
 
 /-- A supported admissible execution proves the literal Clean `Ensemble.Statement` at the

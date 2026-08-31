@@ -1853,7 +1853,8 @@ theorem loadByteChipInteractionsFaithful
   have hProgram :=
     loadByteProgramInteractionsFaithful (p := p) env input offset
   refine List.Perm.trans ?_
-    (LookupAccessList.perm_filter_by_kind rustAccesses).symm
+    (LookupAccessList.perm_filter_by_kind_of_exit_nil rustAccesses
+      (Extracted.map_toAccess_exit_filter _)).symm
   dsimp only [rustAccesses] at hState hByte hMemory hProgram ⊢
   rw [hState, hProgram]
   simpa only [List.append_assoc] using

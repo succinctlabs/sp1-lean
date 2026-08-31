@@ -53,6 +53,19 @@ structure GuestProgram where
 def GuestProgram.fetchWord (prog : GuestProgram) (a : BitVec 64) : Option (BitVec 32) :=
   (prog.rom.find? (·.1 == a)).map Prod.snd
 
+/-- The reserved low window holds no code: `fetchWord` misses every address below `2^16`
+(`rom_in_window`) — in particular the halt pc `1`. The halting trail uses this to place the halt
+edge terminally: no row can fetch at `pc = 1`. -/
+theorem GuestProgram.fetchWord_low_none (prog : GuestProgram) {a : BitVec 64}
+    (ha : a.toNat < 2 ^ 16) : prog.fetchWord a = none := by
+  rw [GuestProgram.fetchWord, Option.map_eq_none_iff, List.find?_eq_none]
+  intro aw haw
+  have hw := prog.rom_in_window aw haw
+  simp only [beq_iff_eq]
+  intro h
+  rw [h] at hw
+  omega
+
 /-- The ROM's bytes are present in Sail memory, little-endian — the layout `fetch`/`mem_read` reads. -/
 def RomLoaded (prog : GuestProgram) (s : SailState) : Prop :=
   ∀ a w, prog.fetchWord a = some w →

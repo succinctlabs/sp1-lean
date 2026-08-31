@@ -5,7 +5,7 @@ import SP1Clean.Model.InstructionChipId
 # Stable identities for native provider and boundary tables
 
 Instruction tables and provider tables have different semantic roles and therefore different
-identity types. `ProviderTableId` names the 28 non-instruction tables appended to the native
+identity types. `ProviderTableId` names the 29 non-instruction tables appended to the native
 ensemble without importing Clean components or proof-layer provider implementations.
 
 The seventeen Range tables are indexed rather than copied into seventeen constructors. This keeps
@@ -38,7 +38,7 @@ theorem all_nodup : all.Nodup := by decide
 
 end ByteProviderId
 
-/-- Stable identity of one non-instruction table in the 53-table native ensemble. -/
+/-- Stable identity of one non-instruction table in the 54-table native ensemble. -/
 inductive ProviderTableId where
   | byte (provider : ByteProviderId)
   | range (width : Fin 17)
@@ -47,23 +47,24 @@ inductive ProviderTableId where
   | memoryFinalize
   | memoryBump
   | stateBump
+  | halt
 deriving DecidableEq, Repr, Inhabited
 
 namespace ProviderTableId
 
 /-- Every provider/boundary identity in physical ensemble order: six Byte tables, Range widths
-`0..16`, then Program, the two Memory boundaries, MemoryBump, and StateBump. -/
+`0..16`, then Program, the two Memory boundaries, MemoryBump, StateBump, and the Halt table. -/
 def all : List ProviderTableId :=
   ByteProviderId.all.map .byte ++ (List.finRange 17).map .range ++
-    [.program, .memoryInit, .memoryFinalize, .memoryBump, .stateBump]
+    [.program, .memoryInit, .memoryFinalize, .memoryBump, .stateBump, .halt]
 
 /-- Number of non-instruction tables in the native ensemble. -/
 def count : ℕ := all.length
 
-@[simp] theorem all_length : all.length = 28 := by
+@[simp] theorem all_length : all.length = 29 := by
   simp [all, ByteProviderId.all]
 
-@[simp] theorem count_eq : count = 28 := by
+@[simp] theorem count_eq : count = 29 := by
   simp [count]
 
 @[simp] theorem mem_all (id : ProviderTableId) : id ∈ all := by
@@ -75,6 +76,7 @@ def count : ℕ := all.length
   | memoryFinalize => simp [all]
   | memoryBump => simp [all]
   | stateBump => simp [all]
+  | halt => simp [all]
 
 theorem all_nodup : all.Nodup := by
   decide
@@ -90,11 +92,11 @@ deriving DecidableEq, Repr, Inhabited
 
 namespace NativeTableId
 
-/-- The complete 53-table witness order, derived from the two role-specific registries. -/
+/-- The complete 54-table witness order, derived from the two role-specific registries. -/
 def all : List NativeTableId :=
   InstructionChipId.all.map .instruction ++ ProviderTableId.all.map .provider
 
-@[simp] theorem all_length : all.length = 53 := by
+@[simp] theorem all_length : all.length = 54 := by
   simp [all]
 
 @[simp] theorem mem_all (id : NativeTableId) : id ∈ all := by

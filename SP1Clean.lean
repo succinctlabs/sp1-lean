@@ -347,6 +347,7 @@ import SP1Clean.Model.Machine.Execution
 import SP1Clean.Proofs.Sail.TryStepReduction
 import SP1Clean.Proofs.Sail.Advance
 import SP1Clean.Model.Semantics.GuestProgram
+import SP1Clean.Model.Semantics.ImageContent
 import SP1Clean.Model.Semantics.ProgramCommitment
 import SP1Clean.Model.Semantics.MicroTime
 import SP1Clean.Model.Semantics.AccessPlan
@@ -445,6 +446,7 @@ import SP1Clean.Soundness.SP1Ensemble
 import SP1Clean.Soundness.WitnessDecode
 import SP1Clean.Soundness.TypedInteractions
 import SP1Clean.Soundness.TypedState
+import SP1Clean.Soundness.ExitAccounting
 import SP1Clean.Soundness.TimeExtraction
 import SP1Clean.Soundness.TypedTime
 import SP1Clean.Soundness.TypedTimeContracts
@@ -461,6 +463,7 @@ import SP1Clean.Soundness.LocalExecution
 import SP1Clean.Soundness.RowSoundness
 import SP1Clean.Soundness.RowEffectDefs
 import SP1Clean.Soundness.GroundingAdapter
+import SP1Clean.Soundness.FetchDiscriminant
 import SP1Clean.Soundness.GroundingInternal
 import SP1Clean.Soundness.Grounding.RTypeChips
 import SP1Clean.Soundness.Grounding.ITypeChips
@@ -471,7 +474,9 @@ import SP1Clean.Soundness.Grounding.MemoryCell
 import SP1Clean.Soundness.Grounding.MemoryChips
 import SP1Clean.Soundness.ChipContracts
 import SP1Clean.Soundness.RefreshWiring
+import SP1Clean.Soundness.HaltExecution
 import SP1Clean.Soundness.AIR
+import SP1Clean.Soundness.BootHalt
 import SP1Clean.Soundness.AIRCompleteness
 import SP1Clean.Soundness.CoreAIR
 import SP1Clean.Soundness.CoreAIRSyscallFree
@@ -514,8 +519,10 @@ import SP1Clean.Proofs.Chips.MemoryFinalizeChip
 import SP1Clean.FormalModel.Contracts.SystemChips
 import SP1Clean.Native.Chips.StateBumpChip.Defs
 import SP1Clean.Native.Chips.MemoryBumpChip.Defs
+import SP1Clean.Native.Chips.HaltChip.Defs
 import SP1Clean.Proofs.Chips.StateBumpChip.Formal
 import SP1Clean.Proofs.Chips.MemoryBumpChip.Formal
+import SP1Clean.Proofs.Chips.HaltChip.Formal
 import SP1Clean.Soundness.RankedGrounding
 import SP1Clean.Soundness.GoodnessFilter
 import SP1Clean.Soundness.RefreshElimination
@@ -525,6 +532,7 @@ import SP1Clean.Soundness.StatePcClass
 import SP1Clean.Soundness.TouchChains
 import SP1Clean.Soundness.TimedGrounding
 import SP1Clean.Soundness.AlignedCarrier
+import SP1Clean.Proofs.Chips.HaltChip.Witgen
 import SP1Clean.Proofs.Completeness.ProviderWitgen
 import SP1Clean.Proofs.Completeness.Providers
 import SP1Clean.Proofs.Completeness.AluGeneration

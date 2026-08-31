@@ -373,6 +373,7 @@ def canonicalProviderOccurrences : (id : ProviderTableId) → List id.Occurrence
   | .memoryFinalize => trace.providerOccurrences .memoryFinalize
   | .memoryBump => trace.providerOccurrences .memoryBump
   | .stateBump => trace.providerOccurrences .stateBump
+  | .halt => trace.providerOccurrences .halt
 
 /-- Rebuild only the Byte, Range, and Program provider window from the trace's own demand. -/
 def canonicalClosure : SupportedCoreTraceWitness p where
@@ -435,16 +436,17 @@ theorem tables_drop_preprocessed (t : SupportedCoreTraceWitness p) :
   simp [tables, instructionTableCount, preprocessedProviderTableCount, instructionTables,
     List.drop_append]
 
-/-- The provider suffix after the 24 preprocessed tables is exactly the two Memory boundaries and
-the two canonicalization-bump tables. -/
+/-- The provider suffix after the 24 preprocessed tables is exactly the two Memory boundaries,
+the two canonicalization-bump tables, and the Halt table. -/
 theorem providerTables_drop_preprocessed (t : SupportedCoreTraceWitness p) :
     t.providerTables.drop preprocessedProviderTableCount =
       [t.providerTableFor .memoryInit, t.providerTableFor .memoryFinalize,
-        t.providerTableFor .memoryBump, t.providerTableFor .stateBump] := by
+        t.providerTableFor .memoryBump, t.providerTableFor .stateBump,
+        t.providerTableFor .halt] := by
   simp [providerTables, ProviderTableId.all, ByteProviderId.all,
     preprocessedProviderTableCount, List.drop_append]
 
-/-- Canonical closure preserves the four-table suffix after the preprocessed window. -/
+/-- Canonical closure preserves the five-table suffix after the preprocessed window. -/
 theorem canonicalClosure_providerTables_drop :
     trace.canonicalClosure.providerTables.drop preprocessedProviderTableCount =
       trace.providerTables.drop preprocessedProviderTableCount := by
@@ -510,14 +512,14 @@ theorem canonicalClosure_skeletonLedger :
 
 /-- The rebuilt trace realizes its own closure.  Idempotence is supplied by skeleton invariance. -/
 theorem canonicalClosure_closureRealized : trace.canonicalClosure.ClosureRealized where
-  u8Range := trace.canonicalClosure_closureU8RangeEntries.symm
-  msb := trace.canonicalClosure_closureMsbEntries.symm
-  andByte := trace.canonicalClosure_closureAndByteEntries.symm
-  orByte := trace.canonicalClosure_closureOrByteEntries.symm
-  xorByte := trace.canonicalClosure_closureXorByteEntries.symm
-  ltu := trace.canonicalClosure_closureLtuEntries.symm
-  range width := (trace.canonicalClosure_closureRangeEntries width).symm
-  rom := trace.canonicalClosure_closureRomEntries.symm
+  u8Range := by rw [trace.canonicalClosure_closureU8RangeEntries]; rfl
+  msb := by rw [trace.canonicalClosure_closureMsbEntries]; rfl
+  andByte := by rw [trace.canonicalClosure_closureAndByteEntries]; rfl
+  orByte := by rw [trace.canonicalClosure_closureOrByteEntries]; rfl
+  xorByte := by rw [trace.canonicalClosure_closureXorByteEntries]; rfl
+  ltu := by rw [trace.canonicalClosure_closureLtuEntries]; rfl
+  range width := by rw [trace.canonicalClosure_closureRangeEntries width]; rfl
+  rom := by rw [trace.canonicalClosure_closureRomEntries]; rfl
 
 /-- Servability depends only on the provider-free skeleton, so it is preserved by canonical
 closure. -/

@@ -14,7 +14,7 @@ Completed:
 - a kernel-checked 25-table oracle-column-size ↔ independent-manifest `mainWidth` battery;
 - deterministic typed row decoding and exhaustive ranked State ordering, with the public
   `supported_core_native_grounding` endpoint retaining final-State and memory-finalize truth;
-- Program and Memory timed grounding for the native 53-table ensemble;
+- Program and Memory timed grounding for the native 54-table ensemble;
 - `supported_core_native_sound`;
 - `supported_core_native_shard_sound` into the shared proof-free
   `CoreShardSemanticWitness`, with deterministic event evaluation, normal-retirement evidence, and
@@ -25,21 +25,31 @@ Completed:
   soundness construction, chronological compiler, and Program agreement proof;
 - the paired exact `CoreAIR.Current.ShardRelation`, containing the list-level 34-table execution and
   6-table Memory-boundary witnesses together;
-- constructive exact-row assembly of all 53 native tables plus the verifier row, with local
+- constructive exact-row assembly of all 54 native tables plus the verifier row, with local
   constraints proved from valid clusters, a caller-supplied `CanonicalPreprocessedInventory`, and
   named preprocessing, memory-boundary, and public-limb transport contracts;
 - a hand-assembled one-instruction semantic trace record whose physical rows are circuit-generated,
   carried through native AIR soundness to Sail for any supplied model satisfying
   `UsesOrdinarySchedule`;
-- honest COMMIT-row versus wrapper-coverage separation; and
+- honest COMMIT-row versus wrapper-coverage separation;
+- **halting shards**: the native `HaltChip` table at ensemble position 53, the fifth (Exit) channel
+  whose ungated verifier pull forces exactly one halt row and binds the committed `exit_code`, the
+  committed-fragment Program re-base with its per-chip fetch discriminant, the halted grounding
+  certificate, and the plain-Sail `OrdinaryRun`/`HaltedRun` dichotomy — plus the single-shard
+  boot→halt corollary `supported_core_boot_to_halt_single_shard`; and
 - zero main-library proof deferrals or project axioms.
 
 Not completed:
 
 - a closed `CoreAIRRefinementObligations` value;
 - exact upstream system-table grounding;
-- cross-shard boot-to-halt soundness;
-- concrete syscall-handler refinements beyond the abstract relation;
+- **the compiler's terminal halt row** — the deterministic completeness compiler still emits only
+  the padding Halt row (`Occurrence .halt := Empty`, `NativeTraceReady.exitZero`), so the
+  totality-conditional correctness and language-equality statements remain relative to
+  `SupportedCoreNativeOrdinaryShardRelation`, and `SupportedCoreBootHaltRelation` has no
+  constructed inhabitant; this is the named next tranche;
+- cross-shard boot-to-halt soundness (the single-shard corollary above is not ledger composition);
+- concrete syscall-handler refinements beyond `ExecutableSyscallHandler.haltOnly`;
 - ArkLib verifier knowledge soundness; and
 - `NativeShardTraceTotal`, the residual implications from the shared bounded semantic
   relation to `NativeTraceReady` and `NativeTraceFootprint.Fits`; and
@@ -320,7 +330,7 @@ admissible compiler image, and both directions now use one capacity-bounded sema
 Closing the transparent compiler-admissibility totality theorem remains open.**
 
 W4 built `ToClean/Air/TableBuild.lean` and local completeness tables for all 25 instruction chips,
-the 28 provider/boundary tables, and the verifier row.  W5 now adds the semantic construction:
+the 29 provider/boundary tables, and the verifier row.  W5 now adds the semantic construction:
 
 - `InstructionEvent.lean` implements all 25 instruction-family projections;
 - `TransitionView.lean` hoists fetch/decode/route and the attempted access plan into the one
@@ -336,7 +346,7 @@ the 28 provider/boundary tables, and the verifier row.  W5 now adds the semantic
 - `MemoryHistory.lean` constructs the canonical initial/final record per touched location;
 - `CanonicalClosure.lean` constructs Byte, Range, and Program providers from the trace's own literal
   Clean ledger; direct field balance removes the old `2 * multiplicity <= p` restriction; and
-- `nativeTrace` deterministically assembles the exact 53-table witness and verifier boundary with
+- `nativeTrace` deterministically assembles the exact 54-table witness and verifier boundary with
   no proof argument and no instruction padding.
 
 `supported_core_native_functionalCompleteness`
@@ -446,10 +456,16 @@ are involved.
 - **Re-run `scripts/profile_compile.sh` after a suspected performance regression** — keep the
   generated report as a review artifact for the affected change; point-in-time timing output is not
   maintained as evergreen repository documentation.
-- **Unify the two time models** — retire the `MicroTime` compatibility layer into the
-  `Machine.SP1MachineModel.schedule` event model (or derive it as the ordinary-schedule instance),
-  discharging the capstone's `UsesOrdinarySchedule` bridging hypothesis structurally. Real
-  grounding-engine surgery; see `docs/architecture.md` § deliberate layering exceptions item 4.
+- **Unify the two time models** — the engine half is DONE (2026-08-28): the timed grounding walk
+  is duration-generic (`TimedGrounding.walkT` over `Semantics.Timeline`), mixed 8/264-tick walks
+  are expressible, and the ordinary walk is its `Timeline.ordinary` instantiation with every
+  carrier converted by a proved `…_ordinary` bridge — no chip or exported statement changed.
+  The HALT row has since landed **without** needing the non-uniform timeline: the halted branch
+  splits the halt edge out *before* the walk (the ordinary eight-tick walk runs on the instruction
+  prefix, ending at the halt row's own pre-syscall pull), so the `264` window is arithmetic at the
+  boundary rather than a mixed-duration walk. Remaining: the constructive
+  `Timeline` ↔ `Machine.clockAt` bridge, and a genuinely mixed timeline if a future profile needs
+  interleaved syscalls; see `docs/architecture.md` § deliberate layering exceptions item 4.
 - **Fold more platform facts into the generation config** — `memory.regions`,
   `htif_tohost_base`, and `memory.physaddr_bits` are also config-driven upstream, so the SP1 PMA
   region (base `2^16`, size `2^48 − 2^16`) and HTIF-off could become *generated* values instead

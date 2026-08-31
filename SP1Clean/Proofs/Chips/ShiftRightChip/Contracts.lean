@@ -312,4 +312,55 @@ theorem ShiftRightChip.rowViewOpCBinding_of_constraints
     Readers.ALUTypeReader.eval_opC]
   simpa only [readerInput, ShiftRightChip.aluReaderInput] using binding
 
+/-- With binary flags, ShiftRight's committed opcode combination avoids `ECALL`'s discriminant
+`50`. -/
+private theorem ShiftRightChip.flagCombo_ne_ecall {x y z w : ZMod p}
+    (hx : x = 0 ∨ x = 1) (hy : y = 0 ∨ y = 1) (hz : z = 0 ∨ z = 1) (hw : w = 0 ∨ w = 1) :
+    x * 7 + y * 8 + z * 22 + w * 23 ≠ (50 : ZMod p) := by
+  obtain ⟨a, ha, rfl⟩ : ∃ a : ℕ, a ≤ 1 ∧ x = (a : ZMod p) := by
+    rcases hx with h | h
+    · exact ⟨0, Nat.zero_le 1, by rw [h, Nat.cast_zero]⟩
+    · exact ⟨1, Nat.le_refl 1, by rw [h, Nat.cast_one]⟩
+  obtain ⟨b, hb, rfl⟩ : ∃ b : ℕ, b ≤ 1 ∧ y = (b : ZMod p) := by
+    rcases hy with h | h
+    · exact ⟨0, Nat.zero_le 1, by rw [h, Nat.cast_zero]⟩
+    · exact ⟨1, Nat.le_refl 1, by rw [h, Nat.cast_one]⟩
+  obtain ⟨c, hc, rfl⟩ : ∃ c : ℕ, c ≤ 1 ∧ z = (c : ZMod p) := by
+    rcases hz with h | h
+    · exact ⟨0, Nat.zero_le 1, by rw [h, Nat.cast_zero]⟩
+    · exact ⟨1, Nat.le_refl 1, by rw [h, Nat.cast_one]⟩
+  obtain ⟨d, hd, rfl⟩ : ∃ d : ℕ, d ≤ 1 ∧ w = (d : ZMod p) := by
+    rcases hw with h | h
+    · exact ⟨0, Nat.zero_le 1, by rw [h, Nat.cast_zero]⟩
+    · exact ⟨1, Nat.le_refl 1, by rw [h, Nat.cast_one]⟩
+  have hp : (131072 : ℕ) < p := by
+    have hfact : (2 : ℕ) ^ 17 < p := Fact.out
+    norm_num at hfact
+    exact hfact
+  intro h
+  have hcast : ((a * 7 + b * 8 + c * 22 + d * 23 : ℕ) : ZMod p) = ((50 : ℕ) : ZMod p) := by
+    exact_mod_cast h
+  have hval := congrArg ZMod.val hcast
+  rw [ZMod.val_natCast_of_lt (by omega), ZMod.val_natCast_of_lt (by omega)] at hval
+  interval_cases a <;> interval_cases b <;> interval_cases c <;> interval_cases d <;> omega
+
+/-- A real physical ShiftRight row's Program-bus opcode is never the `ECALL` discriminant `50`
+(the committed-fragment re-base's per-chip strengthening fact). -/
+theorem ShiftRightChip.physicalViewOpcode_ne_ecall (env : Environment (ZMod p))
+    (constraints :
+      (⟨ShiftRightChip.circuit (p := p)⟩ : Component (ZMod p)).operations.ConstraintsHold env)
+    (real : (ShiftRightChip.physicalView env).is_real = 1) :
+    (ShiftRightChip.physicalView env).opcode ≠ (50 : ZMod p) := by
+  have active := ShiftRightChip.rowViewSelectorActive_of_constraints env constraints real
+  rw [ShiftRightChip.ActiveSelector] at active
+  show (ShiftRightChip.physicalCols env).is_srl * 7 +
+    (ShiftRightChip.physicalCols env).is_sra * 8 +
+    (ShiftRightChip.physicalCols env).is_srlw * 22 +
+    (ShiftRightChip.physicalCols env).is_sraw * 23 ≠ (50 : ZMod p)
+  rcases active with ⟨h1, h2, h3, h4⟩ | ⟨h1, h2, h3, h4⟩ | ⟨h1, h2, h3, h4⟩ | ⟨h1, h2, h3, h4⟩
+  · exact ShiftRightChip.flagCombo_ne_ecall (Or.inr h1) (Or.inl h2) (Or.inl h3) (Or.inl h4)
+  · exact ShiftRightChip.flagCombo_ne_ecall (Or.inl h2) (Or.inr h1) (Or.inl h3) (Or.inl h4)
+  · exact ShiftRightChip.flagCombo_ne_ecall (Or.inl h2) (Or.inl h3) (Or.inr h1) (Or.inl h4)
+  · exact ShiftRightChip.flagCombo_ne_ecall (Or.inl h2) (Or.inl h3) (Or.inl h4) (Or.inr h1)
+
 end SP1Clean.Soundness

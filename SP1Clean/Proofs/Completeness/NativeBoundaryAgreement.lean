@@ -43,9 +43,9 @@ theorem NativeTraceReady.semanticBoundary
     simpa only [programEq] using
       Execution.SupportedCoreShardExecutionValid.programEncodable semantic
   obtain ⟨-, -, -, initialPc, -, -, -, -⟩ :=
-    Execution.SupportedCoreShardExecutionValid.evaluatedTrace_facts semantic
+    Execution.SupportedCoreShardExecutionValid.evaluatedTrace_facts semantic ready.syscallFree
   have clockEncodable := nativeInitialClock_encodable statement publicWellFormed
-  have programProvider := nativeTrace_programProviderBound semantic rfl ready.compiler
+  have programProvider := nativeTrace_programProviderBound semantic rfl ready.syscallFree ready.compiler
     ready.demandServable ready.programProjection
   refine InitialBoundaryFacts.binding (initial := semanticWitness.initialState) {
     programWellFormed := programWellFormed

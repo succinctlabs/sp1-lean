@@ -126,6 +126,7 @@ theorem canonicalClosure_wellFormed (wf : trace.WellFormed)
     | memoryFinalize => exact wf.provider .memoryFinalize entry entryMem
     | memoryBump => exact wf.provider .memoryBump entry entryMem
     | stateBump => exact wf.provider .stateBump entry entryMem
+    | halt => exact wf.provider .halt entry entryMem
   boundary := wf.boundary
 
 end SupportedCoreTraceWitness

@@ -3,6 +3,7 @@ import SP1Clean.Math.Word
 import SP1Clean.Proofs.Chips.UTypeChip.Formal
 import SP1Clean.Soundness.ChipRow
 import SP1Clean.Proofs.Sail.Advance
+import Clean.Air.FlatComponent
 
 /-! # Native Sail bridge for U-type (`LUI` / `AUIPC`) (+ `ChipKind` registration)
 
@@ -251,5 +252,91 @@ def kind : Soundness.ChipKind p where
   advanceReady := fun inp cols _ _ => cols.state.pc[0].val < 2 ^ 16 ∧
     (inp.is_auipc = 0 ∨ inp.is_auipc = 1)
   advance := some (PLift.up advance)
+
+/-! ## Physical row view and the ECALL opcode exclusion -/
+
+open Air.Flat Circuit
+
+omit [Fact (2 ^ 17 < p)] in
+/-- The `x - y` Equality-gadget constraint is among the gadget's deep constraints (as
+`LtChip`'s grounding contracts). -/
+private theorem equalityConstraint_mem (x y : Expression (ZMod p)) (offset : ℕ) :
+    x - y ∈ ((Gadgets.Equality.main (M := field) (x, y)).operations offset).constraints := by
+  simp [Gadgets.Equality.main, Circuit.forEach.operations_eq, circuit_norm]
+  rfl
+
+/-- The `is_auipc` boolean gate is among the physical U-type circuit's deep constraints. -/
+private theorem isAuipcGate_mem_constraints (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    input.is_auipc * (input.is_auipc - 1) - 0 ∈
+      ((UTypeChip.main input).operations offset).constraints := by
+  simp only [UTypeChip.main, circuit_norm]
+  right; right; right; right; right; right; right; left
+  simpa only [FormalAssertion.toSubcircuit, Operations.toNested_toFlat,
+    Operations.constraints_toFlat, Gadgets.Equality.circuit] using
+    equalityConstraint_mem (input.is_auipc * (input.is_auipc - 1)) (0 : Expression (ZMod p)) _
+
+omit [Fact (2 ^ 17 < p)] in
+/-- Evaluation of U-type's committed `is_auipc` selector, exposed without decomposing the row. -/
+private theorem eval_isAuipc (env : Environment (ZMod p))
+    (input : Inputs (Expression (ZMod p))) :
+    (Eval.eval env input).is_auipc = Expression.eval env input.is_auipc := by
+  simpa only [CircuitType.eval_expr] using
+    congrArg (fun value : Inputs (ZMod p) => value.is_auipc) (UTypeChip.eval_inputs env input)
+
+/-- The physical U-type constraints force the committed `is_auipc` selector binary. -/
+theorem isAuipcBinary_of_mainConstraints (input : Var Inputs (ZMod p)) (offset : ℕ)
+    (env : Environment (ZMod p))
+    (constraints : ((UTypeChip.main input).operations offset).ConstraintsHold env) :
+    Expression.eval env input.is_auipc = 0 ∨ Expression.eval env input.is_auipc = 1 := by
+  have gate : Expression.eval env (input.is_auipc * (input.is_auipc - 1) - 0) = 0 :=
+    constraints.1 _ (isAuipcGate_mem_constraints input offset)
+  simp only [eval_sub, Expression.eval, sub_zero] at gate
+  exact bool_of_mul_pred gate
+
+/-- The completed U-type columns at one physical component row. -/
+noncomputable def physicalCols (env : Environment (ZMod p)) : Columns (ZMod p) :=
+  (⟨UTypeChip.circuit (p := p)⟩ : Component (ZMod p)).rowOutput env
+
+/-- The completed U-type row view at one physical component row. -/
+noncomputable def physicalView (env : Environment (ZMod p)) : Trace.RowView (ZMod p) :=
+  rowView ((⟨UTypeChip.circuit (p := p)⟩ : Component (ZMod p)).rowInput env) (physicalCols env)
+
+/-- Small-literal disequality against the `ECALL` discriminant `50`, via `ZMod.val` injectivity. -/
+private theorem utypeOpcodeLiteral_ne_ecall {k : ℕ} (hk : k < 2 ^ 17) (hne : k ≠ 50) :
+    ((k : ℕ) : ZMod p) ≠ (50 : ZMod p) := by
+  intro h
+  have hp := Fact.out (p := 2 ^ 17 < p)
+  apply hne
+  have hval := congrArg ZMod.val h
+  rwa [ZMod.val_natCast_of_lt (by omega),
+    show (50 : ZMod p) = ((50 : ℕ) : ZMod p) from by norm_cast,
+    ZMod.val_natCast_of_lt (show (50 : ℕ) < p by omega)] at hval
+
+/-- A real physical U-type row's Program-bus opcode is never the `ECALL` discriminant `50`
+(the committed-fragment re-base's per-chip strengthening fact). -/
+theorem physicalViewOpcode_ne_ecall (env : Environment (ZMod p))
+    (constraints :
+      (⟨UTypeChip.circuit (p := p)⟩ : Component (ZMod p)).operations.ConstraintsHold env)
+    (_real : (physicalView env).is_real = 1) :
+    (physicalView env).opcode ≠ (50 : ZMod p) := by
+  let input : Var Inputs (ZMod p) := varFromOffset Inputs 0
+  let offset := size Inputs
+  have mainConstraints : ((UTypeChip.main input).operations offset).ConstraintsHold env :=
+    (Component.constraintsHold_iff env).mp constraints
+  have binary := isAuipcBinary_of_mainConstraints input offset env mainConstraints
+  have inputEq : Eval.eval env input =
+      (⟨UTypeChip.circuit (p := p)⟩ : Component (ZMod p)).rowInput env :=
+    eval_varFromOffset_valueFromOffset Inputs 0 env
+  have viewOpcode : (physicalView env).opcode =
+      (Eval.eval env input).is_auipc * 48 + (1 - (Eval.eval env input).is_auipc) * 49 := by
+    simpa only [physicalView, rowView] using
+      congrArg (fun value : Inputs (ZMod p) =>
+        value.is_auipc * 48 + (1 - value.is_auipc) * 49) inputEq.symm
+  rw [viewOpcode, eval_isAuipc env input]
+  rcases binary with h0 | h1
+  · rw [h0]
+    simpa using utypeOpcodeLiteral_ne_ecall (k := 49) (by norm_num) (by norm_num)
+  · rw [h1]
+    simpa using utypeOpcodeLiteral_ne_ecall (k := 48) (by norm_num) (by norm_num)
 
 end SP1Clean.UTypeChip

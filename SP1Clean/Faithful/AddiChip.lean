@@ -670,7 +670,8 @@ private theorem addicols_interactions_faithful_syntactic
   have hByte := addicols_byte_interactions_faithful_syntactic env input offset cols
     hreal hclk0 hclk1 hwrite0 hwrite1 hwrite2 hwrite3
     hprevA hdiffA hprevB hdiffB
-  refine List.Perm.trans ?_ (LookupAccessList.perm_filter_by_kind _).symm
+  refine List.Perm.trans ?_ (LookupAccessList.perm_filter_by_kind_of_exit_nil _
+      (Extracted.map_toAccess_exit_filter _)).symm
   rw [hState, hProgram']
   exact ((hByte.append_left _).append hMemory).append_right _
 

@@ -469,7 +469,8 @@ private theorem addcols_interactions_faithful_syntactic
     h_pl_b h_pv_b0 h_pv_b1 h_pv_b2 h_pv_b3 h_pl_c h_pv_c0 h_pv_c1 h_pv_c2 h_pv_c3
   have hB := addcols_byte_interactions_faithful_syntactic env input offset cols h_ir h_c0 h_c1
     h_wv0 h_wv1 h_wv2 h_wv3 h_pl_a h_dl_a h_pl_b h_dl_b h_pl_c h_dl_c
-  refine List.Perm.trans ?_ (LookupAccessList.perm_filter_by_kind _).symm
+  refine List.Perm.trans ?_ (LookupAccessList.perm_filter_by_kind_of_exit_nil _
+      (Extracted.map_toAccess_exit_filter _)).symm
   -- State + Program blocks are clean `=` (`rw`); Byte + Memory are `Perm`s (`hB`/`hM`) threaded through the
   -- append structure. (W11 memory flip: the Memory block is now `negMult`-bridged + reordered, like Program.)
   rw [hS, hP']

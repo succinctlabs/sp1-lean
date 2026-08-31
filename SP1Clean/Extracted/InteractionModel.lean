@@ -136,4 +136,35 @@ upstream Byte/Range tables receive the lookups), recording the native push sign 
     (fun m => (InteractionKind.Byte, "SP1Byte", [opcode.val, a.val, b.val, c.val], signedVal m))
     (neg_neg mult)
 
+/-- No extracted interaction projects to the native-only Exit kind: the payload arms cover
+Byte/State/Memory/Program plus the reserved raw `.State` bucket, and SP1's oracle vocabulary has no
+exit bus (SP1 binds `exit_code` by direct public-values access instead). The Faithful anchors use
+this to keep the historical four-block kind partition
+(`LookupAccessList.perm_filter_by_kind_of_exit_nil`). -/
+theorem Interaction.toAccess_kind_ne_exit (intr : Interaction (ZMod p)) :
+    (Interaction.toAccess intr).1 ≠ InteractionKind.Exit := by
+  rcases intr with ⟨dir, payload, mult⟩
+  cases payload <;> simp [Interaction.toAccess]
+
+/-- The Exit filter of any extracted access list is empty. -/
+theorem map_toAccess_exit_filter (l : List (Interaction (ZMod p))) :
+    (l.map Interaction.toAccess).filter
+      (fun a => a.1 = InteractionKind.Exit) = [] := by
+  rw [List.filter_eq_nil_iff]
+  intro a ha
+  obtain ⟨i, -, rfl⟩ := List.mem_map.mp ha
+  simpa using Interaction.toAccess_kind_ne_exit i
+
+/-- The Exit filter of an extracted access list survives the `active` restriction. -/
+theorem active_map_toAccess_exit_filter (l : List (Interaction (ZMod p))) :
+    (LookupAccessList.active (l.map Interaction.toAccess)).filter
+      (fun a => a.1 = InteractionKind.Exit) = [] := by
+  rw [List.filter_eq_nil_iff]
+  intro a ha
+  have hmem : a ∈ l.map Interaction.toAccess :=
+    List.mem_of_mem_filter (l := l.map Interaction.toAccess)
+      (p := fun access => decide (LookupAccessList.multOf access ≠ 0)) ha
+  obtain ⟨i, -, rfl⟩ := List.mem_map.mp hmem
+  simpa using Interaction.toAccess_kind_ne_exit i
+
 end SP1Clean.Extracted

@@ -1,5 +1,6 @@
 import SP1Clean.Math.Word
 import SP1Clean.Extracted.MemoryAccess
+import SP1Clean.FormalModel.Contracts.Readers
 import Clean.Utils.Tactics.ProvableStructDeriving
 
 /-! # System-table chip contracts: StateBump and MemoryBump (W3, external report Finding 2)
@@ -132,5 +133,71 @@ def Spec (r : Inputs (ZMod p)) : Prop :=
     r.access.access_timestamp.diff_high_limb.val < 2 ^ 8)
 
 end MemoryBumpChip
+
+namespace HaltChip
+
+/-- The native Halt row — the provider-segment system table that witnesses the `HALT` ECALL of a
+halting shard (semantics-gap campaign, PR 2.4's inhabitation wave). One real row per halting shard:
+
+- its `CPUState` block pulls the pre-syscall state `(clk, pc)` and pushes the halted state
+  `(clk + 264, pc = 1)` — SP1's syscall row duration and `HALT_PC` (`Model/Machine/Syscall.lean`'s
+  `haltPc`);
+- it pulls the committed instruction at `pc` from the Program bus and pins it to the ECALL shape
+  (`opcode = Opcode.ECALL.toNat = 50`, operands `x5/x10/x11`, no immediates) — proving the halt
+  happened at a genuine `ECALL` site of the committed program;
+- it reads registers `x5` (`t0`, the syscall code — constrained to `0 = SyscallCode::HALT`),
+  `x10` (`a0`, the exit-code word), and `x11` (`a1`) through the standard register-access
+  pull/push-back pairs at clock offsets `+4/+3/+2`; and
+- it pushes the **reduced** `x10` word on the Exit bus when real (its high limbs pinned zero —
+  the u32 exit code), and the zero code when padding; the state-boundary verifier's ungated
+  `⟨exit_code⟩` pull balances against exactly one of them, forcing `exit_code = reduce(a0)` on
+  halting shards and `exit_code = 0` on ordinary shards (see `Channels.ExitMsg`).
+
+The row struct: the `CPUState` block, the three register-access blocks, and the selector. -/
+structure Inputs (F : Type) where
+  state : Extracted.CPUState F
+  x5_memory : Extracted.RegisterAccessCols F
+  x10_memory : Extracted.RegisterAccessCols F
+  x11_memory : Extracted.RegisterAccessCols F
+  is_real : F
+deriving ProvableStruct
+
+/-- Halt's semantic contract, composed from the reader sub-`Spec`s (the AddChip pattern). Ungated:
+the proven `is_real`-binary fact. Then the `CPUState` clock byte bounds (at the halt transition
+`next_pc = (1, 0, 0)`, `clk_inc = 264`), the three register-access timestamp byte bounds (access
+clocks `clk_low + 4/3/2` for `x5/x10/x11`), and — gated on `is_real = 1` — the program-pull-derived
+pc limb bounds plus the memory-pull-derived facts: the `x5` word is limb-wise zero (the syscall
+code is `HALT`), the `x10` word's high limbs are zero (the u32 exit code), the three read words
+are u64, and the three pulled prior records' access clocks are 24-bit. The exit-bus payload is
+*definitionally* the reduced `x10` word (the pushed message), so with the high-limb zeros its
+value is exactly `w0 + w1·2^16 < 2^32`; the cross-row binding to the committed `exit_code` is
+ensemble balance, not a row-local claim. -/
+def Spec (r : Inputs (ZMod p)) : Prop :=
+  (r.is_real = 0 ∨ r.is_real = 1) ∧
+  Readers.CPUState.Spec
+    { cols := r.state, next_pc := #v[1, 0, 0], clk_inc := 264, is_real := r.is_real } ∧
+  Readers.RegisterAccessCols.Spec
+    { cols := r.x5_memory, is_real := r.is_real,
+      clk_target := r.state.clk_0_16 + r.state.clk_16_24 * 65536 + 4 } ∧
+  Readers.RegisterAccessCols.Spec
+    { cols := r.x10_memory, is_real := r.is_real,
+      clk_target := r.state.clk_0_16 + r.state.clk_16_24 * 65536 + 3 } ∧
+  Readers.RegisterAccessCols.Spec
+    { cols := r.x11_memory, is_real := r.is_real,
+      clk_target := r.state.clk_0_16 + r.state.clk_16_24 * 65536 + 2 } ∧
+  (r.is_real = 1 →
+    r.state.pc[0].val < 2 ^ 16 ∧ r.state.pc[1].val < 2 ^ 16 ∧ r.state.pc[2].val < 2 ^ 16) ∧
+  (r.is_real = 1 →
+    (r.x5_memory.prev_value[0] = 0 ∧ r.x5_memory.prev_value[1] = 0 ∧
+      r.x5_memory.prev_value[2] = 0 ∧ r.x5_memory.prev_value[3] = 0) ∧
+    (r.x10_memory.prev_value[1] = 0 ∧ r.x10_memory.prev_value[2] = 0 ∧
+      r.x10_memory.prev_value[3] = 0) ∧
+    Word.isU64 r.x5_memory.prev_value ∧ Word.isU64 r.x10_memory.prev_value ∧
+    Word.isU64 r.x11_memory.prev_value ∧
+    r.x5_memory.access_timestamp.prev_low.val < 2 ^ 24 ∧
+    r.x10_memory.access_timestamp.prev_low.val < 2 ^ 24 ∧
+    r.x11_memory.access_timestamp.prev_low.val < 2 ^ 24)
+
+end HaltChip
 
 end SP1Clean

@@ -1,4 +1,6 @@
-import SP1Clean.Soundness.GroundingInternal
+import SP1Clean.Soundness.HaltExecution
+
+open LeanRV64D.Defs
 
 /-! # AIR witness relations and the semantic capstone
 
@@ -70,6 +72,14 @@ def SupportedCoreNativeShardRelation :
       (realDecodedInstructionRows witness.data witness.tables).length
 
 
+/-- The **halt-free** native shard sub-relation: no active Halt row, so the Exit hand-off forces
+the committed exit code to zero and every active row is an eight-tick instruction.  This is the
+sub-language the deterministic completeness compiler currently targets; halting shards are the
+complementary case, and both rejoin in `supported_core_native_shard_sound`. -/
+def SupportedCoreNativeOrdinaryShardRelation :
+    WitnessRelation.Relation (SupportedCoreStatement p) (SupportedCoreNativeWitness p) :=
+  SupportedCoreNativeShardRelation.restrict fun _ witness => realHaltRows witness = []
+
 /-- Export the complete semantic grounding certificate from the honest native relation.
 
 Unlike the local-execution soundness projection below, this theorem retains the initial boundary
@@ -78,15 +88,17 @@ the reusable native endpoint for shard composition and for later exact-Core/ArkL
 do not have to reopen the relation or reconstruct facts that the timed grounding walk already proved. -/
 theorem supported_core_native_grounding
     (statement : SupportedCoreStatement p) (witness : SupportedCoreNativeWitness p)
-    (valid : SupportedCoreNativeRelation statement witness) :
+    (valid : SupportedCoreNativeRelation statement witness)
+    (haltFree : realHaltRows witness = []) :
     ∃ initial orderedRows, InitialBoundaryFacts statement witness initial ∧
+      statement.publicValues.exit_code = 0 ∧
       SupportedCoreGrounding statement witness initial orderedRows := by
   obtain ⟨⟨publicInputEq, constraints, balanced⟩, binding⟩ := valid
   obtain ⟨initial, boundary⟩ := binding.boundaryFacts
-  obtain ⟨orderedRows, grounding⟩ :=
-    supported_core_witness_grounding statement witness initial publicInputEq constraints balanced
-      boundary
-  exact ⟨initial, orderedRows, boundary, grounding⟩
+  rcases supported_core_witness_grounding statement witness initial publicInputEq constraints
+      balanced boundary with ⟨-, exitZero, orderedRows, grounding⟩ | ⟨rows', halt, hg⟩
+  · exact ⟨initial, orderedRows, boundary, exitZero, grounding⟩
+  · exact absurd (haltFree.symm.trans hg.haltReal) (by simp)
 
 /-- **Supported native-Clean soundness.** A satisfying, channel-balanced witness whose provider
 tables are semantically bound produces a genuine shard-local official-Sail execution: a
@@ -102,8 +114,88 @@ theorem supported_core_native_sound :
     WitnessRelation.Sound (SupportedCoreNativeRelation (p := p))
       (SupportedCoreSailRelation (p := p)) := by
   intro statement witness valid
-  obtain ⟨initial, rows, boundary, grounding⟩ :=
-    supported_core_native_grounding statement witness valid
+  obtain ⟨⟨publicInputEq, constraints, balanced⟩, binding⟩ := valid
+  obtain ⟨initial, boundary⟩ := binding.boundaryFacts
+  rcases supported_core_witness_grounding statement witness initial publicInputEq constraints
+      balanced boundary with ⟨-, exitZero, rows, grounding⟩ | ⟨rows, halt, hg⟩
+  · -- **Ordinary shard**: the whole run retires normally between the public pc endpoints.
+    obtain ⟨memBoundary, memWF, memContent⟩ :=
+      exists_populated_memoryBoundary witness initial
+        (Semantics.StateMsg.timeNat (finalBoundaryStateMessage statement.publicValues))
+        boundary.memoryFinalizeProviderUnique boundary.memoryProvider grounding.memoryFinalizeTruth
+    have timeEq : Semantics.StateMsg.timeNat (finalBoundaryStateMessage statement.publicValues) =
+        Commit.initClkNat witness.data + 8 * rows.length := by
+      have h1 := grounding.clockCount
+      have h2 := boundary.initialClock
+      change Semantics.clkNat statement.publicValues.final_clk_high
+        statement.publicValues.final_clk_low = _
+      omega
+    obtain ⟨w, sailValid, -⟩ := groundedRows_sailRelation statement witness.data initial
+      (fun decoded : DecodedInstructionRow p => decoded.toChipRow witness.data) rows memBoundary
+      boundary.programWellFormed boundary.initialPc boundary.romLoaded boundary.configured
+      boundary.codeMemoryCompatible grounding.walk grounding.grounded grounding.clockCount
+      exitZero memWF (by
+        intro final chainEq cell member
+        obtain ⟨initContent, finalMicro⟩ := memContent cell member
+        refine ⟨initContent, ?_⟩
+        rw [timeEq] at finalMicro
+        exact locContent_final_of_microValue chainEq finalMicro)
+    exact ⟨w, sailValid⟩
+  · -- **Halting shard**: a normally-retiring prefix reaches `SP1Halted`, then the host handler
+    -- parks the machine at `haltPc` one syscall window later.
+    obtain ⟨preHalt, retire, halted, contentBridge⟩ :=
+      haltedSail_of_haltGrounding statement witness initial rows halt hg boundary
+    obtain ⟨memBoundary, memWF, memContent⟩ :=
+      exists_populated_memoryBoundary witness initial
+        (Semantics.StateMsg.timeNat
+          (HaltChip.statePulledMessage (haltRow (haltTable witness) halt)))
+        boundary.memoryFinalizeProviderUnique boundary.memoryProvider hg.memoryFinalizeTruth
+    have clocks : statement.finalClkNat =
+        statement.initClkNat + 8 * rows.length + 264 := by
+      have h1 := hg.finalClock
+      have h2 := hg.pullClock
+      have h3 := boundary.initialClock
+      show Semantics.clkNat statement.publicValues.final_clk_high
+          statement.publicValues.final_clk_low =
+        Semantics.clkNat statement.publicValues.init_clk_high
+          statement.publicValues.init_clk_low + 8 * rows.length + 264
+      omega
+    have pullLe : Semantics.StateMsg.timeNat
+        (HaltChip.statePulledMessage (haltRow (haltTable witness) halt)) ≤
+        Semantics.clkNat statement.publicValues.final_clk_high
+          statement.publicValues.final_clk_low := by
+      have h1 := hg.finalClock
+      omega
+    refine ⟨⟨initial, rows.length + 1,
+      { preHalt with regs := preHalt.regs.insert Register.PC Machine.haltPc }, memBoundary⟩,
+      boundary.programWellFormed,
+      ⟨boundary.initialPc, boundary.romLoaded, boundary.configured⟩,
+      memWF.mono pullLe, ?_,
+      Or.inr ⟨preHalt, Nat.le_add_left 1 rows.length, ?_, halted, rfl, hg.finalPc, ?_⟩⟩
+    · intro cell member
+      obtain ⟨initContent, finalMicro⟩ := memContent cell member
+      refine ⟨initContent, ?_⟩
+      show Semantics.locContent
+        { preHalt with regs := preHalt.regs.insert Register.PC Machine.haltPc } cell.loc = _
+      rw [locContent_insert_pc]
+      exact contentBridge cell.loc cell.finalValue finalMicro
+    · simpa using retire
+    · simpa using clocks
+
+/-- The model-scheduled corollary of `supported_core_native_sound`: any machine model
+implementing SP1's ordinary eight-tick schedule recovers the local-execution-witness form.  This
+is the composition seam consumed by `supportedCoreLocalExecution_anchors` when shards are
+composed along a model-selected boot trajectory. -/
+theorem supported_core_native_sound_scheduled (model : Machine.SP1MachineModel)
+    (ordinary : model.UsesOrdinarySchedule) :
+    WitnessRelation.Sound
+      ((SupportedCoreNativeRelation (p := p)).restrict
+        fun _ witness => realHaltRows witness = [])
+      (SupportedCoreLocalExecutionRelation model) := by
+  intro statement witness valid
+  obtain ⟨nativeValid, haltFree⟩ := valid
+  obtain ⟨initial, rows, boundary, exitZero, grounding⟩ :=
+    supported_core_native_grounding statement witness nativeValid haltFree
   obtain ⟨memBoundary, memWF, memContent⟩ :=
     exists_populated_memoryBoundary witness initial
       (Semantics.StateMsg.timeNat (finalBoundaryStateMessage statement.publicValues))
@@ -115,28 +207,17 @@ theorem supported_core_native_sound :
     change Semantics.clkNat statement.publicValues.final_clk_high
       statement.publicValues.final_clk_low = _
     omega
-  refine groundedRows_sailRelation statement witness.data initial
+  obtain ⟨w, sailValid, run⟩ := groundedRows_sailRelation statement witness.data initial
     (fun decoded : DecodedInstructionRow p => decoded.toChipRow witness.data) rows memBoundary
     boundary.programWellFormed boundary.initialPc boundary.romLoaded boundary.configured
     boundary.codeMemoryCompatible grounding.walk grounding.grounded grounding.clockCount
-    memWF ?_
-  intro final chainEq cell member
-  obtain ⟨initContent, finalMicro⟩ := memContent cell member
-  refine ⟨initContent, ?_⟩
-  rw [timeEq] at finalMicro
-  exact locContent_final_of_microValue chainEq finalMicro
-
-/-- The model-scheduled corollary of `supported_core_native_sound`: any machine model
-implementing SP1's ordinary eight-tick schedule recovers the local-execution-witness form.  This
-is the composition seam consumed by `supportedCoreLocalExecution_anchors` when shards are
-composed along a model-selected boot trajectory. -/
-theorem supported_core_native_sound_scheduled (model : Machine.SP1MachineModel)
-    (ordinary : model.UsesOrdinarySchedule) :
-    WitnessRelation.Sound (SupportedCoreNativeRelation (p := p))
-      (SupportedCoreLocalExecutionRelation model) := by
-  intro statement witness valid
-  obtain ⟨w, sailValid⟩ := supported_core_native_sound statement witness valid
-  exact supportedCoreLocalExecution_of_sailRelation model ordinary sailValid
+    exitZero memWF (by
+      intro final chainEq cell member
+      obtain ⟨initContent, finalMicro⟩ := memContent cell member
+      refine ⟨initContent, ?_⟩
+      rw [timeEq] at finalMicro
+      exact locContent_final_of_microValue chainEq finalMicro)
+  exact supportedCoreLocalExecution_of_sailRelation model ordinary sailValid run
 
 /-- Construct the common semantic witness while retaining its exact active-row count.
 
@@ -148,20 +229,23 @@ recovered by the shared evaluator, so native soundness does not publish a second
 semantic relation. -/
 theorem supported_core_native_shard_execution
     (statement : SupportedCoreStatement p) (witness : SupportedCoreNativeWitness p)
-    (valid : SupportedCoreNativeShardRelation statement witness) :
+    (valid : SupportedCoreNativeOrdinaryShardRelation statement witness) :
     ∃ semanticWitness : Machine.CoreShardSemanticWitness,
       SupportedCoreShardExecutionRelation statement semanticWitness ∧
+        (semanticWitness.evaluatedTrace (supportedCoreShardModel (p := p))).AllOrdinary ∧
         (semanticWitness.evaluatedTrace (supportedCoreShardModel (p := p))).steps =
           (realDecodedInstructionRows witness.data witness.tables).length := by
-  obtain ⟨nativeValid, rowLimit⟩ := valid
+  obtain ⟨⟨nativeValid, rowLimit⟩, haltFree⟩ := valid
   obtain ⟨⟨publicInputEq, constraints, balanced⟩, binding⟩ := nativeValid
   obtain ⟨initial, boundary⟩ := binding.boundaryFacts
-  obtain ⟨rows, grounding⟩ :=
-    supported_core_witness_grounding statement witness initial publicInputEq constraints balanced
-      boundary
+  obtain ⟨-, -, rows, grounding⟩ :=
+    (supported_core_witness_grounding statement witness initial publicInputEq constraints balanced
+      boundary).resolve_right (by
+        rintro ⟨rows', halt, hg⟩
+        exact absurd (haltFree.symm.trans hg.haltReal) (by simp))
   obtain ⟨execution, initialEq, stepsEq, finalPc, executionValid, clocked, finalClock,
       ordinary, supported⟩ :=
-    eventExecution_of_groundedRows Machine.ExecutableSyscallHandler.none.relation
+    eventExecution_of_groundedRows Machine.ExecutableSyscallHandler.haltOnly.relation
       (fun decoded : DecodedInstructionRow p => decoded.toChipRow witness.data)
       witness.data statement.program initial rows
       (supportedPcBits statement.publicValues.init_pc0 statement.publicValues.init_pc1
@@ -207,7 +291,7 @@ theorem supported_core_native_shard_execution
     codeMemoryCompatible := ?_
     memoryWellFormed := ?_
     memoryAgrees := ?_
-    shardCase := ?_ }, ?_⟩
+    shardCase := ?_ }, ?_, ?_⟩
   · change Target.RomLoaded statement.program execution.initialState
     rw [initialEq]
     exact boundary.romLoaded
@@ -239,7 +323,95 @@ theorem supported_core_native_shard_execution
       rw [stepsEq, grounding.exhaustive.length_eq]
       exact rowLimit
   · rw [Machine.CoreShardSemanticWitness.evaluatedTrace_eq_of_trace? evaluated]
+    exact ordinary
+  · rw [Machine.CoreShardSemanticWitness.evaluatedTrace_eq_of_trace? evaluated]
     exact stepsEq.trans grounding.exhaustive.length_eq
+
+/-- **The halting shard's semantic witness.**  The companion of
+`supported_core_native_shard_execution` on a shard whose Halt table carries a live row: the same
+canonical carrier, landing in the shared relation's `.halted` case — an ordinary supported prefix
+followed by the terminal canonical-`HALT` syscall transition, which `HaltsWith` binds to the
+committed public exit code. -/
+theorem supported_core_native_shard_execution_halted
+    (statement : SupportedCoreStatement p) (witness : SupportedCoreNativeWitness p)
+    (valid : SupportedCoreNativeShardRelation statement witness)
+    {halt : Array (ZMod p)} (haltMem : halt ∈ realHaltRows witness) :
+    ∃ semanticWitness : Machine.CoreShardSemanticWitness,
+      SupportedCoreShardExecutionRelation statement semanticWitness ∧
+        (semanticWitness.evaluatedTrace (supportedCoreShardModel (p := p))).HaltsWith
+          statement.program statement.publicValues.exitCodeBits := by
+  obtain ⟨nativeValid, rowLimit⟩ := valid
+  obtain ⟨⟨publicInputEq, constraints, balanced⟩, binding⟩ := nativeValid
+  obtain ⟨initial, boundary⟩ := binding.boundaryFacts
+  obtain ⟨rows, halt', hg⟩ :=
+    (supported_core_witness_grounding statement witness initial publicInputEq constraints balanced
+      boundary).resolve_left (by
+        rintro ⟨haltFree, -, -⟩
+        rw [haltFree] at haltMem
+        exact List.not_mem_nil haltMem)
+  obtain ⟨execution, initialEq, -, execValid, clocked, finalClock, initialPc, finalPc,
+      halts, prefixOrdinary, prefixSupported, prefixLength, contentBridge⟩ :=
+    haltedExecution_of_haltGrounding statement witness initial rows halt' hg boundary
+  obtain ⟨memBoundary, memWF, memContent⟩ :=
+    exists_populated_memoryBoundary witness initial
+      (Semantics.StateMsg.timeNat
+        (HaltChip.statePulledMessage (haltRow (haltTable witness) halt')))
+      boundary.memoryFinalizeProviderUnique boundary.memoryProvider hg.memoryFinalizeTruth
+  let semanticWitness := Machine.CoreShardSemanticWitness.ofOrdinaryTrace
+    statement.program memBoundary execution
+  have publicValuesWellFormed : statement.publicValues.LimbBounds := by
+    rw [← publicInputEq]
+    exact witness_publicInput_limbBounds witness constraints balanced
+  have evaluated := Machine.CoreShardSemanticWitness.trace?_ofTrace
+    (supportedCoreShardModel (p := p)) statement.program memBoundary execution execValid
+  have clocksLe : Semantics.StateMsg.timeNat
+      (HaltChip.statePulledMessage (haltRow (haltTable witness) halt')) ≤
+      Semantics.clkNat statement.publicValues.final_clk_high
+        statement.publicValues.final_clk_low := by
+    have := hg.finalClock
+    omega
+  refine ⟨semanticWitness, {
+    statementValid := publicValuesWellFormed
+    programWellFormed := boundary.programWellFormed
+    programBound := rfl
+    programValid := boundary.programCommitted.encodable
+    contractValid := trivial
+    romLoaded := ?_
+    configured := ?_
+    codeMemoryCompatible := ?_
+    memoryWellFormed := ?_
+    memoryAgrees := ?_
+    shardCase := ?_ }, ?_⟩
+  · change Target.RomLoaded statement.program execution.initialState
+    rw [initialEq]
+    exact boundary.romLoaded
+  · change Target.SailConfigured execution.initialState
+    rw [initialEq]
+    exact boundary.configured
+  · change Target.SailCodeMemoryCompatible statement.program execution.initialState
+    rw [initialEq]
+    exact boundary.codeMemoryCompatible
+  · -- memoryWellFormed: hygiene at the pre-halt clock, widened to the committed final clock.
+    change memBoundary.WellFormed (Semantics.clkNat statement.publicValues.final_clk_high
+      statement.publicValues.final_clk_low)
+    exact memWF.mono clocksLe
+  · -- memoryAgrees: genesis content at the initial state, pre-halt currency at the parked endpoint.
+    intro cell member
+    obtain ⟨initContent, finalMicro⟩ := memContent cell member
+    refine ⟨?_, ?_⟩
+    · change Semantics.locContent execution.initialState cell.loc = some cell.initialValue
+      rw [initialEq]
+      exact initContent
+    · rw [Machine.CoreShardSemanticWitness.evaluatedTrace_eq_of_trace? evaluated]
+      exact contentBridge cell.loc cell.finalValue finalMicro
+  · -- the shared `.halted` case: an ordinary supported prefix, then the canonical HALT syscall.
+    refine .halted execution.events execution rfl rfl evaluated execValid clocked finalClock ?_
+      finalPc halts ⟨prefixOrdinary, prefixSupported, ?_⟩
+    · simpa only [supportedCoreShardModel, supportedCoreShardBoundary] using initialPc
+    · rw [prefixLength, hg.exhaustive.length_eq]
+      exact rowLimit
+  · rw [Machine.CoreShardSemanticWitness.evaluatedTrace_eq_of_trace? evaluated]
+    exact halts
 
 /-- **Capacity-aligned native soundness into the one canonical shard relation.**
 
@@ -252,9 +424,14 @@ theorem supported_core_native_shard_sound :
     WitnessRelation.Sound (SupportedCoreNativeShardRelation (p := p))
       (SupportedCoreShardExecutionRelation (p := p)) := by
   intro statement witness valid
-  obtain ⟨semanticWitness, semantic, -⟩ :=
-    supported_core_native_shard_execution statement witness valid
-  exact ⟨semanticWitness, semantic⟩
+  by_cases haltFree : realHaltRows witness = []
+  · obtain ⟨semanticWitness, semantic, -⟩ :=
+      supported_core_native_shard_execution statement witness ⟨valid, haltFree⟩
+    exact ⟨semanticWitness, semantic⟩
+  · obtain ⟨halt, haltMem⟩ := List.exists_mem_of_ne_nil _ haltFree
+    obtain ⟨semanticWitness, semantic, -⟩ :=
+      supported_core_native_shard_execution_halted statement witness valid haltMem
+    exact ⟨semanticWitness, semantic⟩
 
 /-! ## Completeness boundary
 

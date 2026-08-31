@@ -27,7 +27,7 @@ open SP1Clean.LookupAccessList
 open SP1Clean.TraceGenTests
 open SP1Clean.Audit.JointNonVacuity
 open SP1Clean.Audit.TraceNonVacuity
-open SP1Clean.Channels (stateChannel byteChannel programChannel memoryChannel)
+open SP1Clean.Channels (stateChannel byteChannel programChannel memoryChannel exitChannel)
 
 /-- The proof-free, zero-transition semantic execution at the shared audit state. -/
 noncomputable def anchorExecution : Machine.EventExecutionTrace where
@@ -222,7 +222,9 @@ theorem anchorExecution_memoryChronology :
   exact absurd member List.not_mem_nil
 
 /-- A fully executable presentation of the empty compiler skeleton.  Its preprocessed occurrence
-lists are deliberately empty because `skeletonLedger` omits that provider window. -/
+lists are deliberately empty because `skeletonLedger` omits that provider window; the Halt
+occurrence list is empty because the deterministic compiler emits no halt event, which is exactly
+what makes its table the single all-zero padding row (`haltTablePadding`). -/
 def concreteBaseTrace : SupportedCoreTraceWitness SP1Prime where
   instructionEvents := fun _ => []
   providerOccurrences := fun _ => []
@@ -257,6 +259,10 @@ theorem concreteBaseTrace_skeletonLedger :
     concreteBaseTrace.skeletonLedger = anchorTrace.skeletonLedger := by
   rfl
 
+/-- The three keys the boundary-only shard actually demands.  The padding Halt row's own Byte,
+Program and Memory accesses are all gated to multiplicity zero, so `closingKeys` (which recounts
+only `active` accesses) does not turn them into demand — which is what keeps a padded provider
+table from manufacturing a ROM key no compiled instruction backs. -/
 def boundaryClosingKeys : List LookupKey :=
   [(InteractionKind.Byte, "SP1Byte", [3, 0, 0, 0]),
    (InteractionKind.Byte, "SP1Byte", [6, 1, 16, 0]),
@@ -281,7 +287,28 @@ def boundarySkeletonLedger : LookupAccessList :=
    (InteractionKind.Byte, "SP1Byte", [3, 0, 0, 0], -1),
    (InteractionKind.Byte, "SP1Byte", [6, 0, 16, 0], -1),
    (InteractionKind.Byte, "SP1Byte", [6, 1, 16, 0], -1),
-   (InteractionKind.Byte, "SP1Byte", [6, 0, 16, 0], -1)]
+   (InteractionKind.Byte, "SP1Byte", [6, 0, 16, 0], -1),
+   (InteractionKind.Exit, "SP1Exit", [0], -1),
+   (InteractionKind.Byte, "SP1Byte", [6, 266338304, 13, 0], 0),
+   (InteractionKind.Byte, "SP1Byte", [3, 0, 0, 0], 0),
+   (InteractionKind.State, "SP1State", [0, 0, 0, 0, 0], 0),
+   (InteractionKind.State, "SP1State", [0, 264, 1, 0, 0], 0),
+   (InteractionKind.Byte, "SP1Byte", [6, 0, 16, 0], 0),
+   (InteractionKind.Byte, "SP1Byte", [3, 0, 2130608897, 0], 0),
+   (InteractionKind.Byte, "SP1Byte", [6, 0, 16, 0], 0),
+   (InteractionKind.Byte, "SP1Byte", [3, 0, 2130641409, 0], 0),
+   (InteractionKind.Byte, "SP1Byte", [6, 0, 16, 0], 0),
+   (InteractionKind.Byte, "SP1Byte", [3, 0, 2130673921, 0], 0),
+   (InteractionKind.Program, "SP1Program",
+     [0, 0, 0, 50, 5, 10, 0, 0, 0, 11, 0, 0, 0, 0, 0, 0], 0),
+   (InteractionKind.Memory, "SP1Memory", [0, 0, 5, 0, 0, 0, 0, 0, 0], 0),
+   (InteractionKind.Memory, "SP1Memory", [0, 4, 5, 0, 0, 0, 0, 0, 0], 0),
+   (InteractionKind.Memory, "SP1Memory", [0, 0, 10, 0, 0, 0, 0, 0, 0], 0),
+   (InteractionKind.Memory, "SP1Memory", [0, 3, 10, 0, 0, 0, 0, 0, 0], 0),
+   (InteractionKind.Memory, "SP1Memory", [0, 0, 11, 0, 0, 0, 0, 0, 0], 0),
+   (InteractionKind.Memory, "SP1Memory", [0, 2, 11, 0, 0, 0, 0, 0, 0], 0),
+   (InteractionKind.Exit, "SP1Exit", [0], 0),
+   (InteractionKind.Exit, "SP1Exit", [0], 1)]
 
 theorem concreteBaseTrace_skeletonLedger_eq :
     concreteBaseTrace.skeletonLedger = boundarySkeletonLedger := by
@@ -294,6 +321,8 @@ theorem anchorExecution_byteConsumers :
   rw [concreteBaseTrace_skeletonLedger_eq] at member
   simp only [boundarySkeletonLedger, List.mem_cons, List.not_mem_nil, or_false] at member
   rcases member with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl |
+    rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl |
+    rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl |
     rfl | rfl | rfl | rfl <;> simp [multOf] at byte ⊢
 
 theorem anchorExecution_demandServable :
@@ -391,10 +420,12 @@ theorem anchorExecution_memoryGenesis :
 
 /-! ## Exact finite footprint -/
 
-/-- The canonical zero-step closure has two State interactions, twelve verifier Byte pulls, and
-three aggregate Byte-provider pushes. -/
+/-- The canonical zero-step closure carries 37 interactions: the boundary skeleton's 34 (two
+State, twelve verifier Byte pulls, the verifier's Exit pull, and the padding Halt row's own
+eighteen entries — seventeen gated to multiplicity zero, plus its zero-code Exit push) and the
+three aggregate Byte-provider pushes that close the shard's actual demand. -/
 theorem anchorExecution_nativeTrace_interactions_length :
-    (nativeTrace stmt anchorExecution).witness.interactions.length = 17 := by
+    (nativeTrace stmt anchorExecution).witness.interactions.length = 37 := by
   unfold nativeTrace nativeBaseTrace
   rw [show compileExecution stmt.program anchorExecution (nativeInitialClock stmt) =
       emptyCompiledExecution (nativeInitialClock stmt) by
@@ -421,7 +452,7 @@ theorem anchorExecution_footprintFits :
     (NativeTraceFootprint.ofTrace (nativeTrace stmt anchorExecution)).Fits SP1Prime := by
   unfold NativeTraceFootprint.Fits NativeTraceFootprint.ofTrace
   have bound (channel : RawChannel (ZMod SP1Prime)) :
-      ((nativeTrace stmt anchorExecution).witness.interactionsWith channel).length ≤ 17 := by
+      ((nativeTrace stmt anchorExecution).witness.interactionsWith channel).length ≤ 37 := by
     rw [← anchorExecution_nativeTrace_interactions_length]
     exact witness_interactionsWith_length_le _ _
   simp only [Air.Flat.EnsembleWitness.interactionsWith_allTablesWitness]
@@ -431,13 +462,17 @@ theorem anchorExecution_footprintFits :
   · exact lt_of_le_of_lt (bound byteChannel.toRaw) (by native_decide)
   constructor
   · exact lt_of_le_of_lt (bound programChannel.toRaw) (by native_decide)
+  constructor
   · exact lt_of_le_of_lt (bound memoryChannel.toRaw) (by native_decide)
+  · exact lt_of_le_of_lt (bound exitChannel.toRaw) (by native_decide)
 
 /-! ## Joint admissibility and capstone consequences -/
 
 /-- Every readiness field of the deterministic compiler is jointly inhabited on the same honest
 semantic execution. -/
 theorem anchorExecution_nativeTraceReady : NativeTraceReady stmt anchorExecution where
+  syscallFree := by intro transition transitionMem; simp [anchorExecution] at transitionMem
+  exitZero := rfl
   compiler := by simpa only [stmt] using anchorExecution_compilerReady
   stateBumps := by simpa only [stmt] using anchorExecution_stateBumpsReady
   stateChronology := by simpa only [stmt] using anchorExecution_stateChronology
