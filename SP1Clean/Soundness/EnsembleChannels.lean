@@ -26,7 +26,7 @@ namespace SP1Clean.Soundness
 open SP1Clean
 open Air.Flat
 open Circuit
-open SP1Clean.Channels (stateChannel byteChannel programChannel memoryChannel)
+open SP1Clean.Channels (stateChannel byteChannel programChannel memoryChannel exitChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
@@ -438,17 +438,30 @@ private theorem rangeProvider_channels_subset (width : RangeChip.Width) :
   simp only [sp1Ensemble_channels, List.mem_cons, List.not_mem_nil, or_false]
   tauto
 
+private theorem haltProvider_channels_subset :
+    (HaltChip.circuit (p := p)).channels ⊆ (sp1Ensemble (p := p)).channels := by
+  intro ch h
+  rw [GeneralFormalCircuit.channels, List.mem_append,
+    show (HaltChip.circuit (p := p)).channelsWithGuarantees
+      = [byteChannel.toRaw, stateChannel.toRaw, programChannel.toRaw, memoryChannel.toRaw,
+         exitChannel.toRaw] from rfl,
+    show (HaltChip.circuit (p := p)).channelsWithRequirements = [memoryChannel.toRaw] from rfl] at h
+  simp only [List.not_mem_nil, List.mem_cons, or_false] at h
+  simp only [sp1Ensemble_channels, List.mem_cons, List.not_mem_nil, or_false]
+  tauto
+
 private theorem verifier_channels_subset :
     (sp1StateVerifier (p := p)).channels ⊆ (sp1Ensemble (p := p)).channels := by
   intro ch h
   rw [GeneralFormalCircuit.channels, List.mem_append,
-    show (sp1StateVerifier (p := p)).channelsWithGuarantees = [stateChannel.toRaw, byteChannel.toRaw] from rfl,
+    show (sp1StateVerifier (p := p)).channelsWithGuarantees
+      = [stateChannel.toRaw, byteChannel.toRaw, exitChannel.toRaw] from rfl,
     show (sp1StateVerifier (p := p)).channelsWithRequirements = [] from rfl] at h
   simp only [List.not_mem_nil, List.mem_cons, or_false] at h
   simp only [sp1Ensemble_channels, List.mem_cons, List.not_mem_nil, or_false]
   tauto
 
-/-- **Every boundary/provider table stays on the ensemble's four buses.** -/
+/-- **Every boundary/provider table stays on the ensemble's five buses.** -/
 theorem sp1ProviderTables_channels_subset : ∀ c ∈ sp1ProviderTables (p := p),
     c.circuit.channels ⊆ (sp1Ensemble (p := p)).channels := by
   intro c hc
@@ -463,10 +476,10 @@ theorem sp1ProviderTables_channels_subset : ∀ c ∈ sp1ProviderTables (p := p)
     obtain ⟨width, -, rfl⟩ := List.mem_map.mp hc
     exact rangeProvider_channels_subset width
   · simp only [List.mem_cons, List.not_mem_nil, or_false] at hc
-    rcases hc with rfl | rfl | rfl | rfl | rfl
+    rcases hc with rfl | rfl | rfl | rfl | rfl | rfl
     exacts [programProvider_channels_subset, memoryInitProvider_channels_subset,
       memoryFinalizeProvider_channels_subset, memoryBumpProvider_channels_subset,
-      stateBumpProvider_channels_subset]
+      stateBumpProvider_channels_subset, haltProvider_channels_subset]
 
 /-- **The ensemble's tables speak only on the ensemble's channels** — verifier row included.
 
@@ -481,7 +494,7 @@ theorem sp1Ensemble_allTables_channels_subset :
   · exact sp1Tables_channels_subset _ hc
   · exact sp1ProviderTables_channels_subset _ hc
 
-/-- **The four buses have four distinct names**, so a channel name identifies its channel.
+/-- **The five buses have five distinct names**, so a channel name identifies its channel.
 
 This is what turns `Interaction.toAccess`'s key — which carries the emitting channel's `name` — into
 a statement about *which* channel produced an access. -/
@@ -489,33 +502,34 @@ theorem channel_eq_of_name_eq {c₁ c₂ : RawChannel (ZMod p)}
     (h₁ : c₁ ∈ (sp1Ensemble (p := p)).channels) (h₂ : c₂ ∈ (sp1Ensemble (p := p)).channels)
     (hname : c₁.name = c₂.name) : c₁ = c₂ := by
   simp only [sp1Ensemble_channels, List.mem_cons, List.not_mem_nil, or_false] at h₁ h₂
-  rcases h₁ with rfl | rfl | rfl | rfl <;> rcases h₂ with rfl | rfl | rfl | rfl <;>
+  rcases h₁ with rfl | rfl | rfl | rfl | rfl <;> rcases h₂ with rfl | rfl | rfl | rfl | rfl <;>
     first
       | rfl
       | (exfalso
          revert hname
-         simp only [Channel.toRaw_name, stateChannel, byteChannel, programChannel, memoryChannel]
+         simp only [Channel.toRaw_name, stateChannel, byteChannel, programChannel, memoryChannel,
+           exitChannel]
          decide)
 
 
-/-- **The four buses have four distinct kinds too**, so an access's `InteractionKind` identifies its
+/-- **The five buses have five distinct kinds too**, so an access's `InteractionKind` identifies its
 channel just as its name does. This is the form the ledger's kind-filter needs. -/
 theorem channel_eq_of_kindOf_eq {c₁ c₂ : RawChannel (ZMod p)}
     (h₁ : c₁ ∈ (sp1Ensemble (p := p)).channels) (h₂ : c₂ ∈ (sp1Ensemble (p := p)).channels)
     (hkind : kindOf c₁.name = kindOf c₂.name) : c₁ = c₂ := by
   simp only [sp1Ensemble_channels, List.mem_cons, List.not_mem_nil, or_false] at h₁ h₂
-  rcases h₁ with rfl | rfl | rfl | rfl <;> rcases h₂ with rfl | rfl | rfl | rfl <;>
+  rcases h₁ with rfl | rfl | rfl | rfl | rfl <;> rcases h₂ with rfl | rfl | rfl | rfl | rfl <;>
     first
       | rfl
       | (exfalso
          revert hkind
          simp [Channel.toRaw_name, stateChannel, byteChannel, programChannel, memoryChannel,
-           kindOf])
+           exitChannel, kindOf])
 
 /-- **The side condition `Model/CleanLedger.lean`'s kind-filter asks of a table**, discharged for
 every table of this ensemble: an interaction whose kind matches a declared channel's *is* on that
 channel. Both halves are already proved — the table emits only on the ensemble's channels, and those
-four have four distinct kinds. -/
+five have five distinct kinds. -/
 theorem interactions_channel_eq_of_kindOf (table : Table (ZMod p))
     (hcomponent : table.component ∈ (sp1Ensemble (p := p)).allTables)
     (channel : RawChannel (ZMod p)) (hchannel : channel ∈ (sp1Ensemble (p := p)).channels) :

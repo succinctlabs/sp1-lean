@@ -1770,7 +1770,8 @@ theorem ltChip_interactions_faithful
       hDoubleNeg]
     simp
   refine List.Perm.trans ?_
-    (LookupAccessList.perm_filter_by_kind rustAccesses).symm
+    (LookupAccessList.perm_filter_by_kind_of_exit_nil rustAccesses
+      (Extracted.map_toAccess_exit_filter _)).symm
   rw [hS, hP]
   exact ((hB.append_left _).append hM).append_right _
 

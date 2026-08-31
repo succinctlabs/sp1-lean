@@ -60,9 +60,17 @@ access clock `clk_low + off`. -/
     MemoryMsg (Expression (ZMod p)) :=
   ⟨input.state.clk_high, clkLow input + off, idx, 0, 0, block.prev_value⟩
 
-/-- The Exit-bus payload: `x10`/`a0`'s read word — the exit code the shard commits. -/
+/-- The Exit-bus payload of a real row: the **reduced** `x10`/`a0` word — SP1's `b().reduce()`
+(`crates/core/machine/src/syscall/instructions/air.rs:487`), `w0 + w1·2^16 + w2·2^32 + w3·2^48`.
+With the gated high-limb zero checks below, this is exactly the u32 exit code. -/
 @[circuit_norm] def exitMsg (input : Var Inputs (ZMod p)) : ExitMsg (Expression (ZMod p)) :=
-  ⟨input.x10_memory.prev_value⟩
+  ⟨input.x10_memory.prev_value[0] +
+    (input.x10_memory.prev_value[1] +
+      (input.x10_memory.prev_value[2] + input.x10_memory.prev_value[3] * 65536) * 65536) * 65536⟩
+
+/-- The Exit-bus payload of a padding row: the zero exit code. The verifier's ungated pull then
+forces `exit_code = 0` on ordinary shards and exactly one halt-table row overall (`ExitMsg`). -/
+@[circuit_norm] def exitPaddingMsg : ExitMsg (Expression (ZMod p)) := ⟨0⟩
 
 /-- The halt row: the inline `is_real` gate, the `CPUState` block at the halt transition, the three
 register-access timestamp sub-assertions, the ECALL Program pull, the gated `x5 = 0` (syscall code
@@ -85,6 +93,11 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
   assertZero (input.is_real * input.x5_memory.prev_value[1])
   assertZero (input.is_real * input.x5_memory.prev_value[2])
   assertZero (input.is_real * input.x5_memory.prev_value[3])
+  -- The exit code is a u32: the `x10` word's high limbs vanish — the profile strengthening that
+  -- makes the committed `exit_code` cell reconstruct the exact 64-bit `a0` value (SP1's own AIR
+  -- reduces the full word without this check, wrapping mod p for `a0 ≥ 2^32`).
+  assertZero (input.is_real * input.x10_memory.prev_value[2])
+  assertZero (input.is_real * input.x10_memory.prev_value[3])
   -- Three pure register reads: read-prior pull + read-back push (`x5` at `+4`, `x10` at `+3`,
   -- `x11` at `+2`), exactly the `RTypeReader` read shape.
   memoryChannel.pullIf input.is_real (memPullMsg input input.x5_memory 5)
@@ -93,8 +106,10 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
   memoryChannel.pushIf input.is_real (memPushMsg input input.x10_memory 10 3)
   memoryChannel.pullIf input.is_real (memPullMsg input input.x11_memory 11)
   memoryChannel.pushIf input.is_real (memPushMsg input input.x11_memory 11 2)
-  -- The exit word: `x10`/`a0`'s read value, for the state-boundary verifier's gated pull.
+  -- The exit binding: a real row pushes the reduced `x10` word, a padding row the zero code; the
+  -- state-boundary verifier's ungated `⟨exit_code⟩` pull balances against exactly one of them.
   exitChannel.pushIf input.is_real (exitMsg input)
+  exitChannel.pushIf (1 - input.is_real) exitPaddingMsg
 
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
   localLength _ := 0
@@ -119,8 +134,8 @@ instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
     intro interaction h_interaction
     simp only [circuit_norm, main, Readers.CPUState.circuit,
       Readers.RegisterAccessCols.circuit] at h_interaction
-    rcases h_interaction with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
-    -- program (slot 2), the six memory interactions (slot 3), exit (slot 4)
+    rcases h_interaction with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
+    -- program (slot 2), the six memory interactions (slot 3), the two exit pushes (slot 4)
     · exact Or.inl (List.mem_cons_of_mem _ (List.mem_cons_of_mem _ List.mem_cons_self))
     all_goals first
       | exact Or.inl (List.mem_cons_of_mem _ (List.mem_cons_of_mem _

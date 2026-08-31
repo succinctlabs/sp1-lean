@@ -142,6 +142,10 @@ def Occurrence : ProviderTableId → Type
   | .memoryFinalize => MemRecordEntry
   | .memoryBump => MemoryBumpEvent
   | .stateBump => StateBumpEvent
+  -- The deterministic compiler emits no real halt rows yet; `Empty` makes that type-level (the
+  -- 2.4b tranche replaces it with the semantic halt event). The halt table itself is never empty:
+  -- `HaltChip.haltTraceInputs [] = [paddingInputs]`, whose `⟨0⟩` Exit push balances the verifier.
+  | .halt => Empty
 
 /-- Side condition required by one provider table's trace builder. -/
 def Valid : (id : ProviderTableId) → id.Occurrence → Prop
@@ -152,6 +156,7 @@ def Valid : (id : ProviderTableId) → id.Occurrence → Prop
   | .memoryFinalize, _ => True
   | .memoryBump, e => e.WellFormed
   | .stateBump, e => e.WellFormed
+  | .halt, e => e.elim
 
 end SP1Clean.ProviderTableId
 
@@ -383,8 +388,10 @@ def providerTableFor : ProviderTableId → Table (ZMod p)
       (memoryBumpTraceInputs (trace.providerOccurrences .memoryBump)) trace.data trace.hint
   | .stateBump => Table.build StateBumpChip.component
       (stateBumpTraceInputs (trace.providerOccurrences .stateBump)) trace.data trace.hint
+  | .halt => Table.build HaltChip.component
+      (HaltChip.haltTraceInputs (trace.providerOccurrences .halt)) trace.data trace.hint
 
-/-- The twenty-eight built provider and boundary tables, in the one physical order fixed by the
+/-- The twenty-nine built provider and boundary tables, in the one physical order fixed by the
 neutral provider registry. -/
 def providerTables : List (Table (ZMod p)) :=
   ProviderTableId.all.map trace.providerTableFor
@@ -402,6 +409,7 @@ circuit-bearing soundness registry. -/
   | memoryFinalize => rfl
   | memoryBump => rfl
   | stateBump => rfl
+  | halt => rfl
 
 /-- Every provider table carries the trace's shared committed prover data. -/
 @[simp] theorem providerTableFor_data (id : ProviderTableId) :
@@ -414,6 +422,7 @@ circuit-bearing soundness registry. -/
   | memoryFinalize => rfl
   | memoryBump => rfl
   | stateBump => rfl
+  | halt => rfl
 
 /-- Pointwise provider-table completeness. This is the sole proof that dispatches on all provider
 identities; list-level assembly below only reasons through `List.map`. -/
@@ -449,8 +458,11 @@ theorem providerTableFor_constraints (wf : trace.WellFormed) (id : ProviderTable
   | stateBump =>
       exact StateBumpChip.traceTable_constraints _ _ _
         (stateBumpTraceInputs_spec (wf.provider .stateBump))
+  | halt =>
+      exact HaltChip.traceTable_constraints _ _ _
+        (HaltChip.haltTraceInputs_spec (trace.providerOccurrences .halt))
 
-/-- The full 53-table assembly is the instruction registry followed by the provider segment. -/
+/-- The full 54-table assembly is the instruction registry followed by the provider segment. -/
 def tables : List (Table (ZMod p)) :=
   trace.instructionTables ++ trace.providerTables
 

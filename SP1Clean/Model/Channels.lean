@@ -87,14 +87,16 @@ def byteChannel : Channel (ZMod p) ByteRow where
   Guarantees msg _ := ByteRowSpec msg
 
 /-- The Exit channel — the native halt table's exit-code bus. It has no SP1 `InteractionKind`
-counterpart: SP1's syscall chip constrains `public_values.exit_code` in place, while the native
-ensemble factors that binding through one channel so the halt row (push) and the state-boundary
-verifier (pull, against the committed `exit_code` cell) meet on an explicit bus balance.
-`Guarantees := Word.isU64` of the carried word — the halt row proves it on push straight from its
-paired `x10` memory read-prior pull, so the verifier-side pull derives a genuine u64 exit word. -/
+counterpart: SP1's syscall chip constrains `public_values.exit_code` by direct chip-level
+public-values access, which Clean's flat-AIR reserves to the designated verifier — so the native
+ensemble factors that binding through one channel. The verifier pulls `⟨exit_code⟩` **ungated**
+(its row is exactly the public input and can witness no gate cell); a real halt row pushes its
+reduced `x10` word, a padding halt row pushes `⟨0⟩`, and balance alone forces the exit semantics
+(see `ExitMsg`). `Guarantees := True` — like the State bus, the channel is purely structural: the
+binding is a multiset fact, not a per-message predicate. -/
 def exitChannel : Channel (ZMod p) ExitMsg where
   name := "SP1Exit"
-  Guarantees msg _ := Word.isU64 msg.value
+  Guarantees _ _ := True
 
 open Classical in
 /-- **Subcircuit interactions, kept in `interactionsWith` form.** Combines Clean's

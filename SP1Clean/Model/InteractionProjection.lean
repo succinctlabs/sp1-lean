@@ -32,6 +32,7 @@ def kindOf (name : String) : InteractionKind :=
   else if name = "SP1Program" then .Program
   else if name = "SP1State" then .State
   else if name = "SP1Byte" then .Byte
+  else if name = "SP1Exit" then .Exit
   else .State
 
 /-- A channel is classified as Byte exactly when it carries the canonical native Byte name. This
@@ -46,7 +47,9 @@ a preprocessed Byte demand. -/
     · subst name; simp
     · split <;> rename_i hstate
       · subst name; simp
-      · split <;> simp_all
+      · split
+        · simp_all
+        · split <;> simp_all
 
 /-- The **signed** value of a field element: its centered representative in `(-p/2, p/2]`, as `ℤ`. For the
 `±is_real` multiplicities the buses use this is exactly `±is_real.val` (`signedVal_is_real`/`_neg_is_real`);

@@ -3672,8 +3672,9 @@ private theorem mulChip_interactions_faithful
   rw [hUnexpected]
   simp only [List.map_nil, List.append_nil]
   refine List.Perm.trans ?_
-    (LookupAccessList.perm_filter_by_kind
-      (LookupAccessList.active (mulChipOracle.accesses rustCols))).symm
+    (LookupAccessList.perm_filter_by_kind_of_exit_nil
+      (LookupAccessList.active (mulChipOracle.accesses rustCols))
+      (Extracted.active_map_toAccess_exit_filter _)).symm
   simp only [LookupAccessList.active] at hStateActive
   simp only [LookupAccessList.active] at hByteActive
   simp only [LookupAccessList.active] at hMemoryActive

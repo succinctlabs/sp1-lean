@@ -148,8 +148,10 @@ halting shard (semantics-gap campaign, PR 2.4's inhabitation wave). One real row
 - it reads registers `x5` (`t0`, the syscall code — constrained to `0 = SyscallCode::HALT`),
   `x10` (`a0`, the exit-code word), and `x11` (`a1`) through the standard register-access
   pull/push-back pairs at clock offsets `+4/+3/+2`; and
-- it pushes `x10`'s word on the Exit bus (`Channels.exitChannel`), where the state-boundary
-  verifier's gated pull binds it to the committed `exit_code` public value (ensemble-wiring work).
+- it pushes the **reduced** `x10` word on the Exit bus when real (its high limbs pinned zero —
+  the u32 exit code), and the zero code when padding; the state-boundary verifier's ungated
+  `⟨exit_code⟩` pull balances against exactly one of them, forcing `exit_code = reduce(a0)` on
+  halting shards and `exit_code = 0` on ordinary shards (see `Channels.ExitMsg`).
 
 The row struct: the `CPUState` block, the three register-access blocks, and the selector. -/
 structure Inputs (F : Type) where
@@ -165,9 +167,10 @@ the proven `is_real`-binary fact. Then the `CPUState` clock byte bounds (at the 
 `next_pc = (1, 0, 0)`, `clk_inc = 264`), the three register-access timestamp byte bounds (access
 clocks `clk_low + 4/3/2` for `x5/x10/x11`), and — gated on `is_real = 1` — the program-pull-derived
 pc limb bounds plus the memory-pull-derived facts: the `x5` word is limb-wise zero (the syscall
-code is `HALT`), the three read words are u64, and the three pulled prior records' access clocks
-are 24-bit. The exit-bus payload is *definitionally* `x10_memory.prev_value` (the pushed message),
-so its meaning here is the `isU64` conjunct; the cross-row binding to the committed `exit_code` is
+code is `HALT`), the `x10` word's high limbs are zero (the u32 exit code), the three read words
+are u64, and the three pulled prior records' access clocks are 24-bit. The exit-bus payload is
+*definitionally* the reduced `x10` word (the pushed message), so with the high-limb zeros its
+value is exactly `w0 + w1·2^16 < 2^32`; the cross-row binding to the committed `exit_code` is
 ensemble balance, not a row-local claim. -/
 def Spec (r : Inputs (ZMod p)) : Prop :=
   (r.is_real = 0 ∨ r.is_real = 1) ∧
@@ -187,6 +190,7 @@ def Spec (r : Inputs (ZMod p)) : Prop :=
   (r.is_real = 1 →
     (r.x5_memory.prev_value[0] = 0 ∧ r.x5_memory.prev_value[1] = 0 ∧
       r.x5_memory.prev_value[2] = 0 ∧ r.x5_memory.prev_value[3] = 0) ∧
+    (r.x10_memory.prev_value[2] = 0 ∧ r.x10_memory.prev_value[3] = 0) ∧
     Word.isU64 r.x5_memory.prev_value ∧ Word.isU64 r.x10_memory.prev_value ∧
     Word.isU64 r.x11_memory.prev_value ∧
     r.x5_memory.access_timestamp.prev_low.val < 2 ^ 24 ∧

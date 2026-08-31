@@ -69,6 +69,42 @@ theorem clkNat_add_eight_of_cpuState_bounds (clkHigh clk0 clk1 : ZMod p)
   simp only [clkNat, incrementedVal]
   omega
 
+/-- The `+ 264` twin of `clkNat_add_eight_of_cpuState_bounds` — the halt row's syscall-width
+low-clock increment.  The incremented low clock can exceed `2^24` (that is what StateBump
+re-canonicalizes), but the `2^25` field bound keeps the field sum an exact natural sum, matching
+SP1's own `2 · 2^24` field-size requirement. -/
+theorem clkNat_add_syscall_of_cpuState_bounds (clkHigh clk0 clk1 : ZMod p)
+    (clk0Bound : ((clk0 - 1) * (8 : ZMod p)⁻¹).val < 2 ^ 13)
+    (clk1Bound : clk1.val < 2 ^ 8) :
+    clkNat clkHigh (clk0 + clk1 * 65536 + 264) =
+      clkNat clkHigh (clk0 + clk1 * 65536) + 264 := by
+  have hp := Fact.out (p := 2 ^ 25 < p)
+  have val264 : ((264 : ZMod p)).val = 264 := by
+    rw [show ((264 : ZMod p)) = ((264 : ℕ) : ZMod p) by norm_num,
+      ZMod.val_natCast_of_lt (by omega)]
+  let scaled := (clk0 - 1) * (8 : ZMod p)⁻¹
+  have scaledBound : scaled.val < 2 ^ 13 := clk0Bound
+  have reconstruct : scaled * 8 + 1 = clk0 := by
+    dsimp only [scaled]
+    rw [mul_assoc, inv_mul_cancel₀ val_8_ne_zero, mul_one]
+    ring_nf
+  have scaledMulVal : (scaled * 8).val = scaled.val * 8 := by
+    rw [ZMod.val_mul_of_lt (by rw [val_8_zmod_p]; omega), val_8_zmod_p]
+  have clk0Val : clk0.val = scaled.val * 8 + 1 := by
+    calc
+      clk0.val = (scaled * 8 + 1).val := congrArg ZMod.val reconstruct.symm
+      _ = (scaled * 8).val + (1 : ZMod p).val :=
+        ZMod.val_add_of_lt (by rw [scaledMulVal, ZMod.val_one]; omega)
+      _ = scaled.val * 8 + 1 := by rw [scaledMulVal, ZMod.val_one]
+  have highLimbVal : (clk1 * 65536).val = clk1.val * 65536 := by
+    rw [ZMod.val_mul_of_lt (by rw [val_65536_zmod_p]; omega), val_65536_zmod_p]
+  have lowVal : (clk0 + clk1 * 65536).val = clk0.val + clk1.val * 65536 := by
+    rw [ZMod.val_add_of_lt (by rw [clk0Val, highLimbVal]; omega), highLimbVal]
+  have incrementedVal : (clk0 + clk1 * 65536 + 264).val = (clk0 + clk1 * 65536).val + 264 := by
+    rw [ZMod.val_add_of_lt (by rw [lowVal, clk0Val, val264]; omega), val264]
+  simp only [clkNat, incrementedVal]
+  omega
+
 /-- Contract-level form used by instruction-row proofs. -/
 theorem clkNat_add_eight_of_cpuState_spec (input : Readers.CPUState.Inputs (ZMod p))
     (real : input.is_real = 1) (spec : Readers.CPUState.Spec input)

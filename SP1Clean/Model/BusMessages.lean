@@ -298,13 +298,18 @@ def ProgramMsg.RowSpec (msg : ProgramMsg (ZMod p)) : Prop :=
   msg.pc0.val < 2 ^ 16 ∧ msg.pc1.val < 2 ^ 16 ∧ msg.pc2.val < 2 ^ 16 ∧
   (msg.op_a_0 = 0 ∨ msg.op_a_0 = 1)
 
-/-- The Exit-bus message — the halting shard's exit-code operand, as the 4-limb `Word` the halt
-table reads out of `x10`/`a0` at the `HALT` ECALL. SP1 constrains `public_values.exit_code`
-directly inside its syscall chip; the native ensemble factors that binding through one channel —
-the halt row pushes this word and the state-boundary verifier pulls it against the committed
-`exit_code` public value (the pull is ensemble-wiring work; this struct is the shared payload). -/
+/-- The Exit-bus message — the halting shard's **reduced** exit code, the single cell
+`w0 + w1·2^16 + w2·2^32 + w3·2^48` of the `x10`/`a0` word the halt row reads at the `HALT` ECALL
+(SP1's `b().reduce()`, `crates/core/machine/src/syscall/instructions/air.rs`). SP1 constrains
+`public_values.exit_code` by direct chip-level public-values access, which Clean's flat-AIR model
+reserves to the designated verifier — and the verifier row is exactly the public input
+(`verifier_length_zero`), so it can witness no gate cell. The native ensemble therefore factors
+the binding through this channel **ungated**: the verifier always pulls `⟨exit_code⟩`, a real halt
+row pushes its reduced word, and a padding halt row pushes `⟨0⟩` — balance alone then forces
+`exit_code = reduce(word)` on halting shards, `exit_code = 0` on ordinary shards, at most one real
+halt row, and exactly one halt-table row overall. -/
 structure ExitMsg (F : Type) where
-  value : Word F
+  value : F
 deriving ProvableStruct
 
 end SP1Clean.Channels

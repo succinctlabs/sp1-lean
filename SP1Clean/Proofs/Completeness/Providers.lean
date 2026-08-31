@@ -867,6 +867,7 @@ theorem traceTable_interactionsWith (rows : List (Inputs (ZMod p))) (data : Prov
 
 end MemoryBumpChip
 
+
 /-! ## The ensemble verifier row
 
 `localLength = 0`, so witness generation contributes nothing and the built row is exactly the
