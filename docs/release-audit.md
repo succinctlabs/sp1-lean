@@ -163,10 +163,20 @@ single-shard corollary `supported_core_boot_to_halt_single_shard`, whose premise
 
 Two disclosures attach to the halting branch:
 
-* **The Halt table is native, not extracted.** SP1's own ECALL path runs through `SyscallInstrsChip`
-  and the global syscall tables, which the supported profile excludes; `HaltChip` is this
-  repository's explicit replacement for exactly the `HALT` arm, with no Rust oracle and therefore
-  no `ChipFaithful` anchor. Its faithfulness to SP1's executor is reviewed prose, not a theorem.
+* **The Halt table is native and unanchored.** The Rust oracle it would be anchored against does
+  exist — `Extracted/SystemOracle/SyscallInstrs.lean`, extracted like every other, and already
+  consumed by `Faithful/CoreAIR.lean` — so what is missing is the `ChipFaithful` anchor, not the
+  oracle. The anchor cannot be stated in its present form, because `ChipFaithful` equates two
+  *complete* assertion systems and two *complete* interaction multisets, and these are not the same
+  table: SP1's row is a multi-arm dispatcher whose interaction list carries `IsZero` selectors for
+  syscall codes `0`, `3`, `16`, `26`, and `240`, and which sends on the global `.syscall` bus that
+  the supported profile's five channels do not contain. `HaltChip` implements the code-`0` arm
+  alone. What lines up — and is the review evidence — is the skeleton: the Rust row computes
+  `clk + 264` and reads its three registers at clock offsets `+4`, `+3`, `+2`, exactly the window
+  and offsets `HaltChip` uses for `x5`/`x10`/`x11`, with a matching bus shape (2 State, 1 Program,
+  6 Memory). Closing this needs a *gated projection* anchor — agreement on rows whose syscall-code
+  selector is `HALT` and whose excluded-bus terms vanish — which in turn needs the syscall bus in
+  ensemble scope. Until then the restriction relation is reviewed prose, not a theorem.
 * **A 16-bit exit-code profile restriction.** The halt row pins `a0`'s upper three limbs to zero.
   Without it the single committed `exit_code` field cell cannot be decoded back to `a0` at all,
   because SP1's own `b().reduce()` folds the whole 64-bit word into one cell of a prime below
@@ -332,7 +342,7 @@ recomputed and matched cell-for-cell), and the independent Rust interpreter diff
 | `SailConfigured` platform state | the theorems' initial-state hypotheses select SP1's platform on the Lean side: machine mode, no enabled interrupts, `MPRV`/`mseccfg`/PMM off, no HTIF, PMP all-OFF (`h_pmp_off`), and the single RWX PMA region `[2^16, 2^48)` | discharge per-field from SP1's boot/ELF-load contract; the PMA window and PMP-off are the platform selection itself (verification-report §3.2) |
 | Native semantic boundary relation | native provider tables must mean the selected program/state | derive from exact Program/Memory/Global system tables |
 | `SyscallHandler` | Sail does not implement SP1 host syscalls | `ExecutableSyscallHandler.haltOnly` is now a *concrete* handler for the one claimed syscall (`HALT`), so the halting conclusion rests on a named executable host semantics rather than an opaque relation; every other syscall still evaluates to `none` (outside the profile) |
-| Native `HaltChip` | SP1's ECALL path runs through `SyscallInstrsChip` + the global syscall tables, which the supported profile excludes; `HaltChip` is this repository's explicit replacement for exactly the `HALT` arm | no Rust oracle and therefore no `ChipFaithful` anchor — its faithfulness to SP1's executor is reviewed prose; anchor it when the target architecture's ECALL table is in the extraction scope |
+| Native `HaltChip` | SP1's ECALL row is a multi-arm dispatcher (`IsZero` selectors for syscall codes 0/3/16/26/240) that also sends on the global `.syscall` bus, which the supported profile's channels exclude; `HaltChip` implements the `HALT` arm alone | the Rust oracle exists (`Extracted/SystemOracle/SyscallInstrs.lean`) but no `ChipFaithful` anchor does — whole-row assertion/interaction equality is false between an arm and its dispatcher; the restriction relation is reviewed prose. Close it with a gated-projection anchor once the syscall bus is in ensemble scope |
 | 16-bit exit codes | the halt row pins `a0`'s upper three limbs to zero so the single committed `exit_code` cell decodes back to `a0`; SP1's own `b().reduce()` wraps modulo a prime below `2^32` | widen when the public-values block carries enough cells to hold a full `u32`/`u64` exit code, or when a range-checked decomposition is added |
 | Preprocessed commitment | verifying key must bind the Program/provider trace | discharge in PCS/ArkLib layer |
 | Exact natural balance | execution needs a real multiset, not modular equality | extract with LogUp/GKR soundness and bounds |

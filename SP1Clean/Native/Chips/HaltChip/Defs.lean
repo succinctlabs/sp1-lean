@@ -17,11 +17,15 @@ offsets `+4/+3/+2`), pulls the committed ECALL instruction from the Program bus,
 register read-prior/read-back Memory pairs, constrains the `x5` word (the syscall code) to zero,
 and pushes `x10`'s word (the exit code) on the Exit bus.
 
-This is a **native** system table — like `StateBumpChip`/`MemoryBumpChip` it has no
-`ChipKind.advance` and no extracted Rust oracle: SP1's own syscall path runs through
-`SyscallInstrsChip` + the global syscall tables, which the supported profile excludes; the halt
-table is the native ensemble's explicit, auditable replacement for exactly the `HALT` arm
-(`ExecutableSyscallHandler.haltOnly`). Ensemble wiring (table position, the verifier's gated Exit
+This is a **native** system table with no `ChipKind.advance`, and — unlike
+`StateBumpChip`/`MemoryBumpChip`, which are anchored — no `ChipFaithful` anchor. Its Rust
+counterpart *is* extracted (`Extracted/SystemOracle/SyscallInstrs.lean`); what fails is whole-row
+equality, because that row is a multi-arm dispatcher (`IsZero` selectors on syscall codes
+`0`/`3`/`16`/`26`/`240`) that also sends on the global `.syscall` bus, absent from the supported
+profile's five channels. This table implements the code-`0` arm alone
+(`ExecutableSyscallHandler.haltOnly`). The skeleton does match, and is the review evidence: the
+Rust row computes `clk + 264` and reads its three registers at clock offsets `+4`/`+3`/`+2`,
+exactly the window and offsets used below. Ensemble wiring (table position, the verifier's gated Exit
 pull, decode/grounding) is the follow-up chunk; this file is the standalone row circuit.
 
 (`main` + `ElaboratedCircuit` here; soundness/completeness/`circuit` in

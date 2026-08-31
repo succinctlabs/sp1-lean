@@ -29,9 +29,9 @@ The deliverables:
   (`SP1Clean/Soundness/SP1Ensemble.lean`). The provider suffix is six Byte-op tables, 17 Range
   tables for widths `0..16`, Program, MemoryInit, MemoryFinalize, MemoryBump, StateBump, and Halt.
   All 17 widths are needed: honest shift rows emit live Range requests outside the former
-  `8/13/14/16` subset. The Halt table is this repository's own — SP1's ECALL path runs through
-  `SyscallInstrsChip`, which the supported profile excludes — and it is the one table without a
-  Rust oracle (§8.2).
+  `8/13/14/16` subset. The Halt table is this repository's own — it implements the `HALT` arm of
+  SP1's `SyscallInstrsChip`, whose other arms and global syscall bus the supported profile
+  excludes — and it is the one table without a faithfulness anchor (§8.2).
 - **D2 — Per-chip soundness, completeness, and ISA refinement.** Every chip carries closed
   soundness *and* completeness proofs against a semantic `Spec`, and a Sail bridge (`advance`)
   showing its rows realize genuine steps of the official RV64 interpreter.
@@ -753,10 +753,12 @@ the state-boundary verifier pulls `⟨exit_code⟩` **ungated**, and each row of
 native replacement for SP1's `HALT` ECALL arm, ensemble position 53) pushes either its reduced
 `a0` word or, when padding, the zero code. Balance alone then forces exactly one physical Halt row
 and pins the committed exit code to `0` or to `reduce(a0)` accordingly, which is the case split
-`supported_core_witness_grounding` performs. Two facts are disclosed with it: the Halt chip has no
-Rust oracle and therefore no `ChipFaithful` anchor (SP1's ECALL path runs through
-`SyscallInstrsChip`, excluded from the supported profile), and the halt row pins `a0`'s upper three
-limbs to zero — a 16-bit exit-code profile restriction without which the single committed field
+`supported_core_witness_grounding` performs. Two facts are disclosed with it: the Halt chip carries no
+`ChipFaithful` anchor — its Rust oracle is extracted like every other
+(`Extracted/SystemOracle/SyscallInstrs.lean`), but whole-row assertion and interaction equality is
+false between a single arm and the multi-arm dispatcher SP1 actually compiles, which also sends on
+a global syscall bus the supported profile's channels exclude — and the halt row pins `a0`'s upper
+three limbs to zero — a 16-bit exit-code profile restriction without which the single committed field
 cell cannot be decoded back to `a0`, since SP1's own `b().reduce()` wraps modulo a prime below
 `2^32`.
 
