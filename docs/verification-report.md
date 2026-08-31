@@ -27,9 +27,11 @@ The deliverables:
   control-flow, and memory core) are implemented as Clean `GeneralFormalCircuit`s with semantic
   specifications, plus 29 provider/boundary tables, forming the 54-table `sp1Ensemble`
   (`SP1Clean/Soundness/SP1Ensemble.lean`). The provider suffix is six Byte-op tables, 17 Range
-  tables for widths `0..16`, Program, MemoryInit, MemoryFinalize, MemoryBump, and StateBump.
+  tables for widths `0..16`, Program, MemoryInit, MemoryFinalize, MemoryBump, StateBump, and Halt.
   All 17 widths are needed: honest shift rows emit live Range requests outside the former
-  `8/13/14/16` subset.
+  `8/13/14/16` subset. The Halt table is this repository's own — SP1's ECALL path runs through
+  `SyscallInstrsChip`, which the supported profile excludes — and it is the one table without a
+  Rust oracle (§8.2).
 - **D2 — Per-chip soundness, completeness, and ISA refinement.** Every chip carries closed
   soundness *and* completeness proofs against a semantic `Spec`, and a Sail bridge (`advance`)
   showing its rows realize genuine steps of the official RV64 interpreter.
@@ -48,8 +50,13 @@ The deliverables:
 - **D5 — The headline theorem.** `supported_core_native_sound`
   (`SP1Clean/Soundness/AIR.lean`): every constraint-satisfying, channel-balanced witness of the
   54-table ensemble, with an explicit boundary premise, yields a genuine finite,
-  normally-retiring run of the official (SP1-configured, §3.2) Sail RV64 interpreter between the
-  public program-counter/clock endpoints — with no machine-model parameter (§8).
+  normally-retiring run of the official (SP1-configured, §3.2) Sail RV64 interpreter — either
+  between the public program-counter/clock endpoints, or ending in a genuine `SP1Halted` state
+  whose `a0` is the committed exit code, with the AIR's own Exit-channel algebra deciding which
+  (§8.2) — and with no machine-model parameter (§8). One corollary,
+  `supported_core_boot_to_halt_single_shard`, adds a boot boundary and states the first
+  whole-program fact: entry point with zeroed registers to a halting state carrying the committed
+  exit code, on a single shard.
 - **D6 — Conformance testing against the real prover.** A dump-anchored pipeline reconstructs
   every event row of all 25 chips from the circuits' own witness generators and matches it
   cell-for-cell against full trace matrices dumped from SP1's actual Rust prover at SP1's field,
@@ -594,7 +601,10 @@ follow-up work; (ii) the shard-local initial state comes from the boundary bindi
 No cross-shard stitching (the relation exists — `SP1ExecutionRelation`, with full-state
 continuity between consecutive execution shards, last-shard canonical-halt, and ledger
 authentication fields — but its soundness theorem is intentionally not declared). No syscall
-host-behavior semantics beyond the `SyscallHandler` interface. No boot/ELF-loading claim.
+host-behavior semantics beyond `ExecutableSyscallHandler.haltOnly`, the concrete handler for the
+one claimed syscall; every other syscall evaluates to `none`, i.e. outside the profile. Boot
+reachability appears in exactly one place — the single-shard corollary
+`supported_core_boot_to_halt_single_shard` (§8.2) — and nowhere in the shard-level statements.
 
 A deterministic native ensemble-completeness theorem is now declared (§7.4). It covers the entire
 admissible native compiler image, not yet every witness of the shared bounded ordinary semantic
@@ -723,12 +733,43 @@ Read precisely: for every statement and every witness in the native relation, **
 shard-local run witness — a genuine finite `try_step` run of the official Sail RV64 interpreter,
 on the committed program, in which every step retires normally (`SailRetireChain` — the trap,
 illegal-instruction, wait, and extension-failure exits are excluded), starting from a
-`ShardStartState` (public initial PC, committed ROM loaded, platform configured), ending at the
-public final PC, and taking exactly `(finalClk − initClk)/8` instructions — together with a
+`ShardStartState` (public initial PC, committed ROM loaded, platform configured) — together with a
 well-formed Memory boundary, populated per canonically-addressed, genesis-backed committed
 finalize record, whose cells agree with real location content in the initial and final Sail
 states (`exists_populated_memoryBoundary` from the walk's exported value currency at the
-committed final clock). There is no
+committed final clock).
+
+The run itself comes in one of two shapes, and **which one is decided by the AIR's own algebra**:
+
+- an `OrdinaryRun` — the run ends at the public final PC, takes exactly `(finalClk − initClk)/8`
+  instructions, and the committed `exit_code` is `0`; or
+- a `HaltedRun` — the normally-retiring prefix reaches a genuine `SP1Halted` state (the PC at a
+  committed `ECALL` word of the guest ROM, `t0` holding the canonical `SyscallCode::HALT`, `a0`
+  holding the committed exit code), and the public endpoint is that state parked at SP1's terminal
+  `haltPc` one 264-tick syscall window later.
+
+The disjunction costs no hypothesis. The ensemble's fifth channel, Exit, has exactly two parties:
+the state-boundary verifier pulls `⟨exit_code⟩` **ungated**, and each row of the Halt table (the
+native replacement for SP1's `HALT` ECALL arm, ensemble position 53) pushes either its reduced
+`a0` word or, when padding, the zero code. Balance alone then forces exactly one physical Halt row
+and pins the committed exit code to `0` or to `reduce(a0)` accordingly, which is the case split
+`supported_core_witness_grounding` performs. Two facts are disclosed with it: the Halt chip has no
+Rust oracle and therefore no `ChipFaithful` anchor (SP1's ECALL path runs through
+`SyscallInstrsChip`, excluded from the supported profile), and the halt row pins `a0`'s upper three
+limbs to zero — a 16-bit exit-code profile restriction without which the single committed field
+cell cannot be decoded back to `a0`, since SP1's own `b().reduce()` wraps modulo a prime below
+`2^32`.
+
+One corollary steps outside the shard: `supported_core_boot_to_halt_single_shard`
+(`SP1Clean/Soundness/BootHalt.lean`) adds a *boot* semantic boundary (`BootBoundaryFacts`:
+`IsInitialState` at the committed entry PC, SP1's zeroed integer register file, boot clock `1`)
+and a live Halt row, and concludes a whole-program fact — from the entry point with zeroed
+registers, `steps` normally-retiring interpreter steps reach an `SP1Halted` state carrying the
+committed exit code, with committed terminal PC `haltPc` and committed final clock
+`1 + 8·steps + 264`. It is single-shard, and it has no *constructed* inhabitant yet: the
+deterministic completeness compiler still emits only the padding Halt row.
+
+There is no
 machine-model parameter and no schedule hypothesis; the model-scheduled form is the corollary
 `supported_core_native_sound_scheduled` via the no-strength-lost adapter
 `supportedCoreLocalExecution_of_sailRelation`. Axiom census: `propext`, `Classical.choice`,
