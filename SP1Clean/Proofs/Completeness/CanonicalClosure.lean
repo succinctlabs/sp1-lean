@@ -512,14 +512,14 @@ theorem canonicalClosure_skeletonLedger :
 
 /-- The rebuilt trace realizes its own closure.  Idempotence is supplied by skeleton invariance. -/
 theorem canonicalClosure_closureRealized : trace.canonicalClosure.ClosureRealized where
-  u8Range := trace.canonicalClosure_closureU8RangeEntries.symm
-  msb := trace.canonicalClosure_closureMsbEntries.symm
-  andByte := trace.canonicalClosure_closureAndByteEntries.symm
-  orByte := trace.canonicalClosure_closureOrByteEntries.symm
-  xorByte := trace.canonicalClosure_closureXorByteEntries.symm
-  ltu := trace.canonicalClosure_closureLtuEntries.symm
-  range width := (trace.canonicalClosure_closureRangeEntries width).symm
-  rom := trace.canonicalClosure_closureRomEntries.symm
+  u8Range := by rw [trace.canonicalClosure_closureU8RangeEntries]; rfl
+  msb := by rw [trace.canonicalClosure_closureMsbEntries]; rfl
+  andByte := by rw [trace.canonicalClosure_closureAndByteEntries]; rfl
+  orByte := by rw [trace.canonicalClosure_closureOrByteEntries]; rfl
+  xorByte := by rw [trace.canonicalClosure_closureXorByteEntries]; rfl
+  ltu := by rw [trace.canonicalClosure_closureLtuEntries]; rfl
+  range width := by rw [trace.canonicalClosure_closureRangeEntries width]; rfl
+  rom := by rw [trace.canonicalClosure_closureRomEntries]; rfl
 
 /-- Servability depends only on the provider-free skeleton, so it is preserved by canonical
 closure. -/

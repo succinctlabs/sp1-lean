@@ -851,9 +851,16 @@ closure leaves the unselected buses completely alone, so adding providers cannot
 Memory balance that held before.
 -/
 
-/-- Every key the skeleton touches on a selectable bus, without duplicates. -/
+/-- Every key the skeleton actually *demands* on a selectable bus, without duplicates.
+
+Zero-multiplicity accesses are dropped first (`active`).  A padded chip row emits its whole
+interaction list gated to multiplicity zero, and such an access contributes to neither LogUp nor
+the signed balance — so its key is not a demand, and a provider that recounted it would be
+supplying a row nothing asked for.  Skipping them is also what keeps the closure insensitive to
+padding: the Halt table is always exactly one row, so on an ordinary shard its padding row's
+Program fetch would otherwise manufacture a ROM demand no compiled instruction backs. -/
 def closingKeys (skeleton : LookupAccessList) (select : LookupKey → Bool) : List LookupKey :=
-  ((skeleton.map keyOf).filter select).dedup
+  (((active skeleton).map keyOf).filter select).dedup
 
 theorem closingKeys_nodup (skeleton : LookupAccessList) (select : LookupKey → Bool) :
     (closingKeys skeleton select).Nodup := List.nodup_dedup _
@@ -870,6 +877,7 @@ theorem mem_closingKeys_of_multiplicitySum_ne_zero (skeleton : LookupAccessList)
   rw [closingKeys, List.mem_dedup, List.mem_filter]
   refine ⟨?_, hsel⟩
   by_contra hmem
+  rw [← multiplicitySum_active] at h
   exact h (multiplicitySum_eq_zero_of_keyOf_ne fun a ha hka => hmem (hka ▸ List.mem_map_of_mem ha))
 
 /-- The closure never touches a bus it was not asked to supply. This is what makes it safe to add:
