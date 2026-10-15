@@ -1,0 +1,48 @@
+name: Released SP1 inventory
+
+on:
+  pull_request:
+    paths:
+      - 'rust/sp1-comparison/**'
+      - 'scripts/provenance.json'
+      - 'scripts/check_pins.py'
+      - 'scripts/check_release_surface.py'
+      - '.github/workflows/rust-comparison.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'rust/sp1-comparison/**'
+      - 'scripts/provenance.json'
+      - 'scripts/check_pins.py'
+      - 'scripts/check_release_surface.py'
+      - '.github/workflows/rust-comparison.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    env:
+      CARGO_BUILD_JOBS: 2
+    strategy:
+      matrix:
+        features: ['', 'mprotect']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust/sp1-comparison
+          key: ${{ matrix.features }}
+      - name: Formatting
+        run: cargo fmt --manifest-path rust/sp1-comparison/Cargo.toml --check
+      - name: Reviewed release pins and coverage
+        run: |
+          python3 scripts/check_pins.py
+          python3 scripts/check_release_surface.py
+      - name: Inventory from pinned Rust source
+        run: cargo test --locked --manifest-path rust/sp1-comparison/Cargo.toml --features '${{ matrix.features }}'

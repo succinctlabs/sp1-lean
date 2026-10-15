@@ -2,9 +2,11 @@ import SP1CleanTest.TraceGenTests.Conformance
 
 /-! # Event → input-column mirrors for the trace-generation conformance layer.
 
-The trace anchors (`TraceGenTests/<Chip>TraceWitness.lean`) derive whole rows from the chip circuits
-(`TraceGenerator.lean`); the *only* hand-written remainder of SP1's `generate_trace` is the
-event → input-column extraction, mirrored here. These are direct ℕ-arithmetic transcriptions of
+Whole rows are derived from the chip circuits (`TraceGenerator.lean`) and checked against SP1's
+real prover by the dump-anchored pipeline (`export/sp1dump/` + the `--testdata` generation-time
+gate in `scripts/witgenExport.lean`), not by a per-chip `native_decide` anchor; the *only*
+hand-written remainder of SP1's `generate_trace` is the event → input-column extraction,
+mirrored here. These are direct ℕ-arithmetic transcriptions of
 SP1's adapter populate functions (read-only references, paths relative to the sibling `sp1`
 checkout):
 
@@ -29,7 +31,7 @@ checkout):
   copies the `op_c` Word into `op_c_memory.prev_value` and zeroes both timestamp columns; on
   register rows it populates the access block from the read record.
 
-Flattening order matches the `ProvableStruct` derivations field-for-field (`Specs/Chip.lean`
+Flattening order matches the `ProvableStruct` derivations field-for-field (`FormalModel/Contracts/Chips.lean`
 `Inputs` = `is_real ++ state ++ adapter`; `Extracted/CPUState.lean`; `Extracted/RTypeReader.lean`;
 `Extracted/ALUTypeReader.lean`), which in turn mirror SP1's `repr(C)` column structs. Everything is
 computable and axiom-clean. -/

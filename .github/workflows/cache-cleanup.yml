@@ -1,0 +1,70 @@
+name: Cache cleanup
+
+# Keeps the repository's GitHub Actions cache inside its 10 GB budget by rule instead of by
+# GitHub's LRU eviction (which is blind to lineage): `scripts/ci/cache_gc.py` deletes superseded
+# `core` entries once the same sha's `align` superset exists, keeps only the newest few `main`
+# shas, drops entries under a stale toolchain/manifest prefix, keeps one build per open PR, and
+# empties a closed PR's ref. Three triggers: a PR closing (its `refs/pull/N/merge` entries can never
+# be restored again), a daily sweep, and a dispatch — the dispatch is also the operator's way to
+# purge one poisoned entry by exact key (the PR #23 case) without a local `gh` login. A dry run
+# prints the plan; `apply` deletes. Never touches anything younger than ten minutes or the newest
+# `main` build.
+
+on:
+  pull_request:
+    types: [closed]
+  schedule:
+    - cron: "23 5 * * *"
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: "delete (unchecked = print the plan only)"
+        type: boolean
+        default: false
+      sweep_closed_prs:
+        description: "also empty the refs of every closed PR"
+        type: boolean
+        default: true
+      delete_key:
+        description: "exact cache key to delete first (a poisoned entry), or empty"
+        type: string
+        default: ""
+
+permissions:
+  actions: write
+  contents: read
+  pull-requests: read
+
+env:
+  SP1_CACHE_VERSION: v2
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  gc:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: cache-gc
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - name: Purge one entry by key
+        if: github.event_name == 'workflow_dispatch' && inputs.delete_key != ''
+        run: gh cache delete "${{ inputs.delete_key }}" --repo "${{ github.repository }}"
+      - name: Garbage-collect by rule
+        run: |
+          prefix="sp1-${SP1_CACHE_VERSION}-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}"
+          args=(--repo "${{ github.repository }}" --prefix "$prefix")
+          case "${{ github.event_name }}" in
+            pull_request)
+              args+=(--closed-ref "refs/pull/${{ github.event.pull_request.number }}/merge" --apply) ;;
+            schedule)
+              args+=(--sweep-closed-prs --apply) ;;
+            workflow_dispatch)
+              if [ "${{ inputs.sweep_closed_prs }}" = "true" ]; then args+=(--sweep-closed-prs); fi
+              if [ "${{ inputs.apply }}" = "true" ]; then args+=(--apply); fi ;;
+          esac
+          python3 scripts/ci/cache_gc.py "${args[@]}" | tee gc.txt
+          { echo '```'; cat gc.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - name: Usage after
+        run: gh api "repos/${{ github.repository }}/actions/cache/usage" --jq '"\(.active_caches_count) entries, \(.active_caches_size_in_bytes / 1e9 | . * 100 | floor / 100) GB"' | tee -a "$GITHUB_STEP_SUMMARY"

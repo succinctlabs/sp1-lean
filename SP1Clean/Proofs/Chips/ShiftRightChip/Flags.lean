@@ -32,23 +32,30 @@ lemma byteRowSpec_range_val {x w : ZMod p}
       | omega
       | (simp only [ByteOpcode.constrain] at hc; exact hc)
 
+/-- The shared `.val` bridge for four binary flags: each is `≤ 1`, and the four-way field sum's `.val`
+is the `ℕ` sum (no wrap, since `4 < p`). Every flag lemma below opens with it. -/
+private lemma val_sum4 {a b c d : ZMod p}
+    (ha : a = 0 ∨ a = 1) (hb : b = 0 ∨ b = 1) (hc : c = 0 ∨ c = 1) (hd : d = 0 ∨ d = 1) :
+    a.val ≤ 1 ∧ b.val ≤ 1 ∧ c.val ≤ 1 ∧ d.val ≤ 1 ∧
+      (a + b + c + d).val = a.val + b.val + c.val + d.val := by
+  have hp : 2 ^ 17 < p := Fact.out
+  have va : a.val ≤ 1 := by rcases ha with rfl | rfl <;> simp [ZMod.val_zero, ZMod.val_one]
+  have vb : b.val ≤ 1 := by rcases hb with rfl | rfl <;> simp [ZMod.val_zero, ZMod.val_one]
+  have vc : c.val ≤ 1 := by rcases hc with rfl | rfl <;> simp [ZMod.val_zero, ZMod.val_one]
+  have vd : d.val ≤ 1 := by rcases hd with rfl | rfl <;> simp [ZMod.val_zero, ZMod.val_one]
+  refine ⟨va, vb, vc, vd, ?_⟩
+  have e1 : (a + b).val = a.val + b.val := by rw [ZMod.val_add_of_lt]; omega
+  have e2 : (a + b + c).val = a.val + b.val + c.val := by rw [ZMod.val_add_of_lt, e1]; omega
+  rw [ZMod.val_add_of_lt, e2]; omega
+
 /-- **Single-op selection.** With one variant flag `a = 1`, the other three binary flags `b, c, d` whose
 four-way sum is binary are all `0` (the sum is `1`, and `1 + b + c + d = 1` forces `b = c = d = 0`). Used
 by each variant `Spec` conjunct to zero out the off-variant flags. -/
 lemma single_flag {a b c d : ZMod p} (ha : a = 1)
     (hb : b = 0 ∨ b = 1) (hc : c = 0 ∨ c = 1) (hd : d = 0 ∨ d = 1)
     (hsum : a + b + c + d = 0 ∨ a + b + c + d = 1) : b = 0 ∧ c = 0 ∧ d = 0 := by
-  have hp : 2 ^ 17 < p := Fact.out
+  obtain ⟨-, vb, vc, vd, e3⟩ := val_sum4 (Or.inr ha) hb hc hd
   have hva : a.val = 1 := by rw [ha]; exact ZMod.val_one p
-  have vb : b.val ≤ 1 := by rcases hb with rfl | rfl <;> simp [ZMod.val_zero, ZMod.val_one]
-  have vc : c.val ≤ 1 := by rcases hc with rfl | rfl <;> simp [ZMod.val_zero, ZMod.val_one]
-  have vd : d.val ≤ 1 := by rcases hd with rfl | rfl <;> simp [ZMod.val_zero, ZMod.val_one]
-  have e1 : (a + b).val = 1 + b.val := by
-    rw [ZMod.val_add_of_lt, hva]; omega
-  have e2 : (a + b + c).val = 1 + b.val + c.val := by
-    rw [ZMod.val_add_of_lt, e1]; omega
-  have e3 : (a + b + c + d).val = 1 + b.val + c.val + d.val := by
-    rw [ZMod.val_add_of_lt, e2]; omega
   rcases hsum with h | h
   · exact absurd (congrArg ZMod.val h) (by rw [e3, ZMod.val_zero]; omega)
   · have hv := congrArg ZMod.val h; rw [e3, ZMod.val_one] at hv
@@ -63,14 +70,7 @@ lemma srlw_sraw_gate {a b c d : ZMod p}
     (hsum : a + b + c + d = 0 ∨ a + b + c + d = 1) (hcd : c + d = 1) :
     a = 0 ∧ b = 0 ∧ a + b + c + d = 1 := by
   have hp : 2 ^ 17 < p := Fact.out
-  have va : a.val ≤ 1 := by rcases ha with rfl | rfl <;> simp [ZMod.val_zero, ZMod.val_one]
-  have vb : b.val ≤ 1 := by rcases hb with rfl | rfl <;> simp [ZMod.val_zero, ZMod.val_one]
-  have vc : c.val ≤ 1 := by rcases hc with rfl | rfl <;> simp [ZMod.val_zero, ZMod.val_one]
-  have vd : d.val ≤ 1 := by rcases hd with rfl | rfl <;> simp [ZMod.val_zero, ZMod.val_one]
-  have e1 : (a + b).val = a.val + b.val := by rw [ZMod.val_add_of_lt]; omega
-  have e2 : (a + b + c).val = a.val + b.val + c.val := by rw [ZMod.val_add_of_lt, e1]; omega
-  have e3 : (a + b + c + d).val = a.val + b.val + c.val + d.val := by
-    rw [ZMod.val_add_of_lt, e2]; omega
+  obtain ⟨va, vb, vc, vd, e3⟩ := val_sum4 ha hb hc hd
   have ecd : (c + d).val = c.val + d.val := by rw [ZMod.val_add_of_lt]; omega
   have hcd1 : c.val + d.val = 1 := by rw [← ecd, hcd]; exact ZMod.val_one p
   have hsum1 : a.val + b.val + c.val + d.val = 1 := by
@@ -87,15 +87,7 @@ lemma srlw_sraw_gate {a b c d : ZMod p}
 lemma pair_flag {a b c d : ZMod p}
     (ha : a = 0 ∨ a = 1) (hb : b = 0 ∨ b = 1) (hc : c = 0 ∨ c = 1) (hd : d = 0 ∨ d = 1)
     (hsum : a + b + c + d = 0 ∨ a + b + c + d = 1) : c + d = 0 ∨ c + d = 1 := by
-  have hp : 2 ^ 17 < p := Fact.out
-  have va : a.val ≤ 1 := by rcases ha with rfl | rfl <;> simp [ZMod.val_zero, ZMod.val_one]
-  have vb : b.val ≤ 1 := by rcases hb with rfl | rfl <;> simp [ZMod.val_zero, ZMod.val_one]
-  have vc : c.val ≤ 1 := by rcases hc with rfl | rfl <;> simp [ZMod.val_zero, ZMod.val_one]
-  have vd : d.val ≤ 1 := by rcases hd with rfl | rfl <;> simp [ZMod.val_zero, ZMod.val_one]
-  have e1 : (a + b).val = a.val + b.val := by rw [ZMod.val_add_of_lt]; omega
-  have e2 : (a + b + c).val = a.val + b.val + c.val := by rw [ZMod.val_add_of_lt, e1]; omega
-  have e3 : (a + b + c + d).val = a.val + b.val + c.val + d.val := by
-    rw [ZMod.val_add_of_lt, e2]; omega
+  obtain ⟨va, vb, vc, vd, e3⟩ := val_sum4 ha hb hc hd
   have hcd2 : c.val + d.val ≤ 1 := by
     rcases hsum with h | h
     · have hh := congrArg ZMod.val h; rw [e3, ZMod.val_zero] at hh; omega

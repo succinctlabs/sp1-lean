@@ -17,20 +17,21 @@ trace generation): given a chip's `main` and one row's concrete input column val
 So a full trace row is *derived* from the circuit definition; nothing about column order, witness
 formulas, or wiring is restated. `generateTrace` then assembles a whole matrix: derived rows for the
 real events plus all-zero padding rows, exactly mirroring SP1's `generate_trace` (which zero-fills
-padding). The conformance anchors (`TraceGenTests/<Chip>TraceWitness.lean`) check the derived matrix
-against whole traces dumped from SP1's **real** `generate_trace`.
+padding). Consumers: the real-row satisfiability anchors (`SP1CleanTest/Alignment/NonVacuityReal.lean`) and
+the exporter's per-chip `circuitTraceRowMapped` spot check, which pins the dump-anchored
+generation-time gate's row evaluation to this value-level path on real SP1 data.
 
 Everything here is computable and axiom-clean; `native_decide` appears only in the anchor files.
 
 Reasoning hook (not used yet): for circuits satisfying `Circuit.ComputableWitnesses`, the witness
 segment of the environment built here agrees with `Operations.localWitnesses` at the fixpoint
 environment (`Circuit.proverEnvironment_usesLocalWitnesses` in `Clean.Circuit.Theorems`) — the
-bridge from this conformance layer to the chips' completeness theorems, if we later upgrade the
-sampled conformance into an all-inputs statement. -/
+bridge from this layer to the chips' completeness theorems, if we later upgrade the sampled
+conformance into an all-inputs statement. -/
 
 namespace SP1Clean.TraceGenTests
 
-variable {F : Type} [Field F]
+variable {F : Type} [FiniteField F]
 
 /-- Derive one trace row from a circuit: run `main`'s own witness closures on the given input
 column values (env-threaded, via `Circuit.proverEnvironment`), then evaluate `main`'s output struct
@@ -45,6 +46,20 @@ def circuitTraceRow (Input : TypeMap) [ProvableType Input] {Output : TypeMap} [P
   let out : Output (Expression F) := circ.output inputs.length
   (toElements out).toList.map (Expression.eval env.toEnvironment)
 
+/-- Derive one trace row and then cross an explicit whole-row layout boundary. Native proof rows are
+allowed to order or factor their columns differently from Rust; `reconfigure` is the same complete-row
+map audited by `ChipFaithful`. Witness generation still comes exclusively from `main`, and the map is
+applied only after evaluating the circuit output to concrete field values. -/
+def circuitTraceRowMapped (Input : TypeMap) [ProvableType Input]
+    {Output RustOutput : TypeMap} [ProvableType Output] [ProvableType RustOutput]
+    (main : Var Input F → Circuit F (Var Output F))
+    (reconfigure : Output F → RustOutput F) (inputs : List F)
+    (hint : ProverHint F := ProverHint.empty F) : List F :=
+  let circ := main (varFromOffset Input 0)
+  let env := circ.proverEnvironment hint inputs
+  let out : Output (Expression F) := circ.output inputs.length
+  (toElements (reconfigure (ProvableType.eval env.toEnvironment out))).toList
+
 /-- Assemble a whole trace matrix from a per-event row generator: derived rows for the real events,
 then `padRow` repeated up to `height`. The default all-zero `padRow` mirrors SP1's plain zero-filled
 padding; chips with a non-zero `padded_row_template` (the shift chips set the ungated `v_*` power
@@ -52,11 +67,5 @@ columns on padding) pass the zero-input derived row instead. -/
 def generateTrace {α : Type} (rowGen : α → List F) (events : List α) (height width : ℕ)
     (padRow : List F := List.replicate width 0) : List (List F) :=
   events.map rowGen ++ List.replicate (height - events.length) padRow
-
-/-- Project a row onto the kept `[lo, hi)` column ranges. Historically used by masked anchors
-(chips whose variant flags were witnessed as constant zeros); all current anchors compare
-unmasked, but the projector is kept for scoping future partial coverage. -/
-def keepCols {α : Type} (keep : List (ℕ × ℕ)) (row : List α) : List α :=
-  keep.flatMap fun (lo, hi) => (row.drop lo).take (hi - lo)
 
 end SP1Clean.TraceGenTests

@@ -13,7 +13,6 @@ open SP1Clean
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
-local instance : Fact (2 ^ 17 < p) := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
 local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
 
 /-- **Unsigned family core (`DIVU`/`REMU`).** From the eight unsigned carry-chain limb equations (on
@@ -42,10 +41,10 @@ lemma assemble_unsigned {b c quotient remainder rwlo rwhi : Word (ZMod p)} {carr
     (hlt : c.toNat ≠ 0 → remainder.toNat < c.toNat)
     (hzero : c.toNat = 0 → quotient.toNat = 2 ^ 64 - 1 ∧ remainder.toNat = b.toNat) :
     quotient.toBitVec64 = RV64.divu c.toBitVec64 b.toBitVec64 ∧
-    remainder.toBitVec64 = RV64.remu c.toBitVec64 b.toBitVec64 := by
-  have hid := hid_of_carry_chain hcU hbU hqU hrU hloU hhiU hc0 hc1 hc2 hc3 hc4 hc5 hc6 hc7
-    hl0 hl1 hl2 hl3 hh4 hh5 hh6 hh7 hlo hhi
-  exact divu_remu_of_identity hbU hcU hqU hrU hid hlt hzero
+    remainder.toBitVec64 = RV64.remu c.toBitVec64 b.toBitVec64 :=
+  divu_remu_of_identity hbU hcU hqU hrU
+    (hid_of_carry_chain hcU hbU hqU hrU hloU hhiU hc0 hc1 hc2 hc3 hc4 hc5 hc6 hc7
+      hl0 hl1 hl2 hl3 hh4 hh5 hh6 hh7 hlo hhi) hlt hzero
 
 omit [Fact p.Prime] in
 /-- **Signed family core, normal (non-overflow, nonzero-divisor) case (`DIV`/`REM`).** The signed
@@ -62,9 +61,8 @@ lemma assemble_signed_normal {b c quotient remc : Word (ZMod p)}
     (hsgn_neg : b.toBitVec64.toInt ≤ 0 → remc.toBitVec64.toInt ≤ 0) :
     quotient.toBitVec64 = RV64.div c.toBitVec64 b.toBitVec64 ∧
     remc.toBitVec64 = RV64.rem c.toBitVec64 b.toBitVec64 :=
-  div_rem_of_identity hc0 (by rw [hid]; ring) hlt hsgn_pos hsgn_neg
+  div_rem_of_identity hc0 (by rw [hid]; ring1) hlt hsgn_pos hsgn_neg
 
-omit [Fact p.Prime] in
 /-- **Unsigned word family core (`DIVUW`/`REMUW`).** The 64-bit Euclidean identity over the (zero-high)
 operand/comp columns is exactly the 32-bit identity (`extractLsb_toNat_of_hi_zero` on all four words),
 so it feeds `Math.divuw_remuw_of_identity`. The conclusion is on the sign-extension of the comp columns'
@@ -119,7 +117,7 @@ lemma assemble_signed_word_normal {b c qc rc : Word (ZMod p)}
   have hrp := toInt_eq_extractLsb_of_signfill hrU hrf2 hrf3
   refine divw_remw_of_identity (q32 := BitVec.extractLsb 31 0 qc.toBitVec64)
     (r32 := BitVec.extractLsb 31 0 rc.toBitVec64) hc0 ?_ ?_ ?_ ?_
-  · rw [← hbp, ← hcp, ← hqp, ← hrp, hid]; ring
+  · rw [← hbp, ← hcp, ← hqp, ← hrp, hid]; ring1
   · rw [← hcp, ← hrp]; exact hlt
   · rw [← hbp, ← hrp]; exact hsgn_pos
   · rw [← hbp, ← hrp]; exact hsgn_neg

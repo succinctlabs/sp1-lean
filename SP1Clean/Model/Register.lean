@@ -1,10 +1,38 @@
-import Mathlib.Tactic
+import Mathlib.Tactic.FinCases
+import Aesop
+import Mathlib.Tactic.Ring
 import Mathlib.Data.ZMod.Basic
 import LeanRV64D
-import SP1Clean.Math.Misc
+import ToMathlib.General
+
+/-! # Sail machine state and register-index decoding
+
+The seam between the generated Sail model and this project's 5-bit register indices:
+
+- `SailState` — the concrete machine-state type every semantic statement ranges over: the
+  lean-sail v5 `Sail.ConcurrencyInterfaceV1.SequentialState` specialized to the generated
+  `RegisterType` with the trivial (deterministic) choice source. Neither component has a
+  `LeanRV64D.*` shim, so the specialization lives here.
+- `SailState.isInitialized` — every architectural register is present in the state's register
+  map (the boot predicate's shape for "the register file exists").
+- `reg_idx_to_Register` — the 5-bit operand index as a generated-model `Register`, total via a
+  catch-all arm that sends both `31#5` and `0#5` to `x31`. The `0#5` collapse is deliberate
+  slack, not an x0 semantics claim: rows with an `x0` operand take the dedicated x0 routes
+  (`AluX0Chip`, `LoadX0Chip`, and the Sail accessors' own x0 handling), and the
+  `regidxToRegister_eq_x31_iff`/`regidxToRegister_inj` lemma family keeps the collapse visible
+  to any proof that case-splits on indices.
+- The `@[simp]` battery (`regidxToRegister_eq_x*_iff`, `…_ofNat_*`, the `no_confusion`
+  non-collision lemmas) — closes the index-vs-register goals the chip Sail bridges generate. -/
+
 set_option linter.unusedSimpArgs false
 
-@[simp] abbrev SailState := PreSail.SequentialState RegisterType Sail.trivialChoiceSource
+open LeanRV64D.Defs
+-- `SequentialState` and `trivialChoiceSource` both live in `Sail.ConcurrencyInterfaceV1` as of
+-- lean-sail v5 (v4 had them at `PreSail.` and `Sail.` respectively). Neither has a `LeanRV64D.*`
+-- shim in `SpecializationV1.lean`, so they are spelled out here.
+@[simp] abbrev SailState :=
+  Sail.ConcurrencyInterfaceV1.SequentialState RegisterType
+    Sail.ConcurrencyInterfaceV1.trivialChoiceSource
 
 /-- Every register has been initialized to some unspecified value. -/
 @[reducible] def SailState.isInitialized (s : SailState) : Prop :=
@@ -107,130 +135,130 @@ lemma misa_ne_reg_idx_toRegister (idx : BitVec 5) :
 end no_confusion
 
 @[simp] lemma regidxToRegister_eq_x1_iff (idx : BitVec 5) :
-reg_idx_to_Register idx = .x1 ↔ idx = 1#5 := by fin_cases idx <;> trivial
+reg_idx_to_Register idx = .x1 ↔ idx = 1#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x2_iff (idx : BitVec 5) :
-reg_idx_to_Register idx = .x2 ↔ idx = 2#5 := by fin_cases idx <;> trivial
+reg_idx_to_Register idx = .x2 ↔ idx = 2#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x3_iff (idx : BitVec 5) :
-reg_idx_to_Register idx = .x3 ↔ idx = 3#5 := by fin_cases idx <;> trivial
+reg_idx_to_Register idx = .x3 ↔ idx = 3#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x4_iff (idx : BitVec 5) :
-reg_idx_to_Register idx = .x4 ↔ idx = 4#5 := by fin_cases idx <;> trivial
+reg_idx_to_Register idx = .x4 ↔ idx = 4#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x5_iff (idx : BitVec 5) :
-reg_idx_to_Register idx = .x5 ↔ idx = 5#5 := by fin_cases idx <;> trivial
+reg_idx_to_Register idx = .x5 ↔ idx = 5#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x6_iff (idx : BitVec 5) :
-reg_idx_to_Register idx = .x6 ↔ idx = 6#5 := by fin_cases idx <;> trivial
+reg_idx_to_Register idx = .x6 ↔ idx = 6#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x7_iff (idx : BitVec 5) :
-reg_idx_to_Register idx = .x7 ↔ idx = 7#5 := by fin_cases idx <;> trivial
+reg_idx_to_Register idx = .x7 ↔ idx = 7#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x8_iff (idx : BitVec 5) :
-reg_idx_to_Register idx = .x8 ↔ idx = 8#5 := by fin_cases idx <;> trivial
+reg_idx_to_Register idx = .x8 ↔ idx = 8#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x9_iff (idx : BitVec 5) :
-reg_idx_to_Register idx = .x9 ↔ idx = 9#5 := by fin_cases idx <;> trivial
+reg_idx_to_Register idx = .x9 ↔ idx = 9#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x10_iff (idx : BitVec 5) :
-reg_idx_to_Register idx = .x10 ↔ idx = 10#5 := by fin_cases idx <;> trivial
+reg_idx_to_Register idx = .x10 ↔ idx = 10#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x11_iff (idx : BitVec 5) :
-reg_idx_to_Register idx = .x11 ↔ idx = 11#5 := by fin_cases idx <;> trivial
+reg_idx_to_Register idx = .x11 ↔ idx = 11#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x12_iff (idx : BitVec 5) :
-reg_idx_to_Register idx = .x12 ↔ idx = 12#5 := by fin_cases idx <;> trivial
+reg_idx_to_Register idx = .x12 ↔ idx = 12#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x13_iff (idx : BitVec 5) :
-reg_idx_to_Register idx = .x13 ↔ idx = 13#5 := by fin_cases idx <;> trivial
+reg_idx_to_Register idx = .x13 ↔ idx = 13#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x14_iff (idx : BitVec 5) :
-reg_idx_to_Register idx = .x14 ↔ idx = 14#5 := by fin_cases idx <;> trivial
+reg_idx_to_Register idx = .x14 ↔ idx = 14#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x15_iff (idx : BitVec 5) :
-reg_idx_to_Register idx = .x15 ↔ idx = 15#5 := by fin_cases idx <;> trivial
+reg_idx_to_Register idx = .x15 ↔ idx = 15#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x16_iff (idx : BitVec 5) :
-reg_idx_to_Register idx = .x16 ↔ idx = 16#5 := by fin_cases idx <;> trivial
+reg_idx_to_Register idx = .x16 ↔ idx = 16#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x17_iff (idx : BitVec 5) :
-reg_idx_to_Register idx = .x17 ↔ idx = 17#5 := by fin_cases idx <;> trivial
+reg_idx_to_Register idx = .x17 ↔ idx = 17#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x18_iff (idx : BitVec 5) :
-reg_idx_to_Register idx = .x18 ↔ idx = 18#5 := by fin_cases idx <;> trivial
+reg_idx_to_Register idx = .x18 ↔ idx = 18#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x19_iff (idx : BitVec 5) :
-reg_idx_to_Register idx = .x19 ↔ idx = 19#5 := by fin_cases idx <;> trivial
+reg_idx_to_Register idx = .x19 ↔ idx = 19#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x20_iff (idx : BitVec 5) :
-reg_idx_to_Register idx = .x20 ↔ idx = 20#5 := by fin_cases idx <;> trivial
+reg_idx_to_Register idx = .x20 ↔ idx = 20#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x21_iff (idx : BitVec 5) :
-reg_idx_to_Register idx = .x21 ↔ idx = 21#5 := by fin_cases idx <;> trivial
+reg_idx_to_Register idx = .x21 ↔ idx = 21#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x22_iff (idx : BitVec 5) :
-reg_idx_to_Register idx = .x22 ↔ idx = 22#5 := by fin_cases idx <;> trivial
+reg_idx_to_Register idx = .x22 ↔ idx = 22#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x23_iff (idx : BitVec 5) :
-reg_idx_to_Register idx = .x23 ↔ idx = 23#5 := by fin_cases idx <;> trivial
+reg_idx_to_Register idx = .x23 ↔ idx = 23#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x24_iff (idx : BitVec 5) :
-reg_idx_to_Register idx = .x24 ↔ idx = 24#5 := by fin_cases idx <;> trivial
+reg_idx_to_Register idx = .x24 ↔ idx = 24#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x25_iff (idx : BitVec 5) :
-reg_idx_to_Register idx = .x25 ↔ idx = 25#5 := by fin_cases idx <;> trivial
+reg_idx_to_Register idx = .x25 ↔ idx = 25#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x26_iff (idx : BitVec 5) :
-reg_idx_to_Register idx = .x26 ↔ idx = 26#5 := by fin_cases idx <;> trivial
+reg_idx_to_Register idx = .x26 ↔ idx = 26#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x27_iff (idx : BitVec 5) :
-reg_idx_to_Register idx = .x27 ↔ idx = 27#5 := by fin_cases idx <;> trivial
+reg_idx_to_Register idx = .x27 ↔ idx = 27#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x28_iff (idx : BitVec 5) :
-reg_idx_to_Register idx = .x28 ↔ idx = 28#5 := by fin_cases idx <;> trivial
+reg_idx_to_Register idx = .x28 ↔ idx = 28#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x29_iff (idx : BitVec 5) :
-reg_idx_to_Register idx = .x29 ↔ idx = 29#5 := by fin_cases idx <;> trivial
+reg_idx_to_Register idx = .x29 ↔ idx = 29#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x30_iff (idx : BitVec 5) :
-reg_idx_to_Register idx = .x30 ↔ idx = 30#5 := by fin_cases idx <;> trivial
+reg_idx_to_Register idx = .x30 ↔ idx = 30#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x31_iff (idx : BitVec 5) :
-reg_idx_to_Register idx = .x31 ↔ idx = 31#5 ∨ idx = 0#5 := by fin_cases idx <;> trivial
+reg_idx_to_Register idx = .x31 ↔ idx = 31#5 ∨ idx = 0#5 := by revert idx; decide +kernel
 
 @[simp] lemma regidxToRegister_eq_x1_iff' (idx : BitVec 5) :
-.x1 = reg_idx_to_Register idx ↔ idx = 1#5 := by fin_cases idx <;> trivial
+.x1 = reg_idx_to_Register idx ↔ idx = 1#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x2_iff' (idx : BitVec 5) :
-.x2 = reg_idx_to_Register idx ↔ idx = 2#5 := by fin_cases idx <;> trivial
+.x2 = reg_idx_to_Register idx ↔ idx = 2#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x3_iff' (idx : BitVec 5) :
-.x3 = reg_idx_to_Register idx ↔ idx = 3#5 := by fin_cases idx <;> trivial
+.x3 = reg_idx_to_Register idx ↔ idx = 3#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x4_iff' (idx : BitVec 5) :
-.x4 = reg_idx_to_Register idx ↔ idx = 4#5 := by fin_cases idx <;> trivial
+.x4 = reg_idx_to_Register idx ↔ idx = 4#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x5_iff' (idx : BitVec 5) :
-.x5 = reg_idx_to_Register idx ↔ idx = 5#5 := by fin_cases idx <;> trivial
+.x5 = reg_idx_to_Register idx ↔ idx = 5#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x6_iff' (idx : BitVec 5) :
-.x6 = reg_idx_to_Register idx ↔ idx = 6#5 := by fin_cases idx <;> trivial
+.x6 = reg_idx_to_Register idx ↔ idx = 6#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x7_iff' (idx : BitVec 5) :
-.x7 = reg_idx_to_Register idx ↔ idx = 7#5 := by fin_cases idx <;> trivial
+.x7 = reg_idx_to_Register idx ↔ idx = 7#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x8_iff' (idx : BitVec 5) :
-.x8 = reg_idx_to_Register idx ↔ idx = 8#5 := by fin_cases idx <;> trivial
+.x8 = reg_idx_to_Register idx ↔ idx = 8#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x9_iff' (idx : BitVec 5) :
-.x9 = reg_idx_to_Register idx ↔ idx = 9#5 := by fin_cases idx <;> trivial
+.x9 = reg_idx_to_Register idx ↔ idx = 9#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x10_iff' (idx : BitVec 5) :
-.x10 = reg_idx_to_Register idx ↔ idx = 10#5 := by fin_cases idx <;> trivial
+.x10 = reg_idx_to_Register idx ↔ idx = 10#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x11_iff' (idx : BitVec 5) :
-.x11 = reg_idx_to_Register idx ↔ idx = 11#5 := by fin_cases idx <;> trivial
+.x11 = reg_idx_to_Register idx ↔ idx = 11#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x12_iff' (idx : BitVec 5) :
-.x12 = reg_idx_to_Register idx ↔ idx = 12#5 := by fin_cases idx <;> trivial
+.x12 = reg_idx_to_Register idx ↔ idx = 12#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x13_iff' (idx : BitVec 5) :
-.x13 = reg_idx_to_Register idx ↔ idx = 13#5 := by fin_cases idx <;> trivial
+.x13 = reg_idx_to_Register idx ↔ idx = 13#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x14_iff' (idx : BitVec 5) :
-.x14 = reg_idx_to_Register idx ↔ idx = 14#5 := by fin_cases idx <;> trivial
+.x14 = reg_idx_to_Register idx ↔ idx = 14#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x15_iff' (idx : BitVec 5) :
-.x15 = reg_idx_to_Register idx ↔ idx = 15#5 := by fin_cases idx <;> trivial
+.x15 = reg_idx_to_Register idx ↔ idx = 15#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x16_iff' (idx : BitVec 5) :
-.x16 = reg_idx_to_Register idx ↔ idx = 16#5 := by fin_cases idx <;> trivial
+.x16 = reg_idx_to_Register idx ↔ idx = 16#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x17_iff' (idx : BitVec 5) :
-.x17 = reg_idx_to_Register idx ↔ idx = 17#5 := by fin_cases idx <;> trivial
+.x17 = reg_idx_to_Register idx ↔ idx = 17#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x18_iff' (idx : BitVec 5) :
-.x18 = reg_idx_to_Register idx ↔ idx = 18#5 := by fin_cases idx <;> trivial
+.x18 = reg_idx_to_Register idx ↔ idx = 18#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x19_iff' (idx : BitVec 5) :
-.x19 = reg_idx_to_Register idx ↔ idx = 19#5 := by fin_cases idx <;> trivial
+.x19 = reg_idx_to_Register idx ↔ idx = 19#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x20_iff' (idx : BitVec 5) :
-.x20 = reg_idx_to_Register idx ↔ idx = 20#5 := by fin_cases idx <;> trivial
+.x20 = reg_idx_to_Register idx ↔ idx = 20#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x21_iff' (idx : BitVec 5) :
-.x21 = reg_idx_to_Register idx ↔ idx = 21#5 := by fin_cases idx <;> trivial
+.x21 = reg_idx_to_Register idx ↔ idx = 21#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x22_iff' (idx : BitVec 5) :
-.x22 = reg_idx_to_Register idx ↔ idx = 22#5 := by fin_cases idx <;> trivial
+.x22 = reg_idx_to_Register idx ↔ idx = 22#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x23_iff' (idx : BitVec 5) :
-.x23 = reg_idx_to_Register idx ↔ idx = 23#5 := by fin_cases idx <;> trivial
+.x23 = reg_idx_to_Register idx ↔ idx = 23#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x24_iff' (idx : BitVec 5) :
-.x24 = reg_idx_to_Register idx ↔ idx = 24#5 := by fin_cases idx <;> trivial
+.x24 = reg_idx_to_Register idx ↔ idx = 24#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x25_iff' (idx : BitVec 5) :
-.x25 = reg_idx_to_Register idx ↔ idx = 25#5 := by fin_cases idx <;> trivial
+.x25 = reg_idx_to_Register idx ↔ idx = 25#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x26_iff' (idx : BitVec 5) :
-.x26 = reg_idx_to_Register idx ↔ idx = 26#5 := by fin_cases idx <;> trivial
+.x26 = reg_idx_to_Register idx ↔ idx = 26#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x27_iff' (idx : BitVec 5) :
-.x27 = reg_idx_to_Register idx ↔ idx = 27#5 := by fin_cases idx <;> trivial
+.x27 = reg_idx_to_Register idx ↔ idx = 27#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x28_iff' (idx : BitVec 5) :
-.x28 = reg_idx_to_Register idx ↔ idx = 28#5 := by fin_cases idx <;> trivial
+.x28 = reg_idx_to_Register idx ↔ idx = 28#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x29_iff' (idx : BitVec 5) :
-.x29 = reg_idx_to_Register idx ↔ idx = 29#5 := by fin_cases idx <;> trivial
+.x29 = reg_idx_to_Register idx ↔ idx = 29#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x30_iff' (idx : BitVec 5) :
-.x30 = reg_idx_to_Register idx ↔ idx = 30#5 := by fin_cases idx <;> trivial
+.x30 = reg_idx_to_Register idx ↔ idx = 30#5 := by revert idx; decide +kernel
 @[simp] lemma regidxToRegister_eq_x31_iff' (idx : BitVec 5) :
-.x31 = reg_idx_to_Register idx ↔ idx = 31#5 ∨ idx = 0#5 := by fin_cases idx <;> trivial
+.x31 = reg_idx_to_Register idx ↔ idx = 31#5 ∨ idx = 0#5 := by revert idx; decide +kernel
 
 @[simp] lemma regidxToRegister_ofNat_0 : reg_idx_to_Register 0#5 = .x31 := rfl
 @[simp] lemma regidxToRegister_ofNat_1 : reg_idx_to_Register 1#5 = .x1 := rfl

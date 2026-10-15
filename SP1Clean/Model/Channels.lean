@@ -1,155 +1,170 @@
-import SP1Clean.Model.ByteTable
-import SP1Clean.Math.Word
-import Clean.Circuit.Basic
-import Clean.Circuit.Channel
-import Clean.Utils.Tactics.ProvableStructDeriving
+module
+
+public import SP1Clean.Model.BusMessages
+public import SP1Clean.Model.ByteTable
+public import SP1Clean.Math.Word
+public import SP1Clean.Math.Gate
+public import Clean.Circuit.Basic
+public import Clean.Circuit.Channel
+public import Clean.Utils.Tactics.ProvableStructDeriving
 
 /-! # Cross-chip interaction channels (the bus, as the circuit actually emits it)
 
 The shared Clean `Channel`s that the readers/chips `push`/`pull` to model SP1's cross-chip
 interaction buses (`builder.send`/`receive`). Each `Channel` here is the Lean analog of one SP1
-`InteractionKind`; emitting on it is the *real* in-circuit bus (vs. the hand-written trace-level
-`*Lookups` shadows in `Soundness/`), so that `Soundness/*Consistency.lean` can eventually be
-re-pointed at `Operations.interactionsWith <channel>` and the projections become theorems
-(`interactionsWith_eq_of_mem_exposedChannels`). See `docs/bus-model.md`.
+`InteractionKind`; emitting on it is the real in-circuit bus consumed directly by the typed
+grounding layer. See `docs/architecture.md`.
 
 This module carries the **State** bus and the **Byte** bus (SP1's preprocessed `ByteChip`,
-`Foundations/ByteTable.lean`), plus the **Program** and **Memory** channels. -/
+`Model/ByteTable.lean`), plus the **Program** and **Memory** channels, the **Exit** channel, and
+the **Syscall** and **PublicValues** channels.
+
+Not every channel here corresponds to an SP1 `InteractionKind`. `Syscall` does (its upstream
+consumer is `SyscallCore`); `Exit` and `PublicValues` do **not** — SP1 states those bindings as
+direct chip-level `public_values` access, which Clean's flat AIR reserves to the verifier row, so
+they are factored through channels instead (upstream Clean's `Air/Vm.lean` requires the same shape
+of its own verifier). `docs/assurance.md` discloses that as a native-only bus.
+
+The last two are **declared but not yet ensemble members**. `kindOf` classifies both, so adding
+either to `sp1Ensemble` no longer risks folding it into State balance — but it does now owe
+`Soundness.EnsembleChannels.channel_eq_of_kindOf_eq` a case, which is where the obligation belongs. -/
+
+@[expose] public section
 
 namespace SP1Clean.Channels
 
 open Circuit
+variable {p : ℕ} [Fact p.Prime]
 
-variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
-
-/-- The State-bus message — `(clk_high, clk_low, pc0, pc1, pc2)`, arity 5, matching SP1's
-`AirInteraction.state` (`crates/hypercube/src/lookup/interaction.rs`) and the `.state` interaction in
-`Extracted/CPUState.lean`. Each CPU/ALU row receives the current `(clk, pc)` and sends the next. -/
-structure StateMsg (F : Type) where
-  clk_high : F
-  clk_low : F
-  pc0 : F
-  pc1 : F
-  pc2 : F
-deriving ProvableStruct
-
-/-- Per-row well-formedness of a State message: **`True`**. SP1's `CPUState::eval`
-(`crates/core/machine/src/adapter/state.rs:90-98`) range-checks *only* the clock (`clk_0_16` 13-bit Range
-+ `clk_16_24` U8Range) — **it does not range-check `pc`** (the `receive_state`/`send_state` pass `cols.pc`/
-`next_pc` un-bounded). So the State *send* proves no local guarantee; the pc-limb bounds are *received*
-facts (the previous row's send / the verifier-committed initial pc via the PC chain, and the program ROM),
-exactly like the register-index bounds. The earlier `pc < 2^16` conjuncts here were discharged by divergent
-`pc` byte checks in `Readers/CPUState.lean` that SP1 has no analog of; removed in the byte faithfulness
-cleanup. The cross-row PC chain stays the trace level (`Soundness/StateConsistency.lean`). -/
-def StateMsg.Spec (_ : StateMsg (ZMod p)) : Prop := True
-
-/-- The State channel (SP1 `InteractionKind.State`). `Guarantees := StateMsg.Spec = True`: SP1's State
-send proves no local well-formedness (it range-checks no pc; the clk checks are separate byte sends).
-Emitted via `Channel.emit` so the `is_real` multiplicity (`+is_real` send / `-is_real`
-receive / `0` padding) is preserved; padding owes nothing (post-#398 gated `toRaw`). The cross-row PC
-chain stays the trace level (`Soundness/StateConsistency.lean`). -/
+/-- The structural State interaction channel (SP1 `InteractionKind.State`).  Its local predicate is
+`True`: a row may emit its current/next `(clock, pc)` records, but reachability is not a fact that either
+side can prove row-locally.  Global balance, schedule ordering, and per-chip transition lemmas are
+combined by the timed grounding engine to derive execution semantics. -/
 def stateChannel : Channel (ZMod p) StateMsg where
   name := "SP1State"
-  Guarantees msg _ := StateMsg.Spec msg
-
-/-- The Memory-bus message — `(clk_high, clk_low, addr0, addr1, addr2, v0, v1, v2, v3)`, arity 9,
-matching SP1's `AirInteraction.memory` (`crates/hypercube/src/lookup/interaction.rs`) and the `.memory`
-interaction in `Extracted/RTypeReader.lean`. Registers use `addr0` = register index, `addr1 = addr2 = 0`;
-`(v0, v1, v2, v3)` is the 4-limb little-endian word. Each register access sends the prior value at the
-previous timestamp and receives the new value at the current timestamp. -/
-structure MemoryMsg (F : Type) where
-  clk_high : F
-  clk_low : F
-  addr0 : F
-  addr1 : F
-  addr2 : F
-  v0 : F
-  v1 : F
-  v2 : F
-  v3 : F
-deriving ProvableStruct
-
-/-- Per-row register-access address shape (`addr1 = addr2 = 0`). Kept as a small structural predicate (e.g.
-for trace use); it is **not** the memory channel's `Guarantees` — see `memoryChannel`. -/
-def MemoryMsg.Spec (msg : MemoryMsg (ZMod p)) : Prop :=
-  msg.addr1 = 0 ∧ msg.addr2 = 0
-
-/-- The Memory channel (SP1 `InteractionKind.Memory`). `Guarantees := True`: the memory bus is **just the
-balance** — the chip *emits* the per-row register interactions (`±is_real`) and the value's well-formedness
-(`isU64`) is **not** a per-row channel fact. Operand `isU64` for a consuming ALU chip is a chip-level
-**`Assumptions`** precondition (discharged at the machine/trace level from the offline-memory balance + the
-writer), not forced into the channel — the idiomatic split (see `docs/bus-model.md` §7). The cross-row
-offline-memory meaning stays trace-level (`Soundness/MemoryConsistency.lean`'s `TraceMemoryLink`). The `name`
-matches the `"SP1Memory"` key in `memoryLookups`. -/
-def memoryChannel : Channel (ZMod p) MemoryMsg where
-  name := "SP1Memory"
   Guarantees _ _ := True
 
-/-- The Program-bus message — the arity-16 instruction-fetch tuple `(pc0, pc1, pc2, opcode, op_a,
-op_b0..3, op_c0..3, op_a_0, imm_b, imm_c)`, matching SP1's `AirInteraction.program`
-(`crates/hypercube/src/lookup/interaction.rs`, `InteractionKind::Program => 16`) and the `.send
-(.program …)` in `Extracted/RTypeReader.lean`. `op_b`/`op_c` are the two operands as 4-limb words; for an
-R-type row only the register-index limb is non-zero (`op_b1..3 = op_c1..3 = imm_b = imm_c = 0`). -/
-structure ProgramMsg (F : Type) where
-  pc0 : F
-  pc1 : F
-  pc2 : F
-  opcode : F
-  op_a : F
-  op_b0 : F
-  op_b1 : F
-  op_b2 : F
-  op_b3 : F
-  op_c0 : F
-  op_c1 : F
-  op_c2 : F
-  op_c3 : F
-  op_a_0 : F
-  imm_b : F
-  imm_c : F
-deriving ProvableStruct
+/-- The Memory channel (SP1 `InteractionKind.Memory`). `Guarantees := MemoryMsg.isU64 ∧
+MemoryMsg.ClkBound` — the value's well-formedness (each limb `< 2^16`) **and** the access clock's
+24-bit bound. The clock conjunct is the one fact SP1's timestamp comparison needs but no accessing row
+can prove: `eval_memory_access_timestamp` bounds only `clk_target − prev_low − 1`, so the *prior*
+record's clock bound must be received from whoever pushed it (see `MemoryMsg.ClkBound`). Pushers prove
+it from their `Readers.CPUState` clock byte bounds via `MemoryMsg.clkBound_of_cpuState_bounds`; the
+memory-init provider proves it by constraining its pushed clock to `0` (SP1 hardcodes `Expr::zero()`
+there, `crates/core/machine/src/memory/global.rs`). **W11 polarity flip:** the memory access's *read-back/write* now
+`pushIf`-pushes (proving `isU64` — a writer's ALU-result range-check for `op_a`; the just-pulled read-prior
+guarantee for an `op_b`/`op_c` read-back), and the *read-prior* `pullIf`-pulls (deriving `isU64`), so the
+operand `isU64` is *derived* by the consuming chip rather than carried as a chip-level `Assumptions`
+precondition — the byte/program-bus model. SP1's Rust *sends* the read-prior (`+is_real`); our pull emits
+`−is_real`, so our Memory interactions match SP1's extracted oracle **up to per-channel multiplicity
+negation** (a sound LogUp sign symmetry, bridged in the `Faithful/*` Memory anchors). The cross-row
+offline-memory *value-correctness* (read = last write) is derived globally by the timed typed-memory
+grounding layer (`Soundness/TypedMemory.lean`); this channel carries only the local `isU64` and clock
+facts. The `name` matches the `"SP1Memory"` interaction key. -/
+def memoryChannel : Channel (ZMod p) MemoryMsg where
+  name := "SP1Memory"
+  Guarantees msg _ := MemoryMsg.isU64 msg ∧ MemoryMsg.ClkBound msg
 
-/-- Per-row well-formedness of a Program message — the part a CPU row can **send-prove locally** for *any*
-adapter type. The only genuinely send-local fact is that `op_a_0` is boolean (from the reader's
-unconditional `op_a_0 * (op_a_0 - 1) = 0` gate). Everything else is a **decode** fact that belongs on the
-**receive** side (`ProgramChip.ProgramRowSpec`), not the send-side channel `Guarantees`:
-the register-index **bounds** (`op_a < 32`, `op_b0`/`op_c0 < 2^16`), the opcode `trusted_instr` decode, the
-`op_a_0 = 1 ↔ op_a = 0` decode, pc bounds/alignment, **and the R-type/I-type operand shape** (`op_b1..3 = 0`,
-and for register-`c` ops `op_c1..3 = imm_c = 0`). The last point is why this is *not* `op_c1..3 = imm_c = 0`:
-an immediate-`c` op (the `ALUTypeReader` adapter — `Addw`, `Lt`, `Bitwise`, shifts) legitimately sends a
-non-zero `op_c` word with `imm_c = 1`, so the R/I-type shape cannot be a send guarantee; it is decoded on
-receive. (`RTypeReader` still emits literal `0`s in those slots, so it proves the same — strictly weaker —
-guarantee; nothing downstream consumes the dropped facts. ROM-membership stays trace-level,
-`Soundness/ProgramConsistency.lean`.) -/
-def ProgramMsg.Spec (msg : ProgramMsg (ZMod p)) : Prop :=
-  msg.op_a_0 = 0 ∨ msg.op_a_0 = 1
+/-- The Program channel (SP1 `InteractionKind.Program`). `Guarantees := ProgramMsg.RowSpec` — the rich
+decode well-formedness (indices `< 32`, pc `< 2^16`, `op_a_0` boolean). **W11 polarity flip:** the ROM
+provider now `pushIf`-pushes valid program rows (proving `ProgramMsg.RowSpec`) and the CPU readers
+`pullIf`-pull (deriving it), so the decode bounds are *derived* by consumers — the byte-bus model. SP1's
+Rust genuinely *sends* program (`+1`); our pull emits `−1`, so our Program interactions match SP1's
+extracted oracle **up to per-channel multiplicity negation** (a sound LogUp sign symmetry — the balance is
+invariant under negating one channel's multiplicities; the divergence is bridged, FV-checked, in the
+`Faithful/*` Program anchors). The channel name is the upstream table identity `"SP1Program"`.
 
-/-- The Program channel (SP1 `InteractionKind.Program`). `Guarantees := ProgramMsg.Spec` (R-type shape +
-`op_a_0` boolean). Emitted via `Channel.emit` (default `toRaw`, gated by `is_trusted` = `is_real` on Add):
-the shape slots are literal `0` and `op_a_0` boolean comes from the reader's unconditional gate, so the send
-proves the guarantee on every row. The index bounds + opcode decode are *received* from the decode/ProgramChip
-(not a local send). The `name` matches the `"SP1Program"` key in `programLookups`. -/
+The channel carries only the structural `RowSpec`.  Agreement with the committed ROM (`ProgTruth`) is
+derived globally from the provider table, program commitment, and interaction balance; it is not a
+local channel assumption. -/
 def programChannel : Channel (ZMod p) ProgramMsg where
   name := "SP1Program"
-  Guarantees msg _ := ProgramMsg.Spec msg
+  Guarantees msg _ := ProgramMsg.RowSpec msg
 
 /-- The Byte channel (SP1 `InteractionKind.Byte`), lookups into the preprocessed `ByteChip`/`RangeChip`.
 Its `Guarantees` is `ByteRowSpec`, the byte-table membership predicate — and **Byte is the root of
-well-formedness** (`docs/bus-model.md` §7): unlike State/Memory/Program (dynamic buses → emit,
-`Guarantees := True`), the byte receiver is a *preprocessed static table* whose rows satisfy `ByteRowSpec`
-by construction, so it is the one bus where a consumer can soundly **pull** and obtain the fact locally.
+arithmetic lookup facts**. The byte receiver is a *preprocessed static table*
+whose rows satisfy `ByteRowSpec` by construction, so a consumer can soundly **pull** and obtain the
+lookup fact locally. Memory and Program likewise expose only row-local hygiene (`isU64` and `RowSpec`);
+State is the sole structural channel with `Guarantees := True`.
 A range check that *needs* its fact (`BitwiseOperation`'s `result = b op c`, `AddOperation`'s result range)
 pulls `(op, value, w, 0)` and gets `ByteRowSpec`; a reader that only emits the check pulls-and-discards.
 Gating is **multiplicity-gated** (`Channel.pullIf`, mult `-is_real`), faithful to SP1's
 `send_byte(op, value, w, 0, is_real)`: the value is passed **raw** (no `is_real * value` fold) and padding
 (`mult = 0`) drops out of the LogUp sum entirely (`mult / fingerprint(values)` with `mult = 0`), owing
-nothing — post-#398 a receive owes no `Requirements` at all (`docs/bus-model.md` §7). The provider side is
-`Chips/ByteChip.lean` (pushes the table, proves each row); until it lands the pull's justification is
-threaded as `Soundness/ByteConsistency.lean`'s `TraceByteLink`. Pulled by
+nothing — post-#398 a receive owes no `Requirements` at all. The provider side is
+`Proofs/Chips/ByteChip/` (pushes the table, proves each row); with it landed, the pull's justification
+is closed by the native Byte/Range providers and ensemble balance; the exact/native artifact recounts
+their demand in `Composition/PreprocessedProviders.lean`. Pulled by
 `Readers/{CPUState,RegisterAccessTimestamp,RegisterAccessCols,RTypeReader}.lean`. -/
 def byteChannel : Channel (ZMod p) ByteRow where
   name := "SP1Byte"
   Guarantees msg _ := ByteRowSpec msg
+
+/-- The Exit channel — the native halt table's exit-code bus. It has no SP1 `InteractionKind`
+counterpart: SP1's syscall chip constrains `public_values.exit_code` by direct chip-level
+public-values access, which Clean's flat-AIR reserves to the designated verifier — so the native
+ensemble factors that binding through one channel. The verifier pulls `⟨exit_code⟩` **ungated**
+(its row is exactly the public input and can witness no gate cell); a real halt row pushes its
+reduced `x10` word, a padding halt row pushes `⟨0⟩`, and balance alone forces the exit semantics
+(see `ExitMsg`). `Guarantees := True` — like the State bus, the channel is purely structural: the
+binding is a multiset fact, not a per-message predicate. -/
+def exitChannel : Channel (ZMod p) ExitMsg where
+  name := "SP1Exit"
+  Guarantees _ _ := True
+
+/-- The **halt hand-off** channel — native-only, and the mechanism that makes the exit code honest.
+
+The verifier's `⟨exit_code⟩` pull is ungated, so its counterparty must be a one-row table; that is
+`HaltChip` today, and its trick is a *gated pair* — a real row pushes the reduced `x10`, a padding
+row pushes `⟨0⟩` — which forces `exit_code = 0` on every halt-free shard. **SP1 makes no such
+restriction.** Upstream leaves `exit_code` free on a non-halting execution shard whose previous code
+is zero; it is sticky once set and chained across shards by the verifier, never pinned within one
+(`record.rs:1172-1193`, `prover/src/verify.rs:269-293`).
+
+So the exit accounting is refactored across two tables and this channel. The successor table keeps
+the ungated `⟨code⟩` push — so the one-row count is still forced — but the `code` it pushes is a
+**witness cell**, constrained only by a gated pull on this channel. The `SyscallInstrs` table's
+`is_halt` rows push here with their reduced `op_b`. Balance then says exactly what SP1 says: on a
+halting shard the committed exit code is `a0`, and on a halt-free shard nothing constrains it.
+
+Like `exitChannel`, `Guarantees := True`: the binding is a multiset fact, not a per-message
+predicate. -/
+def haltHandoffChannel : Channel (ZMod p) ExitMsg where
+  name := "SP1HaltHandoff"
+  Guarantees _ _ := True
+
+/-- The Syscall channel — SP1's own syscall bus (`InteractionKind::Syscall`), the one new channel
+here that is *not* native-only. Its payload is the existing `SyscallMsg`, the same carrier the
+exact v6.4.0 lists project, so both models name this bus with one type.
+
+Its consumer upstream is `SyscallCore`, which the supported profile excludes, so the native
+ensemble declares the channel with **no provider**: balance then forces every send's multiplicity —
+byte 1 of the syscall id, SP1's "this handler has its own table" flag — to zero, which is exactly
+the statement that a supported shard uses only the syscalls `SyscallInstrs` handles inline.
+`Guarantees := True`: as with State and Exit, the content is the multiset fact, not a per-message
+predicate.
+
+Both sides of a faithfulness anchor agree on this bus by name *and* by kind:
+`Extracted.Interaction.toAccess` gives the generated `.raw .syscall` send the same `"SP1Syscall"`
+name, and `kindOf` classifies it `InteractionKind.Syscall`. A whole-chip anchor compares exactly
+that pair, so the agreement has to be deliberate rather than incidental. -/
+def syscallChannel : Channel (ZMod p) SyscallMsg where
+  name := "SP1Syscall"
+  Guarantees _ _ := True
+
+/-- The public-values channel — the second native-only bus, and the general form of what
+`exitChannel` does for one cell. A chip-level assertion about `public_values` cannot be a row
+constraint in Clean's flat AIR (a `Table` carries no `PublicIO`, and `Ensemble.tables` cannot
+depend on one), so each such assertion is factored into one addressed-cell message; upstream
+Clean's `Air/Vm.lean` `VmTables` requires the same shape of its verifier.
+
+Declared with no provider for now, so balance forces the commit selectors to zero. `Guarantees :=
+True` for the same reason as `exitChannel`: the binding is established by balance against the
+verifier (or, once COMMIT is modelled, against a `PublicValues` provider), not row-locally. -/
+def publicValuesChannel : Channel (ZMod p) PublicValueMsg where
+  name := "SP1PublicValues"
+  Guarantees _ _ := True
 
 open Classical in
 /-- **Subcircuit interactions, kept in `interactionsWith` form.** Combines Clean's
@@ -157,12 +172,13 @@ open Classical in
 with `FormalCircuit.toSubcircuit_interactions` (which rewrites that flat list back to the child `main`'s
 operations). Keeping the result as `interactionsWith channel ((circuit.main input).operations n)` — rather
 than the unfolded `.interactions.filter` — is what lets a child's bottom-up `interactionsWith_<chan>_eq`
-rfl-lemma fire when a parent composes it (the readers' Memory/Program recovery, `docs/bus-model.md` §5/§7).
+rfl-lemma fire when a parent composes it (the readers' Memory/Program recovery described in
+`ToClean/Circuit/InteractionRecovery.lean`).
 Tagged `circuit_norm` at **high priority** so it fires before Clean's more-general
 `Operations.interactionsWith_subcircuit` (which would expose the raw `FlatOperation` form and lose the
 fold). -/
 @[circuit_norm high]
-lemma interactionsWith_subcircuit_formal {F : Type} [Field F] {Input Output : TypeMap}
+lemma interactionsWith_subcircuit_formal {F : Type} [FiniteField F] {Input Output : TypeMap}
     [ProvableType Input] [ProvableType Output]
     (channel : RawChannel F) (circuit : FormalCircuit F Input Output)
     (input : Var Input F) (n : ℕ) (ops : Operations F) :
@@ -172,54 +188,213 @@ lemma interactionsWith_subcircuit_formal {F : Type} [Field F] {Input Output : Ty
   rw [Operations.interactionsWith_subcircuit, FormalCircuit.toSubcircuit_interactions]
   rfl
 
-omit [Fact (2 ^ 17 < p)] in
 /-- Two channels with distinct `name`s have distinct `toRaw`s — as a `simp`-shaped `= False` so the
 `interactionsWith` per-op `if i.channel = channel` conditions for a *different* bus reduce to the `else`
 branch **without expanding the channel record** (which would break a child's bottom-up
-`interactionsWith_<chan>_eq` rfl-lemma matching). (`omit`s the `2^17` fact so it applies wherever
-`channelsLawful` does, e.g. under `Fact p.Prime` only.) -/
+`interactionsWith_<chan>_eq` rfl-lemma matching). (Carries no `2^17` magnitude fact — that variable is
+not in scope in this file — so it applies wherever `channelsLawful` does, e.g. under `Fact p.Prime`
+only.) -/
 private lemma toRaw_eq_false_of_name_ne {M1 M2 : TypeMap} [ProvableType M1] [ProvableType M2]
     {c1 : Channel (ZMod p) M1} {c2 : Channel (ZMod p) M2} (h : c1.name ≠ c2.name) :
-    (c1.toRaw = c2.toRaw) = False := by
-  simp only [eq_iff_iff, iff_false]
-  intro he
-  exact h (by rw [← Channel.toRaw_name c1, ← Channel.toRaw_name c2, he])
+    (c1.toRaw = c2.toRaw) = False :=
+  eq_false fun he => h (by rw [← Channel.toRaw_name c1, ← Channel.toRaw_name c2, he])
+
+omit [Fact p.Prime] in
+/-- Name-distinctness at the `RawChannel` layer. -/
+private lemma rawChannel_eq_false_of_name_ne {rc1 rc2 : RawChannel (ZMod p)}
+    (h : rc1.name ≠ rc2.name) : (rc1 = rc2) = False :=
+  eq_false fun he => h (by rw [he])
 
 -- Per-pair `= False` instances (`@[circuit_norm]`) for every ordered pair of distinct buses a channel
 -- list or `interactionsWith` filter can compare — kept as pre-instantiated simp rules so the
 -- `if i.channel = channel` conditions reduce without record expansion.
-omit [Fact (2 ^ 17 < p)] in
 @[circuit_norm] lemma byteChannel_eq_stateChannel_false :
     ((byteChannel (p := p)).toRaw = (stateChannel (p := p)).toRaw) = False :=
-  toRaw_eq_false_of_name_ne (by simp [byteChannel, stateChannel])
-omit [Fact (2 ^ 17 < p)] in
+  rawChannel_eq_false_of_name_ne (by
+    simp only [Channel.toRaw_name, byteChannel, stateChannel]; decide)
 @[circuit_norm] lemma stateChannel_eq_byteChannel_false :
     ((stateChannel (p := p)).toRaw = (byteChannel (p := p)).toRaw) = False :=
-  toRaw_eq_false_of_name_ne (by simp [stateChannel, byteChannel])
-omit [Fact (2 ^ 17 < p)] in
+  rawChannel_eq_false_of_name_ne (by
+    simp only [Channel.toRaw_name, byteChannel, stateChannel]; decide)
+-- State vs Memory / Program — needed wherever a chip's `exposedChannels` filter must drop the
+-- memory/program interactions.
+@[circuit_norm] lemma stateChannel_eq_memoryChannel_false :
+    ((stateChannel (p := p)).toRaw = (memoryChannel (p := p)).toRaw) = False :=
+  rawChannel_eq_false_of_name_ne (by
+    simp only [Channel.toRaw_name, stateChannel, memoryChannel]; decide)
+@[circuit_norm] lemma memoryChannel_eq_stateChannel_false :
+    ((memoryChannel (p := p)).toRaw = (stateChannel (p := p)).toRaw) = False :=
+  rawChannel_eq_false_of_name_ne (by
+    simp only [Channel.toRaw_name, stateChannel, memoryChannel]; decide)
+@[circuit_norm] lemma stateChannel_eq_programChannel_false :
+    ((stateChannel (p := p)).toRaw = (programChannel (p := p)).toRaw) = False :=
+  rawChannel_eq_false_of_name_ne (by
+    simp only [Channel.toRaw_name, stateChannel, programChannel]; decide)
+@[circuit_norm] lemma programChannel_eq_stateChannel_false :
+    ((programChannel (p := p)).toRaw = (stateChannel (p := p)).toRaw) = False :=
+  rawChannel_eq_false_of_name_ne (by
+    simp only [Channel.toRaw_name, stateChannel, programChannel]; decide)
 @[circuit_norm] lemma byteChannel_eq_memoryChannel_false :
     ((byteChannel (p := p)).toRaw = (memoryChannel (p := p)).toRaw) = False :=
   toRaw_eq_false_of_name_ne (by simp [byteChannel, memoryChannel])
-omit [Fact (2 ^ 17 < p)] in
 @[circuit_norm] lemma byteChannel_eq_programChannel_false :
     ((byteChannel (p := p)).toRaw = (programChannel (p := p)).toRaw) = False :=
-  toRaw_eq_false_of_name_ne (by simp [byteChannel, programChannel])
-omit [Fact (2 ^ 17 < p)] in
+  rawChannel_eq_false_of_name_ne (by
+    simp only [Channel.toRaw_name, byteChannel, programChannel]; decide)
 @[circuit_norm] lemma programChannel_eq_memoryChannel_false :
     ((programChannel (p := p)).toRaw = (memoryChannel (p := p)).toRaw) = False :=
-  toRaw_eq_false_of_name_ne (by simp [programChannel, memoryChannel])
-omit [Fact (2 ^ 17 < p)] in
+  rawChannel_eq_false_of_name_ne (by
+    simp only [Channel.toRaw_name, programChannel, memoryChannel]; decide)
 @[circuit_norm] lemma memoryChannel_eq_programChannel_false :
     ((memoryChannel (p := p)).toRaw = (programChannel (p := p)).toRaw) = False :=
-  toRaw_eq_false_of_name_ne (by simp [memoryChannel, programChannel])
-omit [Fact (2 ^ 17 < p)] in
+  rawChannel_eq_false_of_name_ne (by
+    simp only [Channel.toRaw_name, memoryChannel, programChannel]; decide)
 @[circuit_norm] lemma memoryChannel_eq_byteChannel_false :
     ((memoryChannel (p := p)).toRaw = (byteChannel (p := p)).toRaw) = False :=
   toRaw_eq_false_of_name_ne (by simp [memoryChannel, byteChannel])
-omit [Fact (2 ^ 17 < p)] in
 @[circuit_norm] lemma programChannel_eq_byteChannel_false :
     ((programChannel (p := p)).toRaw = (byteChannel (p := p)).toRaw) = False :=
-  toRaw_eq_false_of_name_ne (by simp [programChannel, byteChannel])
+  rawChannel_eq_false_of_name_ne (by
+    simp only [Channel.toRaw_name, programChannel, byteChannel]; decide)
+-- Exit vs the four established buses — both orders, for the halt table's filter conditions.
+@[circuit_norm] lemma exitChannel_eq_byteChannel_false :
+    ((exitChannel (p := p)).toRaw = (byteChannel (p := p)).toRaw) = False :=
+  rawChannel_eq_false_of_name_ne (by
+    simp only [Channel.toRaw_name, exitChannel, byteChannel]; decide)
+@[circuit_norm] lemma byteChannel_eq_exitChannel_false :
+    ((byteChannel (p := p)).toRaw = (exitChannel (p := p)).toRaw) = False :=
+  rawChannel_eq_false_of_name_ne (by
+    simp only [Channel.toRaw_name, byteChannel, exitChannel]; decide)
+@[circuit_norm] lemma exitChannel_eq_stateChannel_false :
+    ((exitChannel (p := p)).toRaw = (stateChannel (p := p)).toRaw) = False :=
+  rawChannel_eq_false_of_name_ne (by
+    simp only [Channel.toRaw_name, exitChannel, stateChannel]; decide)
+@[circuit_norm] lemma stateChannel_eq_exitChannel_false :
+    ((stateChannel (p := p)).toRaw = (exitChannel (p := p)).toRaw) = False :=
+  rawChannel_eq_false_of_name_ne (by
+    simp only [Channel.toRaw_name, stateChannel, exitChannel]; decide)
+@[circuit_norm] lemma exitChannel_eq_programChannel_false :
+    ((exitChannel (p := p)).toRaw = (programChannel (p := p)).toRaw) = False :=
+  rawChannel_eq_false_of_name_ne (by
+    simp only [Channel.toRaw_name, exitChannel, programChannel]; decide)
+@[circuit_norm] lemma programChannel_eq_exitChannel_false :
+    ((programChannel (p := p)).toRaw = (exitChannel (p := p)).toRaw) = False :=
+  rawChannel_eq_false_of_name_ne (by
+    simp only [Channel.toRaw_name, programChannel, exitChannel]; decide)
+@[circuit_norm] lemma exitChannel_eq_memoryChannel_false :
+    ((exitChannel (p := p)).toRaw = (memoryChannel (p := p)).toRaw) = False :=
+  rawChannel_eq_false_of_name_ne (by
+    simp only [Channel.toRaw_name, exitChannel, memoryChannel]; decide)
+@[circuit_norm] lemma memoryChannel_eq_exitChannel_false :
+    ((memoryChannel (p := p)).toRaw = (exitChannel (p := p)).toRaw) = False :=
+  rawChannel_eq_false_of_name_ne (by
+    simp only [Channel.toRaw_name, memoryChannel, exitChannel]; decide)
+
+-- The two native-only buses and SP1's syscall bus against every other channel: the same
+-- pre-instantiated shape, so a whole-chip `interactionsWith` filter reduces without
+-- reopening any channel record.
+@[circuit_norm] lemma syscallChannel_eq_byteChannel_false :
+    ((syscallChannel (p := p)).toRaw = (byteChannel (p := p)).toRaw) = False :=
+  rawChannel_eq_false_of_name_ne (by
+    simp only [Channel.toRaw_name, syscallChannel, byteChannel]; decide)
+@[circuit_norm] lemma byteChannel_eq_syscallChannel_false :
+    ((byteChannel (p := p)).toRaw = (syscallChannel (p := p)).toRaw) = False :=
+  rawChannel_eq_false_of_name_ne (by
+    simp only [Channel.toRaw_name, byteChannel, syscallChannel]; decide)
+@[circuit_norm] lemma syscallChannel_eq_stateChannel_false :
+    ((syscallChannel (p := p)).toRaw = (stateChannel (p := p)).toRaw) = False :=
+  rawChannel_eq_false_of_name_ne (by
+    simp only [Channel.toRaw_name, syscallChannel, stateChannel]; decide)
+@[circuit_norm] lemma stateChannel_eq_syscallChannel_false :
+    ((stateChannel (p := p)).toRaw = (syscallChannel (p := p)).toRaw) = False :=
+  rawChannel_eq_false_of_name_ne (by
+    simp only [Channel.toRaw_name, stateChannel, syscallChannel]; decide)
+@[circuit_norm] lemma syscallChannel_eq_memoryChannel_false :
+    ((syscallChannel (p := p)).toRaw = (memoryChannel (p := p)).toRaw) = False :=
+  rawChannel_eq_false_of_name_ne (by
+    simp only [Channel.toRaw_name, syscallChannel, memoryChannel]; decide)
+@[circuit_norm] lemma memoryChannel_eq_syscallChannel_false :
+    ((memoryChannel (p := p)).toRaw = (syscallChannel (p := p)).toRaw) = False :=
+  rawChannel_eq_false_of_name_ne (by
+    simp only [Channel.toRaw_name, memoryChannel, syscallChannel]; decide)
+@[circuit_norm] lemma syscallChannel_eq_programChannel_false :
+    ((syscallChannel (p := p)).toRaw = (programChannel (p := p)).toRaw) = False :=
+  rawChannel_eq_false_of_name_ne (by
+    simp only [Channel.toRaw_name, syscallChannel, programChannel]; decide)
+@[circuit_norm] lemma programChannel_eq_syscallChannel_false :
+    ((programChannel (p := p)).toRaw = (syscallChannel (p := p)).toRaw) = False :=
+  rawChannel_eq_false_of_name_ne (by
+    simp only [Channel.toRaw_name, programChannel, syscallChannel]; decide)
+@[circuit_norm] lemma syscallChannel_eq_exitChannel_false :
+    ((syscallChannel (p := p)).toRaw = (exitChannel (p := p)).toRaw) = False :=
+  rawChannel_eq_false_of_name_ne (by
+    simp only [Channel.toRaw_name, syscallChannel, exitChannel]; decide)
+@[circuit_norm] lemma exitChannel_eq_syscallChannel_false :
+    ((exitChannel (p := p)).toRaw = (syscallChannel (p := p)).toRaw) = False :=
+  rawChannel_eq_false_of_name_ne (by
+    simp only [Channel.toRaw_name, exitChannel, syscallChannel]; decide)
+@[circuit_norm] lemma syscallChannel_eq_publicValuesChannel_false :
+    ((syscallChannel (p := p)).toRaw = (publicValuesChannel (p := p)).toRaw) = False :=
+  rawChannel_eq_false_of_name_ne (by
+    simp only [Channel.toRaw_name, syscallChannel, publicValuesChannel]; decide)
+@[circuit_norm] lemma publicValuesChannel_eq_syscallChannel_false :
+    ((publicValuesChannel (p := p)).toRaw = (syscallChannel (p := p)).toRaw) = False :=
+  rawChannel_eq_false_of_name_ne (by
+    simp only [Channel.toRaw_name, publicValuesChannel, syscallChannel]; decide)
+@[circuit_norm] lemma publicValuesChannel_eq_byteChannel_false :
+    ((publicValuesChannel (p := p)).toRaw = (byteChannel (p := p)).toRaw) = False :=
+  rawChannel_eq_false_of_name_ne (by
+    simp only [Channel.toRaw_name, publicValuesChannel, byteChannel]; decide)
+@[circuit_norm] lemma byteChannel_eq_publicValuesChannel_false :
+    ((byteChannel (p := p)).toRaw = (publicValuesChannel (p := p)).toRaw) = False :=
+  rawChannel_eq_false_of_name_ne (by
+    simp only [Channel.toRaw_name, byteChannel, publicValuesChannel]; decide)
+@[circuit_norm] lemma publicValuesChannel_eq_stateChannel_false :
+    ((publicValuesChannel (p := p)).toRaw = (stateChannel (p := p)).toRaw) = False :=
+  rawChannel_eq_false_of_name_ne (by
+    simp only [Channel.toRaw_name, publicValuesChannel, stateChannel]; decide)
+@[circuit_norm] lemma stateChannel_eq_publicValuesChannel_false :
+    ((stateChannel (p := p)).toRaw = (publicValuesChannel (p := p)).toRaw) = False :=
+  rawChannel_eq_false_of_name_ne (by
+    simp only [Channel.toRaw_name, stateChannel, publicValuesChannel]; decide)
+@[circuit_norm] lemma publicValuesChannel_eq_memoryChannel_false :
+    ((publicValuesChannel (p := p)).toRaw = (memoryChannel (p := p)).toRaw) = False :=
+  rawChannel_eq_false_of_name_ne (by
+    simp only [Channel.toRaw_name, publicValuesChannel, memoryChannel]; decide)
+@[circuit_norm] lemma memoryChannel_eq_publicValuesChannel_false :
+    ((memoryChannel (p := p)).toRaw = (publicValuesChannel (p := p)).toRaw) = False :=
+  rawChannel_eq_false_of_name_ne (by
+    simp only [Channel.toRaw_name, memoryChannel, publicValuesChannel]; decide)
+@[circuit_norm] lemma publicValuesChannel_eq_programChannel_false :
+    ((publicValuesChannel (p := p)).toRaw = (programChannel (p := p)).toRaw) = False :=
+  rawChannel_eq_false_of_name_ne (by
+    simp only [Channel.toRaw_name, publicValuesChannel, programChannel]; decide)
+@[circuit_norm] lemma programChannel_eq_publicValuesChannel_false :
+    ((programChannel (p := p)).toRaw = (publicValuesChannel (p := p)).toRaw) = False :=
+  rawChannel_eq_false_of_name_ne (by
+    simp only [Channel.toRaw_name, programChannel, publicValuesChannel]; decide)
+@[circuit_norm] lemma publicValuesChannel_eq_exitChannel_false :
+    ((publicValuesChannel (p := p)).toRaw = (exitChannel (p := p)).toRaw) = False :=
+  rawChannel_eq_false_of_name_ne (by
+    simp only [Channel.toRaw_name, publicValuesChannel, exitChannel]; decide)
+@[circuit_norm] lemma exitChannel_eq_publicValuesChannel_false :
+    ((exitChannel (p := p)).toRaw = (publicValuesChannel (p := p)).toRaw) = False :=
+  rawChannel_eq_false_of_name_ne (by
+    simp only [Channel.toRaw_name, exitChannel, publicValuesChannel]; decide)
+
+-- Reusable disequalities for the State exposure proofs.  Keeping these once at the channel boundary
+-- avoids every chip reopening the `RawChannel` record merely to filter its non-State interactions.
+lemma byteChannel_toRaw_ne_stateChannel :
+    (byteChannel (p := p)).toRaw ≠ (stateChannel (p := p)).toRaw :=
+  of_eq_false byteChannel_eq_stateChannel_false
+
+lemma programChannel_toRaw_ne_stateChannel :
+    (programChannel (p := p)).toRaw ≠ (stateChannel (p := p)).toRaw :=
+  of_eq_false programChannel_eq_stateChannel_false
+
+lemma memoryChannel_toRaw_ne_stateChannel :
+    (memoryChannel (p := p)).toRaw ≠ (stateChannel (p := p)).toRaw :=
+  of_eq_false memoryChannel_eq_stateChannel_false
 
 -- These belong with Clean's `channels_lawful` default (`Clean/Circuit/Basic.lean`, which runs
 -- `simp only [circuit_norm, seval]; try trivial`) — a pinned dep we don't edit — so we tag them here
@@ -246,7 +421,7 @@ matches a `populate`-witnessed column struct after `circuit_norm` normalisation:
 proof, `ext_iff` reduces `<witnessed cols> = populate …` to per-cell equalities, each of which this lemma
 turns into `env.get (off + i)`, which the witness hint (`UsesLocalWitnessesCompleteness`) pins to
 `(toElements (populate …))[i]`. Used by `BitwiseChip`; reusable for `MulChip`/`DivRemChip`. -/
-lemma getElem_toElements_eval_varFromOffset {F : Type} [Field F] {α : TypeMap} [ProvableStruct α]
+lemma getElem_toElements_eval_varFromOffset {F : Type} [FiniteField F] {α : TypeMap} [ProvableStruct α]
     (e : Environment F) (off i : ℕ) (hi : i < size α) :
     (toElements (Eval.eval e (ProvableStruct.varFromOffset α off : α (Expression F))))[i]
       = e.get (off + i) := by

@@ -1,0 +1,8 @@
+{"outputCells": [2],
+ "originalCells":
+ [{"signal": 2, "name": "a", "cell": 0},
+  {"signal": 3, "name": "inverse", "cell": 1},
+  {"signal": 1, "name": "result", "cell": 2}],
+ "inputNames": ["a"],
+ "constantSignal": 0,
+ "auxiliarySignalsStart": 4}

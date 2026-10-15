@@ -1,9 +1,159 @@
 # Proof patterns & landmines
 
-Concrete, build-verified patterns for the witnessed-`FormalCircuit` gadgets in `Native/Operations/`
-(+ their proofs in `Proofs/Operations/`).
-Reference templates: `AddOperation.lean` (carry chain), `IsZeroOperation.lean` (tiny witness
-gadget), `BitwiseU16Operation.lean` (byte/opcode), `IsZeroWordOperation.lean` (composed subcircuits).
+> **Read Clean's docs first.** This file records *SP1-specific instances*; the general doctrine lives in
+> Clean's own docs (upstream <https://github.com/Verified-zkEVM/clean>, or in-tree under
+> `.lake/packages/Clean/` — see `AGENTS.md` for the "where to find them" note). Before any nontrivial proof
+> work read Clean's `doc/performance-problems.md` (§"The root failure mode" — make the dangerous value
+> opaque, cross spellings by syntactic rewriting) and `doc/proving-guide.md`. **When you hit a new `whnf` /
+> heartbeat / `(kernel) deep recursion` blowup, check `performance-problems.md` first** — most of the
+> landmines below are worked instances of one of its 9 fix patterns (see §"Clean's unifying principle" for
+> the mapping). Clean's `AGENTS.md` owns the subcircuit-boundary, helper-lemma, spec, and
+> `ElaboratedCircuit` disciplines.
+
+Concrete patterns for bundled gadgets in `Circuits/Gadgets/` and the remaining
+`Native/Operations/` implementations with proofs in `Proofs/Operations/`.
+Reference templates: `Native/Operations/AddOperation/` (carry chain), `Circuits/Gadgets/IsZero.lean`
+(small witness gadget), `Circuits/Gadgets/Bitwise.lean` and `Bitwise/Witness.lean` (byte/opcode),
+and `Circuits/Gadgets/IsZeroWord.lean` (composed subcircuits).
+
+## Clean's unifying principle (and our instances)
+
+Almost every performance landmine below is one concrete instance of the single doctrine in Clean's
+`doc/performance-problems.md` (upstream <https://github.com/Verified-zkEVM/clean>, or in-tree under
+`.lake/packages/Clean/`): **the elaborator and kernel decide defeq by `whnf`, which is cheap
+on symbolic terms but catastrophic when a term can unfold into a large concrete computation (a `ZMod`
+`.val`/`npow` over a big modulus, a recursive def at a literal depth, a `2^64` power). The fix is always to
+make the dangerous value *opaque* before any defeq touches it, and cross between spellings by *syntactic
+rewriting* (`rw`, `simp only`), never by unification.** Read that doc first; the map below tells you which
+of its patterns each of our notes realizes, so a *new* blowup is anticipated rather than rediscovered.
+
+| Our SP1-specific note (below) | Clean's general rule (Clean's `doc/`) |
+|---|---|
+| §"Keeping a nested sub-op's `cols` folded" (`eval_fromElements ↓100000`) | performance-problems §"Keep hypothesis types folded when applying generic lemmas" + item 1; proving-guide §"What (not) to unfold" |
+| The metavariable landmine — never `exact <lemma> _ _ hyp` at a decoded row (7.4M `Vector.mapRange` unfolds); pass the **folded** `Spec` and match on the head symbol (`memoryTimeNat_lt_of_registerAccessCols`) | performance-problems item 1 + §"Keep hypothesis types folded" — *this is the same fix as the working-tree `GroundingAdapter`/`TimeExtraction` change* |
+| §"The converse core" — make `(m*65535).val` opaque via `obtain`, **not** `set`/`let` | performance-problems item 4 verbatim ("`set` is not enough … only the `obtain`-an-existential form is genuinely opaque"); also explains why soundness survives where completeness explodes |
+| §"Bit-shift chip soundness" — factor `2^64` into an abstract-`BitVec` helper (`srl_toNat`/`sra_toNat`), never `skipKernelTC` | performance-problems item 9 ("kernel has no accelerated `Nat.pow`; factor arithmetic into a `private theorem` over abstract ℕ") |
+| Mul: keep `eval((output …) …)` an opaque atom (don't `simp [Expression.eval]`) | performance-problems items 1/4 (opaque values) |
+| §"`ElaboratedCircuit` field obligations: let the default tactics close them" | complements Clean `AGENTS.md` "pass `elaborated` as an **explicit field** for factored circuits (else `soundness` elaborates with metavariables)" + README roadmap (this automation is known-incomplete upstream) |
+| §"Elaboration budgets" — the hand-written surface carries none; fold the blowup rather than raise a ceiling | Clean's thrice-stated "**Never modify maxHeartbeats**" + performance-problems §"Measuring honestly" (`#count_heartbeats` lies; lower the *real* ceiling, or use `diagnostics true`, to find the true floor) |
+| The 3 remaining gated completeness proofs (Branch/ShiftLeft/DivRem); ShiftRight is the validated repair | performance-problems §"Kernel size cliffs in completeness proofs": `circuit_proof_start_core` → per-component `dsimp only [main, circuit_norm] at h_env` → `.1`/`.2` → split into a (virtual, free) subcircuit when the parent cliffs |
+
+One disagreement worth stating honestly: Clean's "don't hand-unpack `ConstraintsHold` into helper lemmas" rule targets *single-circuit*
+proofs; our `Soundness/` whole-machine layer legitimately reasons about the *ensemble*'s global balance,
+which is a different regime — but per-chip closed-form families (`<chip>_memoryInteractionValues_eq`) are
+closer to what Clean would fold into a bundled `Spec`/`exposedChannels` conjunct.
+
+## Elaboration budgets: this repo doesn't use them — fold the blowup
+
+**Hand-written Lean here carries zero `set_option maxHeartbeats`**, matching upstream Clean (none in
+44,603 lines), and two `maxRecDepth` sites (`Faithful/BranchChip.lean`, `Model/Machine/ConfiguredState.lean`),
+each structural and measured. Every other surviving site is
+on a *generated* definition, where the only lever is `update_extracted.py`.
+
+`scripts/check_option_escapes.sh` (a CI `guards` gate + part of `run_audit.sh`) **prohibits** both options:
+any `maxHeartbeats`/`maxRecDepth` site not named in `scripts/option_escapes_allowlist.txt` fails the build.
+It is not a ratchet and not a budget — a ratchet permits a new hatch as long as an old one leaves; this does
+not. So when a proof blows its budget, the fix is to **fold the blowup**, using the recipes below.
+
+The allowlist is a **last resort, not an allowance**. The bar for an entry is a measured floor
+bracket, a named mechanism, at least one attempted fix with its result, and a reason the cause
+cannot be moved — every existing entry carries all four inline. Start instead by extracting over
+OPAQUE arguments and checking what the extraction can still see. That one rule accounts for most
+sites that turn out to be fixable. If the site is *generated*, fix the emitter in
+`update_extracted.py` rather than allowlisting its output.
+
+> **The guard greps for the full `set_option <option>` phrase, so never write that phrase into a Lean
+> comment or docstring under `SP1Clean/` or `SP1CleanTest/`.** It does not parse Lean, so a comment quoting
+> a whole directive scores as a live site and fails the build. (The bare option name in prose is fine.)
+> When recording a measured ladder in the source — which you should — phrase it without the directive:
+> *"the former 8M ceiling was ~170× over; measured floor bracket (40000, 100000]"*. Keep such notes to
+> **one line**; multi-line transcripts belong with the review artifact that motivated the
+> measurement.
+
+**1. `simp` → `simp only` — the biggest lever for chip/contract closers.** A full `simp [X.circuit, X.main,
+…, circuit_norm]` drags in the *entire default simpset* — that, not the `circuit`/`main` unfold, is the real
+cost that pushes these closers past the default. `simp only [<same args>, circuit_norm]` closes the identical
+goal cheaply (fits the 200k default), and it is what keeps the whole `TypedTimeContracts` / `TypedState`
+family there. **Gotcha:** in the `firstStraightCPUTimeContract`-style closers, **keep `input, offset` in
+the args** — dropping them makes chips whose CPUState subcircuit is *not* the operations-list head (AluX0,
+and the `right/left/rfl`-navigated Jalr/Branch) time out. Where goal-1 membership isn't at the head, add the
+manual `right/…/left/rfl` navigation (see `TypedTimeContracts` Jalr/Branch).
+
+**2. The `circuit_output_eq` fold — for closed-forms referencing `<chip>.circuit.output`.** The memory
+closed-form family (`<chip>_memoryInteractionValues_eq`, the ×25 capstone rollout) blows up because
+`simp only [circuit_norm]` leaves `<chip>.circuit.output {concrete row}` un-reduced (its residual is the
+*structural* output — witnessed vars via `Vector.mapRange`, **not** a computed `a+b`). `circuit.output`
+reduces to `elaborated.output` only under `explicit_circuit_norm` (Clean's `FormalCircuitBase.output` is
+`@[explicit_circuit_norm]`, not `@[circuit_norm]`), and no global lever bridges it (a global tag yields the
+*worse* normal form `circuit.elaborated.output`, still stuck on the chip's `elaborated` projection). **Fix:
+a per-chip `rfl` helper over an OPAQUE input**, colocated in `Proofs/Chips/<Chip>/Formal.lean` after
+`def circuit`:
+```lean
+@[circuit_norm] theorem <chip>_circuit_output_eq (input : Var <Chip>.Inputs (ZMod p)) (offset : ℕ) :
+    (<Chip>.circuit (p := p)).output input offset = <the chip's elaborated.output struct> := rfl
+```
+then close with `simp only [circuit_norm, …]` (auto-fires the tagged helper; no whole-`circuit` unfold at the
+concrete row). This is Clean's `doc/performance-problems.md` item-1 ("extract witness values through a lemma
+over an opaque variable") — the unfold is symbolic over the opaque `input`, kernel-checked *once*; applying
+it at the concrete row is a pure rewrite. It dropped `addChip_memoryInteractionValues_eq` from 4M to **no
+override**. The RHS struct is copy-pasteable from `Native/Chips/<Chip>/Defs.lean` for hand-written-output
+chips; for auto-elaborated chips, extract the normalized RHS via `lean_goal` on `(<Chip>.circuit.output
+input offset)`. If the `@[circuit_norm]` tag perturbs the chip's own soundness/completeness, drop the tag and
+pass the plain lemma explicitly.
+
+**3. Measure floors by lowering the real ceiling — `#count_heartbeats` LIES.** It runs with an *unlimited*
+budget and systematically under-reports (Clean's `doc/performance-problems.md` §"Measuring honestly"); a
+declaration it scores at tens of heartbeats can genuinely need hundreds of thousands. Always lower the
+*actual* ceiling and rebuild to find a floor; never trust `#count_heartbeats`. Remove the temporary
+directive before committing — the guard rejects it.
+
+**4. Diagnosing a budget-bound declaration — four facts that separate a measurement from a guess.**
+
+- **A ceiling has *declaration* granularity only.** The heartbeat counter is cumulative from the
+  declaration's start, so wrapping one expensive tactic line in a scoped `… in` directive does **not**
+  isolate that tactic — the wrapped line still fails at the *enclosing declaration's* rung. "Pin the one
+  expensive tactic high and ladder the rest" is therefore not a usable strategy. To attribute cost *within*
+  a declaration, `sorry` out the other branches instead — and restore before any other tool call, since a
+  `sorry` left on disk trips the repo's own guards.
+- **A cascading `(kernel) unknown constant '_private.…'` is never a result; it is a re-measure
+  instruction.** When a producer `def` exhausts its budget, every dependent cascades with that error
+  instead of its own timeout, so the dependents' true floors are invisible and they read as "binding" when
+  they may be hundreds of times over. Two properties make it hard to spot: the cascade also lands on
+  *unceilinged* consumers, where it reads as independent breakage; and **which producer is named changes
+  between rungs** — the same masked line reported `divRemComparisonBlocks_roundtrip` at one rung and
+  `divRemArithmeticBlocks_roundtrip` at the next, because the producers' pass/fail set had changed. Masking
+  is itself rung-dependent (`MulOperation/RawSpec.full_product` masks at 1M and not at 200k/400k), so never
+  conclude "no masking" from one probe. Pin the suspected producer high, re-run, and confirm the dependency
+  by grepping for citations rather than inferring it from the error.
+- **The timeout's phase name is a cost *class* read at the binding rung, not a stable fingerprint.**
+  `whnf` (usually reported at column 1 of a signature) = an elaboration-bound `circuit_proof_start` tower,
+  foldable · `isDefEq` = an abstraction/unification blowup (a `set` over a large term is the classic cause)
+  · `«abstract nested proofs»` = post-elaboration, neither foldable nor term-intrinsic · `«LCNF compiler»` =
+  genuinely code-generation-bound, where **none of the fold recipes apply**
+  (`Circuits/Gadgets/Mul/Constraints.lean`'s `main` is the only known case: it elaborates fine at 40000
+  and only codegen times out;
+  `noncomputable def` is *rejected*, not deferred, because `SP1CleanTest/TraceGenTests` derives traces from
+  `main`'s witness closures and would break `lake test`). **The phase moves with the rung** — measured at
+  n=56, the control-rung distribution (`elaborator` 21 · `isDefEq` 14 · `«synthesize pending MVars»` 14 ·
+  `whnf` 7) bore almost no resemblance to the binding-rung distribution. Read it at the *lowest failing*
+  rung, and never treat a rung-1 phase as the site's identity.
+- **A floor measured through the LSP is not a floor against the gate.** A bare `lake env lean` applies
+  none of the package's `[leanOptions]`/`moreLeanArgs` (`scripts/profile_compile.sh` passes them
+  itself for that reason), and the LSP applies only what Lake hands it as server options. So on the
+  rare occasion an allowlist entry is warranted, size its value at roughly **2–4× the measured bracket top**,
+  not at the bare lowest passing rung. Removal is unaffected: a site clearing 40000 against the plain 200000
+  default has ≥5× headroom either way. Also: a failure *position* is an attribution tool and says nothing reliable about magnitude,
+  and an **in-body** position is not even stable across runs (three identical invocations at one rung named
+  three different owners, while the *signature* positions stayed fixed).
+
+**5. Where `simp → simp only` will NOT help.** On the DivRem/Mul/Shift arithmetic heavies the cost is
+`nlinarith` / `linear_combination` / product-glue `simpa` / `omega` over big arithmetic / kernel
+`2^64`-whnf / kernel `decide`/`bv_decide` / term size — none of it a default-simpset drag, and the measured
+sweep over that family produced **zero** speedup. Chase the term-intrinsic cost
+instead (the abstract-`BitVec` helpers and shared-tail dedup below). In `Faithful/`, the full `simp` is
+doing real `List`/`Perm`/`decide` work *and* shaping residuals for a downstream `rw`, so squeeze it
+per-theorem or not at all. In generated `Extracted/` modules the only lever is right-sizing the emit in
+`update_extracted.py`.
 
 ## The witnessed-`FormalCircuit` recipe
 
@@ -91,15 +241,15 @@ Vector.getElem_map, Vector.getElem_mapRange, circuit_norm]`.
   is just `intro`s and `dsimp` is definitional, both LSP-cheap, and the goal shows the cols still folded as
   `cols := fromElements w`, revealing the form + which sub-ops use it.
 
-This closed `DivRemChip.completeness` axiom-clean and let its `maxHeartbeats` drop 256M → 64M (the nested
-decomposition was the whole cost).
+This technique reduced the DivRem completeness core substantially, but the current 4.31 driver remains
+an explicit deferred proof; do not cite the experiment as a closed theorem.
 
 ## The `FormalAssertion` + `populate` demotion (generalizing the Add worked example)
 
 For ops whose witnessed columns are **pinned by the semantic `Spec`** (see `../architecture.md`
 "Assertion vs `FormalCircuit`"), the op is a *witnessless* `FormalAssertion` and the **chip** owns the
 witnessing. Template: `Native/Operations/{AddOperation,SubOperation,AddwOperation,SubwOperation}/`
-(`Populate`/`RawSpec`; circuit form in `Extracted/Circuit/<Op>.lean`, proofs in
+(`Defs`/`Populate`/`RawSpec`; hand-maintained circuit form in `Defs.lean`, proofs in
 `Proofs/Operations/<Op>/Formal.lean`) and `Native/Operations/{U16MSBOperation,U16CompareOperation}.lean`
 (single file, proofs in `Proofs/Operations/<Op>/Formal.lean`).
 
@@ -115,7 +265,7 @@ witnessing. Template: `Native/Operations/{AddOperation,SubOperation,AddwOperatio
 - **Soundness**: byte ranges from the pull `Guarantees` (`byteRowSpec_range`), carry-bools from the gated
   asserts (`bool_of_mul_pred`), fed to `<sem>_of_<raw>`; plus a byte *padding requirement* per receive
   (`intro h; rw [gate_zero_of_ne hbin h, zero_mul, ← c16]; exact (byteRowSpec_range 0 h16p).mpr (by simp)`).
-- **Chip side** (`Proofs/Chips/AddChip.lean`): `let value ← witnessVector n (fun env => <Op>.populate …)`;
+- **Chip side** (`Proofs/Chips/AddChip/Formal.lean`): `let value ← witnessVector n (fun env => <Op>.populate …)`;
   `assertion <Op>.circuit ⟨…, value, is_real⟩`. Soundness feeds the op's `Assumptions`
   (`(h_op ⟨ha,hb,h_bin⟩ hr).2`); the channel tail gains `Or.inr ⟨ha, hb, h_bin⟩`. Completeness reconstructs
   per-limb `#v[eval input_var[i]]_i = input_word` (`Vector.ext; interval_cases i`), then `rw [hval]; exact
@@ -159,9 +309,19 @@ read into the chip asserts, so the chip is a skeleton (asserts + byte pulls in `
 `Native/Operations/ShiftRightMath.lean` (the `srl/sra/srlw/sraw_close_su16_*_case` lemmas + `is_mod_64`,
 `cancel_mul_65536`, the `srl_within_byte_shift*` division identities, a local `HWord`). Port landmines: the
 early lemmas rely on a section `variable [Fact (Nat.Prime p)] [Fact (2^17<p)]` + a `local instance : NeZero
-p`; file-level `set_option maxHeartbeats 100000000` + `linter.unusedVariables false`; sed range-extraction
-drops `section`/`end` markers and `/--` openers (strip/restore them).
+p`; the source file's blanket elaboration-budget directive and `linter.unusedVariables false` must **not** be
+carried over (fold instead — see §"Elaboration budgets"); sed range-extraction drops `section`/`end` markers
+and `/--` openers (strip/restore them).
 
+- **Completeness: preserve the visible flag gate, fold the arithmetic tail.** Clean's shallow channel-law
+  discharge needs the combined shift-flag sum boolean constraint in the parent; hiding that constraint
+  inside a child prevents the parent from proving its gated byte pulls lawful. Keep the four individual
+  flag booleans and combined sum gate in the parent, then compose a zero-witness `FormalAssertion` whose
+  `CoreSpec` is the remaining 53 assertions in exact upstream order. Prove the child with ordinary
+  `circuit_proof_start [CoreSpec]`; prove the parent with `circuit_proof_start_core`. The child exposes no
+  interactions, so a compositional `interactionsWith_subcircuit_eq_nil` lemma erases it from channel proofs
+  without unfolding its constraints. This is a virtual boundary: no witness cell, assertion, interaction,
+  or AIR order changes. The resulting `ShiftRightChip.completeness` and bundled `circuit` are axiom-clean.
 - **Spec on the register read, not a ghost operand.** The asserts decompose
   `adapter.op_b_memory.prev_value` (rs1) and read the shift amount from `op_c_memory.prev_value[0]` (rs2),
   and `main` never touches a separate `op_b_val`. So the `Spec` must shift `rs1 := adapter.op_b_memory
@@ -231,10 +391,133 @@ drops `section`/`end` markers and `/--` openers (strip/restore them).
   expensive compute into an abstract-`BitVec` helper proved once over variables and apply it symbolically —
   see the `2^64` bullet under "Bit-shift chip soundness" above for the worked `srl_toNat`/`sra_toNat` fix.
 
+- **`autoImplicit` is OFF (package `leanOptions`), so a hoisted statement that names something outside
+  its `open`s errors instead of elaborating as a weaker lemma.** A statement mentioning a name reachable
+  only through a targeted `open` — e.g. `byteChannel`, which lives in `SP1Clean.Channels` — needs
+  `open SP1Clean.Channels (byteChannel) in` (the shape `Faithful/CPUState.lean` already uses mid-file);
+  with auto-bound implicits the name would have become a fresh variable and the mismatch surfaced much
+  later as `Channels.byteChannel` against `byteChannel`, which is why the option is off.
+  **Validate a new shared statement by *applying* it at an existing call site** — a scratch `example`
+  discharging the verbatim hand-written `have` — before rolling it out. Also check for an import cycle before
+  promising a hoist covers every site: `ChipTactics.lean` imports `Faithful/CPUState.lean`, so CPUState
+  cannot cite anything hoisted into `ChipTactics`. A partial correct hoist beats a forced general one.
+
+- **Not every `change` is a free abbrev-restatement — some bridge two distinct defeq constants, and deleting
+  one gives `maximum recursion depth`, not a timeout.** A `change` that merely restates an `abbrev` is safe
+  to drop when the closer is a term rather than a tactic needing the syntactic form
+  (`MicroTime.chainState_succ_front` went 8 lines → 2 that way). But collapsing
+  `change … at clockCount; exact clockCount` in `supported_core_witness_grounding` fails with **`maximum
+  recursion depth has been reached`**, because `StateMsg.timeNat (initialBoundaryStateMessage …)` and
+  `Semantics.clkNat …` are two *different* constants that merely happen to be defeq — the `change` is doing
+  real bridging work. Likewise `TimedGrounding.stepOnce_of_sailStep`'s `change` is what makes the next line's
+  `unfold` possible (`Semantics.stepOnce` ≠ `Machine.stepOnce`). **Before deleting a `change`, check that
+  both sides name the same constant.** And note the failure mode: `maxRecDepth` (default 512) is *not* the
+  heartbeat counter, so no budget change diagnoses or fixes it — when a long `main` or a deep term blows up,
+  suspect `maxRecDepth` before heartbeats.
+
+### Lean ≥ 4.33 and Clean `main` (the 2026-09 toolchain move)
+
+Six failure classes, each with the fix that is now the house pattern (`docs/audits/` keeps the
+per-file ledger of the migration itself):
+
+- **Sealed `structToElements`.** Clean seals `ProvableStruct.structToElements`/`structFromElements`
+  (`attribute [irreducible]`), so nothing sees through `toElements` of a derived struct by defeq
+  any more: no `change (#v[a] ++ …).toList = _`, no `rfl` from `varFromOffset S i` to a struct
+  literal. Unfold by lemma instead: `simp only [toElements, ProvableStruct.structToElements_eq,
+  ProvableStruct.toComponents, Vector.toList_cast]` then `simp only [components,
+  ProvableStruct.componentsToElements, …]` (the `*_toList` message lemmas), and in the cell
+  projections `simp only [circuit_norm, explicit_provable_type, ProvableStruct.toComponents,
+  ProvableStruct.componentsToElements]`. For a small fixed layout, one whole-vector lemma can
+  replace separate cell lemmas: apply `Vector.ext` before unfolding, split the finite index,
+  then use `Vector.getElem_append_left/right`. See `Circuits/Gadgets/IsZeroWord.lean`.
+  A wrapper lemma such as `toElements_mk` unfolds its
+  LHS only (`change structToElements ⟨s⟩ = _; rw [structToElements_eq]`) — unfolding both sides
+  and closing by `exact` is a whnf timeout. State an `ElaboratedCircuit.output` as the literal
+  struct (`⟨⟨varFromOffset (fields 3) i0⟩, var ⟨i0 + 3⟩⟩`), not `varFromOffset S i0`.
+- **Transparency-respecting unifier (Lean #13895).** A metavariable assignment must type-check
+  at implicit transparency. `simpa … using h` where the two sides agree only after unfolding a
+  `def` → `exact h`. A `simp`-produced proof term carries whatever spelling of its type simp
+  produced (`min p 2^32 < 2^64` through `LinearOrder.toLattice.toLT`), and a bundle built with
+  it (`BoundedWord.circuit (bound p) (by simp [bound])`) makes every later rewrite on that goal
+  fail with "not type-correct under the implicit transparency level" — name the proof
+  (`HostHaltChip.bound_fits`). A lemma whose argument type only unfolds to the goal's
+  (`events : List (sp1Machine …).Event` vs `List ExecutionEvent`) must be instantiated by hand
+  (`executes_iff (events := events)`), and an eta-difference left by `simp only` closes with a
+  final `rfl`.
+- **Variable-input struct evaluation.** `circuit_norm` no longer unfolds `ProvableStruct.eval` on
+  a non-literal struct (matchers stopped eta-expanding), and Clean's lift simproc
+  (`Expression.eval env s.x ~~> (ProvableStruct.eval env s).x`) never fires for the same reason.
+  The constraint side of every goal is therefore in the `Expression.eval env input_var.f` form,
+  and a row-level fact `(ProvableStruct.eval env s).f = …` needs a bridge:
+  `provable_struct_eval_lemmas S` (`ToClean/Circuit/StructEvalLemmas.lean`, invoked after every
+  `deriving ProvableStruct`, emitted by `update_extracted.py` for generated structs) declares the
+  `@[circuit_norm] S.eval_f` push-down lemmas, exactly Clean's `FemtoCairo/TypesLemmas.lean`
+  idiom. Clean's literal-decomposition and equality-split simprocs live in
+  `Clean.Circuit.StructEvalSimprocs`, imported at the root (`Math/Word.lean`), not in
+  `Clean.Circuit.Basic` — a file that only imported `Basic` had no struct normalisation at all.
+  Where the input is a variable, destructure it at the `intro` (`intro k ⟨x, y⟩ env env'`) as
+  Clean's own gadget proofs do. Two of those simprocs (`structEvalProjectionExpr`,
+  `structEqSplit`) are registered in the *default* simproc set, so they fire in every `simp`
+  and `simp only`, not just under `circuit_norm`: the lift does fire on a nested projection
+  (`Expression.eval env r.state.clk ~~> (ProvableStruct.eval env r.state).clk`), so a
+  bridging hypothesis stated in the other direction loops as a simp rewrite rule
+  (`maxRecDepth`) — drop it, both sides normalise to the lifted form; and `if_true`/`if_false`
+  (Clean's `iteReduce`) and the `eval_field`/`eval_cols` push-downs become unused simp
+  arguments, which `linter.unusedSimpArgs` turns into a build failure under `--wfail`.
+- **Nested push-downs versus the struct lift on a circuit output.** The lift simproc proves its
+  rewrite by a default-transparency `isDefEq` after a small normalisation, so it *succeeds* on any
+  closed base — `circuit.output input offset`, `elaborated.output …` — while failing on a variable
+  input. On such a base the tagged nested-field push-down (`Columns.eval_state`,
+  `SubwOperation.Columns.eval_msb`) and the lift undo each other and `simp` hits `maxRecDepth`
+  (twice-nested "simp failed" is the tell: the lift's inner simp). Never let `circuit_norm` meet
+  an opaque output: unfold the circuit in the same `simp only` (`simp only [X.rowView, X.circuit,
+  circuit_norm]`, the `TypedMemorySelectors` lift macros) so the output literal decomposes first,
+  or rewrite the output to its named layout pre-order (`simp [↓ DivRemChip.output_eq_populatedRowAt,
+  DivRemChip.populatedRowAt_*_eq, …]`; the forwarding chips' `↓ directOutput_eq`), and reduce a
+  view's projections (`simp only [X.rowView]`) before the pass that evaluates its arguments. The
+  same lift undoes `Vector.getElem_map` on a component-level vector lemma's right-hand side
+  (`(ProvableStruct.eval env cols).pc = Vector.map (Expression.eval env) cols.pc`), so vector
+  push-downs stay untagged and are applied by name.
+- **`ite` at implicit transparency.** `split_ifs` introduces the case hypothesis but leaves the
+  `if` in place, and `rw [if_pos h]`/`rw [if_neg h]` fail on the `Decidable` instance: use
+  `by_cases h : c` and close with `simp [h]` (or `simp only [if_neg (show ¬c by norm_num)]`).
+- **Declaration heartbeat budget.** The forwarded-instance and struct-lift normal forms cost
+  more per `simp`; a 300-line anchor that fit under the default budget on 4.32 can exceed it
+  (`Faithful/BitwiseChip.lean` — the site reported is just where the counter ran out). The
+  fix is the usual one, an opaque-input private lemma for the expensive step, never an option
+  escape: the `unexpectedInteractions … = []` step by `simp [main, …]` costs 2.4 s and is
+  replaced by the Jal/Jalr `channels_subset` shape.
+- **`native_decide` statements carry no `let`.** `cleanup.letToHave` rewrites a theorem's
+  *type* to `have`s while the tactic goal keeps the `let`s; identifying the two sends the
+  kernel through the host interpreter, and the 4.33 kernel's bounded depth (#13956) rejects it
+  as `(kernel) deep recursion` regardless of `maxRecDepth`. Put the per-case body in a private
+  `def` and state the theorem over it (`SP1CleanTest/Core/HostControl.lean`'s `compiledControl`).
+- **`elaborate_circuit`.** It times out on a sixteen-statement `main` (`MulOperation`): write the
+  `ElaboratedCircuit` instance with `simp only [main, circuit_norm, seval]` field proofs. It
+  leaves `if empty then … else …` on a `Bool` literal unreduced in the explicit metadata, so a
+  `cases empty <;> elaborate_circuit` instance carries a stuck
+  `ExplicitCircuit.channelsWithGuarantees (if false = true then …)`: branch with `match empty with
+  | true => … | false => …` instead.
+- **Hand-written obligation proofs start with `preserve_tactic_target`.** A `refine ⟨…⟩`/`intro`
+  proof of a bundle field such as `requirementsChannelsLawful` is abstracted into an auxiliary
+  lemma whose type is the proof term's *inferred* type — the unfolded conjunction, not
+  `Operations.RequirementsChannelsLawful …` — and Lean ≥ 4.33 then rejects the bundle literal
+  that `simp [X.circuit, circuit_norm]` produces downstream as "not type-correct under the
+  implicit transparency level", after which no `circuit_norm` rewrite fires on that goal (the
+  ledger proofs' `simp [BoundedWord.circuit, …]` were the first casualties). Clean main's default
+  field tactics open with `preserve_tactic_target` (it wraps the proof in `id target …` so the
+  aux lemma keeps the declared type); every hand-written `:= by` / `:= fun … => by` proof of
+  `requirementsChannelsLawful`, `exposedChannels_eq`, `channelsLawful`, `subcircuitsConsistent`,
+  `localLength_eq`, `output_eq` does the same, as its first tactic (before any `change`).
+- **Deadlock at shutdown.** A `lake build` worker can hang at 0 % CPU after writing its outputs
+  (main thread joining a worker blocked in `reverseFieldLookup → Environment.constants`). Not
+  reproducible in isolation; `ps -eo pid,utime` static across a minute is the tell — kill the pid
+  and the build resumes.
+
 ### Gadget-level (arithmetic, `Native/Operations/` + `Proofs/Operations/`)
 
 - **`circuit_proof_start` must be the FIRST tactic** in soundness/completeness. Any
-  `haveI`/`set_option`/`have hp` goes *after* it, or it errors "can only be used on Soundness/Completeness"
+  `have`/`set_option`/`have hp` goes *after* it, or it errors "can only be used on Soundness/Completeness"
   (put `set_option … in` on the theorem instead). (`circuit_proof_start` lives in `Clean.Utils.Tactics`.)
 - **Imports before the module doc-comment.** A `/-! … -/` header before the `import` lines makes the package
   `-D linter.flexible` flag get rejected on the (now zero-imports) header. Imports first, then the doc-comment.
@@ -264,13 +547,17 @@ drops `section`/`end` markers and `/--` openers (strip/restore them).
   soundness/`completeness` collapse to one `exact (…).mp`/`linear_combination (…).mpr` call apiece. State the
   lemma conclusions **verbatim** in the chip `Spec`'s shape (incl. `Word.toBitVec64`/`.slt`/`.ult` forms) so
   the call sites need no goal-bridging. `BranchChip` did this (16M→8M soundness, 16M→4M completeness, ~540-line
-  `Formal` + a 3.5 s `Decision`); cf. the `Native/Operations/ShiftBounds.lean` `nlinarith` dedup. The `id (ZMod p)`
+  `Formal` + a 3.5 s `Decision`); cf. the `Math/ShiftBounds.lean` `nlinarith` dedup. The `id (ZMod p)`
   field-carrier landmine bites at the seam: `simp only [id_eq] at <gate-hyp>` to strip it before feeding the
   loose-`ZMod p` lemma (see the `id_eq` note above).
-- **`maxHeartbeats` floors.** `toBitVec64`/`asm8` rw chains are whnf-heavy: `set_option maxHeartbeats 2000000 in`
-  for soundness/completeness; the carry lemmas (`addSemantics_of_carries` etc.) need up to `16000000`.
-- **`omit [Fact (2^17 < p)] in` placement** — it goes *before* the doc-comment, not between the doc-comment and
-  the theorem.
+- **`toBitVec64`/`asm8` rw chains are whnf-heavy** — as are the carry lemmas (`addSemantics_of_carries` etc.).
+  They close at the default budget once the expensive value is opaque; if one blows up, fold it rather than
+  reaching for a budget directive (see §"Elaboration budgets").
+- **`omit [Fact (2^17 < p)] in` — and *any* `set_option … in` — goes *before* the doc-comment**, not between
+  the doc-comment and the theorem. Put after a `/-- … -/` it is a parse error (`unexpected token
+  'set_option'; expected 'lemma'`), and the second-order damage is worse than the error: a scripted pass over
+  the file then **silently skips that site**, no timeout appears, and it reports a clean result for a
+  declaration it never actually tested. Check placement before trusting a measurement.
 - **`omit [Fact …] in` errors with "cannot omit referenced section variable"** when the instance is
   actually used (e.g. via a `ZMod` cast). Drop the `omit`; silence the unused-section-var linter with
   `set_option linter.unusedSectionVars false in` only when the var is genuinely unused.
@@ -288,9 +575,17 @@ drops `section`/`end` markers and `/--` openers (strip/restore them).
 - **`add_comm` / BitVec instance quirk** — same family as the `mul_eq_zero` quirk. Match the gadget's operand
   order (`op_b + op_c`) in the chip Spec and let the Sail bridge `add_comm` to `execute_RTYPE`'s convention,
   rather than rewriting inside the gadget.
-- **Don't leave `ring`'s `info:` note.** On goals like `x - x = 0` after `rw`, `ring` runs `ring1`, fails,
-  prints `Try this: ring_nf`, and closes via fallback — leaking an `info:` note that fails the
-  clean-build bar. Use `simp` (or `ring_nf` / the explicit lemma) instead.
+- **`ring` never fails, and that bites twice.** On a goal it cannot close outright it runs `ring1`, fails,
+  emits `Try this: ring_nf`, and then succeeds via the `ring_nf` fallback.
+  1. **The `info:` leak.** On goals like `x - x = 0` after `rw`, the proof passes but the build is no longer
+     clean. Use `simp` (the `is_real` binary gate and `interval_cases` carry goals), `ring_nf`, or the
+     explicit lemma (`sub_eq_add_neg`, `zero_mul`) instead.
+  2. **`ring` cannot lead a `first` ladder.** `first | ring | linear_combination k | …` breaks *every*
+     branch with `unsolved goals`: `ring` "succeeds" as a mere normalisation on the goal that actually needed
+     `linear_combination`, shadowing every alternative behind it. **Use `ring1` as the leading
+     alternative** — it fails cleanly so `first` moves on. A *trailing* `ring` is safe only because
+     everything reaching it is already `ring1`-closable. (Measured on `LtOperationUnsigned.sel_populate`;
+     same root cause as the `ring1`-in-leaf-blocks note under "Bit-shift chip soundness".)
 - **`simp_all` leaks** into unrelated hypotheses — prefer targeted `simp [...] at h`.
 - **Named-implicit-arg syntax `(u := …)` can be rejected by `lake` even when the LSP accepts it.** Make
   such lemma args **explicit** and pass positionally.
@@ -348,15 +643,15 @@ drops `section`/`end` markers and `/--` openers (strip/restore them).
   `Clean/Circuit/Basic.lean:218-249`), which close cheaply because they treat each `subcircuit` as a black box.
   Writing them explicitly as `simp +arith [circuit_norm, main, X.circuit, X.elaborated, …]` is what's slow: passing
   the subcircuits' `.circuit`/`.elaborated` forces `circuit_norm` to crack open their internals (the 22-col
-  `RTypeReader` witness especially), which is what made `AddChip`'s instance need `maxHeartbeats 16000000` and ~4
-  min. With the defaults it elaborates in **~1.7 s, no bump** (provide only `localLength _ := <concrete value>`).
+  `RTypeReader` witness especially), which is what pushed `AddChip`'s instance to ~4 min and far past the default
+  budget. With the defaults it elaborates in **~1.7 s** (provide only `localLength _ := <concrete value>`).
 - **In a composition soundness proof, `simp [circuit_norm] at <subcircuit-spec hyps>` BEFORE the final
   `refine`/`exact`.** A subcircuit's soundness hypothesis (e.g. `hclk13 : ((eval env (varFromOffset CPUState …))
   .clk_0_16 - 1) * 8⁻¹).val < 2^13`) is *defeq* to the goal conjunct but not syntactically equal; `exact ⟨…,
   hclk13, …⟩` makes the elaborator bridge that gap by raw `whnf` (slow → wants a heartbeat bump). A cheap
   `simp [circuit_norm] at hclk13 hclk8` normalizes both to `env.get …` first, so `refine ⟨…, hclk13, hclk8⟩`
   matches by `rfl`. Same root cause as the `simp only`/`whnf` finding above — pushing unnormalized terms into a
-  defeq check. See `Proofs/Chips/AddChip.lean`.
+  defeq check. See `Proofs/Chips/AddChip/Formal.lean`.
 - **Compose a chip `Spec` from its sub-circuits' `Spec`s (direct sub-calls), don't restate them inline.**
   Mirror sp1-lean's `SP1Chips` `allHold_constraints_iff` shape: the chip `Spec` is a conjunction of
   `<Reader>.Spec <reader-input-rebuilt-from-cols> cols.<block>` sub-calls (ungated — the readers' range checks
@@ -365,7 +660,7 @@ drops `section`/`end` markers and `/--` openers (strip/restore them).
   conjunct *directly* (no per-bound `circuit_norm`), which is both cleaner and far cheaper than inlining the
   reader's bounds (an inlined "wide" spec is what historically timed out). Reconstruct the reader's cross-block
   inputs from the chip columns in the `Spec` (e.g. `clk_low := cols.state.clk_0_16 + cols.state.clk_16_24*65536`,
-  `wv* := cols.add_operation.value[i]`). See `Proofs/Chips/AddChip.lean`.
+  `wv* := cols.add_operation.value[i]`). See `Proofs/Chips/AddChip/Formal.lean`.
 - **Gate a reader's byte/range checks by `is_real` so padding rows are vacuous — range-check `is_real * value`.**
   SP1 sends each byte lookup with multiplicity `is_real`, so on padding (`is_real = 0`) the check isn't
   enforced and a real zero-padding row (all columns 0) is accepted. We don't model the byte bus (we use
@@ -385,13 +680,14 @@ drops `section`/`end` markers and `/--` openers (strip/restore them).
   which is exactly the eval'd gate) and puts it in the `Spec`. Drop it from the (soundness) `Assumptions`. Only
   *completeness* still needs it as a precondition — keep it in `ProverAssumptions` (the prover commits to a
   boolean selector). This is the point of `GeneralFormalCircuit`'s decoupled Assumptions/ProverAssumptions.
-- **A `maxHeartbeats` bump in a *simple* proof is a code smell, not a fix.** Genuine arithmetic (the
-  `toBitVec64`/`asm8`/carry-chain rw towers in `Native/Operations/`) legitimately needs `2_000_000`–`16_000_000`. But a
-  *structural/compositional* proof — a chip threading subcircuit Specs, an `ElaboratedCircuit` instance, a reader
-  range-check — that only passes with a bump is almost always brute-forcing a `whnf`/defeq blowup that a cheap
-  normalization removes. Before bumping such a proof, find the unnormalized term and fix it: prefer the default
-  obligations; `simp [circuit_norm] at <hyp>` to align forms before `exact`; witness via `fromElements #v[…]` so
-  `toElements` reduces (see above). `AddChip` went 16M-everywhere → **zero bumps** this way (243 s → 1.7 s).
+- **A proof that only passes with a raised budget is brute-forcing a blowup — find the unnormalized term.**
+  This is most obvious in a *structural/compositional* proof (a chip threading subcircuit Specs, an
+  `ElaboratedCircuit` instance, a reader range-check), but it holds for the arithmetic towers too: the
+  `toBitVec64`/`asm8`/carry-chain rw towers in `Native/Operations/` were once believed to need millions of
+  heartbeats and now close at the default. The moves that get you there: prefer the default field
+  obligations; `simp [circuit_norm] at <hyp>` to align forms before `exact`; witness via `fromElements #v[…]`
+  so `toElements` reduces (see above); and extract heavy work through a lemma over an **opaque** argument
+  (the opaque-argument rule above).
 
 ## Reader composition (nested-struct readers as composed `FormalCircuit`s)
 
@@ -420,20 +716,14 @@ plain `circuit_proof_start`.
   composition → `(deterministic) timeout at whnf (200000 heartbeats)`, which then cascades to `Unknown
   identifier 'elaborated'` at `def circuit := { elaborated with … }`. Omit it: the default `output :=
   (main).output offset` is the assembled struct of sub-circuit outputs and `output_eq` is `rfl` with no
-  unfolding (`Native/Readers/RegisterAccessCols.lean`, `Native/Readers/RTypeReader.lean`, `Proofs/Chips/AddChip.lean`). Set
+  unfolding (`Native/Readers/RegisterAccessCols.lean`, `Native/Readers/RTypeReader.lean`, `Proofs/Chips/AddChip/Formal.lean`). Set
   `output` explicitly **only** for a *leaf* circuit whose `main` has no sub-circuits — there `varFromOffset`
   is right and cheap (`Native/Readers/RegisterAccessTimestamp.lean`).
-- **Emit a struct-input-projected byte check as an inline `Circuit.lookup ByteTable ⟨…⟩`, not a
-  `byteRangeCheck`/`byteRangeCheckBits` `FormalAssertion` sub-circuit.** When the lookup argument flows from a
-  *struct field* of the input (`input.clk_target` into the `U8Range`/`Range` argument), composing the
-  `FormalAssertion` wrapper as a sub-circuit makes `circuit_proof_start` explode in `whnf` (superlinear in
-  subcircuit-args-over-struct-projections). The raw inline `Circuit.lookup ByteTable ⟨op, x, …⟩` — the
-  in-circuit half of SP1's `send_byte`, the same way `BitwiseU16Operation` uses `ByteXorTable` — is
-  semantically identical (membership in the same `ByteTable`) and closes at the default floor. Soundness:
-  `simp only [circuit_norm, ByteTable] at h_holds` turns each lookup into a `ByteRowSpec` fact; convert via
-  `byteRowSpec_range`/`byteRowSpec_u8range`. The `FormalAssertion` wrappers stay fine when the arg is the
-  *whole* bare input (`Native/Readers/CPUState.lean`'s clock checks). Related: a `FormalAssertion`'s predicate
-  *preconditions* belong in its internal `Assumptions`, not threaded in as extra inputs.
+- **Byte checks use typed channel interactions.** Compose the current bundled byte/range
+  interfaces and keep their semantic specs folded. The native providers discharge membership
+  with polynomial bit decompositions; the legacy inline `ByteTable` workaround is retired.
+  If subcircuit metadata expands through struct projections, supply the elaborated metadata
+  explicitly and use `circuit_norm` projection lemmas before considering a new proof boundary.
 - **Soundness/completeness shapes for a reader composing N sub-circuits.** After `circuit_proof_start`,
   `h_holds` is the N sub-circuit results (`Assumptions → Spec`, `Assumptions = True` so use `h_ trivial`)
   **then** this circuit's own asserts, in `main` emission order — `obtain ⟨h_a, h_b, h_c, z0, z1, z2, z3⟩`.
@@ -447,8 +737,8 @@ plain `circuit_proof_start`.
   assumptions and this circuit's gate obligations (e.g. `env.get(op_a_0) * wv = 0`), so a flat
   `refine ⟨trivial, …, ?_, ?_⟩` fits; pull a witnessed-`0` column out as the k-th conjunct of `h_env`
   (`obtain ⟨_, _, h0, -⟩ := h_env`) and close each gate with `rw [h0, zero_mul]`. See `Native/Readers/RTypeReader.lean`.
-  (For *channel*-emitting readers the tails carry real `Guarantees` content — see `../bus-model.md` §3 for
-  that boilerplate; `Channel` is the faithful way to model the State/Byte/Program/Memory interactions.)
+  (For *channel*-emitting readers the tails carry real `Guarantees` content; `Model/Channels.lean`
+  and `docs/architecture.md`'s structural-bus section are the current contract.)
 
 ## `ElaboratedCircuit` field obligations: let the default tactics close them (don't hand-write proofs)
 
@@ -457,12 +747,10 @@ Every field obligation — `localLength_eq`, `output_eq`, `subcircuitsConsistent
 with a Clean **default tactic** (`Clean/Circuit/Basic.lean`) that runs `simp only [circuit_norm, seval]`
 (plus a `try`-closer). The right move is *always* to make that default succeed by feeding `circuit_norm`
 the right `rfl`-lemmas — **not** to override the field with a bespoke `:= by …`. When you find yourself
-writing an explicit field proof, treat it as a smell: the missing piece is a `circuit_norm` lemma, and
-once it exists the field can be **omitted** so the default tactic resolves the goal. The
-*only* manual `ElaboratedCircuit` field proofs left in the project are the deferred skeletons in
-`Native/Operations/LtOperationUnsigned.lean` and `Native/Operations/AddressOperation.lean` (`localLength_eq`/`output_eq
-:= by sorry`, WIP) plus one explicit `channelsLawful` in `Native/Operations/LtOperationSigned.lean` — everything
-else, including every reader and `Proofs/Chips/AddChip.lean`, omits all four fields.
+writing an explicit field proof, treat it as a smell: the missing piece is usually a `circuit_norm`
+lemma, and once it exists the field can be **omitted** so the default tactic resolves the goal. The
+current main library has no deferred field proof. Preserve any remaining explicit proof only when it
+documents a real structural exception and cannot be replaced by the default tactic.
 
 The recipe that gets you there:
 
@@ -493,7 +781,7 @@ The recipe that gets you there:
    So **also expose `circuit.localLength` as an `@[circuit_norm]` rfl-lemma**, named `circuit_localLength`,
    placed right after `def circuit` (it can't sit beside `localLength_eq`, because `circuit` is defined
    later — in `Formal.lean` for split ops). Every op/reader that is ever composed as a sub-circuit carries
-   one (example `Native/Operations/MulOperation.lean`):
+   one (example `Circuits/Gadgets/Mul.lean`):
    ```lean
    set_option linter.unusedSectionVars false in
    @[circuit_norm] lemma circuit_localLength (x : Var Inputs (ZMod p)) :
@@ -520,6 +808,15 @@ rather than reaching for an override. A one-line `channelsLawful := by simp only
 <Sub>.channelsWith*_eq …]` naming the sub-circuit lemmas is the last resort (still no inline `have`s); it
 remains only in `LtOperationSigned`.
 
+> **Two caveats before you delete a field.** (a) **Omission is per-file, not family-wide, and it is a
+> performance decision** — the default tactic whnf's the whole `main`, and on the chips whose `main` pulls
+> in the sign-extension block that costs +63% to +132% or times out outright; see "Omitting an
+> `ElaboratedCircuit` field …" under *Compile-time / performance landmines*. A/B-time it. (b) A
+> `Prop`-valued field is a *proof*, so proof irrelevance makes **which** proof you wrote invisible to every
+> importer — these fields are freely golfable in a way that `def` *data* bodies are not. But invisible to
+> defeq is not the same as free to elaborate: dropping a `by exact` there removes an opaqueness barrier and
+> can be a downstream catastrophe (same landmine section).
+
 **Soundness-tail caveat.** Because the `channelsWith*_eq` lemmas are in `circuit_norm`, `circuit_proof_start`
 also reduces the sub-circuit channel projections in a `GeneralFormalCircuit`/`FormalCircuit` *soundness*
 goal: the per-sub-circuit "requirement tail" (`channelsWithRequirements = [] ∨ Assumptions`) collapses —
@@ -532,30 +829,54 @@ first
   | exact ⟨trivial, Or.inl rfl, Or.inl rfl⟩
   | (refine ⟨?_, ?_, ?_⟩ <;> first | trivial | exact Or.inl rfl | exact Or.inr h_as | exact Or.inr trivial)
 ```
-See `Proofs/Chips/AddChip.lean` and `Native/Readers/RegisterAccessCols.lean` for the worked examples.
+See `Proofs/Chips/AddChip/Formal.lean` and `Native/Readers/RegisterAccessCols.lean` for the worked examples.
 
 ## Compile-time / performance landmines
 
-The compile-time profile lives in `docs/snapshots/compile-profile.md` (regenerate with
-`scripts/profile_compile.sh`). These are the durable, still-true lessons behind it — apply them when
-adding a chip or chasing a slow file. The broad attribute/macro wins have already been harvested
+For executable validation of a finite list, make the decision procedure an explicit `List.all`
+check and prove its equivalence to the bounded universal proposition. Instance search for
+`Decidable (∀ entry ∈ entries, P entry)` can choose finite-type enumeration when the entry type
+has `Fintype`. The program decoder initially hit this with `BitVec 64 × BitVec 32`: a two-row
+input attempted enumeration of the ambient address/word space. The boolean-list implementation
+in `Model/Core/ProgramTable.lean` avoids that search and the full decoder regression module now
+elaborates in about two seconds. Test the executable checker itself, not just its logical iff.
+
+Generate a point-in-time compile profile with `scripts/profile_compile.sh` when needed; do not keep
+stale timing snapshots as architecture documentation. These are the durable lessons — apply them
+when adding a chip or chasing a slow file. The broad attribute/macro wins have already been harvested
 (below); remaining cost is term-intrinsic in the DivRem/Shift/Mul heavies, so new slowness almost
 always means a *local* regression against one of these.
+
+- **⚠ `by exact` on a `def`'s Prop-valued field can be load-bearing *opacity* — A/B-time the DOWNSTREAM
+  consumers, not the edited file.** A tactic block is auto-abstracted into an **opaque auxiliary proof
+  constant**; the equivalent term-mode form is *inlined*, so `isDefEqDelta` unfolds it straight into
+  whatever cites the enclosing `def`. Dropping `by exact` from one field of `divRemChipRowCodec` — correct
+  by proof irrelevance, −1 line, and clean in its own file — took `Faithful/DivRemChip/Exact.lean` from
+  **260s to >1230s and still climbing**, pinned in `Lean_Meta_isDefEqDelta` / `whnfImp` /
+  `unfoldDefinition`. Reverting that single hunk restored 260s. This is Clean's whnf-into-expensive-values
+  doctrine arriving from an unexpected direction: on a field that any heavy module unfolds, the tactic block
+  *is* the opaqueness barrier. Note also **why it hung instead of erroring** — the blown-up work landed
+  inside a declaration then carrying a very large budget, enough to absorb roughly an hour of extra `whnf`.
+  **A raised ceiling silently converts a downstream regression from a loud error into a slow build**, which
+  is the argument for the prohibition beyond tidiness.
 
 - **The `v[i]` index-bound tax — already fixed by the `decide` fast path.** Every `v[i]` elaborates
   an `i < n` bound side-goal; in Lean 4.28's Std the slice-support `get_elem_tactic_extensible` rule
   does ~11 full-context traversals (`rw … at *`, `dsimp … at *`, a slice `simp`) per index — ~0.34s
-  for `1 < 4` inside a hypothesis-heavy soundness proof, paid in every `have` type. `Math/GetElemFastPath.lean`
+  for `1 < 4` inside a hypothesis-heavy soundness proof, paid in every `have` type. `ToClean/Tactic/GetElemFastPath.lean`
   registers one `macro_rules | get_elem_tactic_extensible => decide` line *above* Std's (so it's tried
   first among the extensible rules, still after `done`/`assumption`): literal bounds close by kernel
   `Nat.decLt` in ~26 heartbeats, non-literals fall through. This single line halved the swept set when
   it landed; **don't regress it** (e.g. by importing a module that re-shadows the rule below Std's). If
   a `have`-dense proof suddenly slows, suspect the fast path isn't in scope.
 
-- **`circuit_proof_start` / bind-chain normalization is NOT the bottleneck — don't chase it.**
-  Measured at 6k–32k heartbeats on medium chips, ~320k (~90s) even on DivRem's `main` (the repo's
-  biggest). The once-per-chip `main_ops_eq` lemma would save ~4% — not worth it. Slow soundness files
-  are slow in their *proof body* (the arithmetic / product-glue `simpa`s), not in the start tactic.
+- **Measure `circuit_proof_start`; a large parent can make its one-shot normalization the bottleneck.**
+  Medium chips still normalize cheaply, and many slow soundness files spend their time in arithmetic.
+  ShiftRight completeness is the counterexample that matters: the exact 53-assert arithmetic tail proves
+  with ordinary `circuit_proof_start` in about four seconds when folded behind its own `FormalAssertion`,
+  while normalizing that tail together with the parent readers, witness closures, and interactions ran for
+  minutes. Use `circuit_proof_start_core` in that parent and normalize projected components separately.
+  Do not infer success or failure from elapsed time alone; require the build's explicit completion line.
 
 - **`ElaboratedCircuit` `localLength_eq`'s `rfl` default whnf-unfolds `main` — seconds on a big main.**
   On a 17-op `main` the default `rfl` costs ~15s; `channelsLawful`'s default fails outright on
@@ -564,43 +885,154 @@ always means a *local* regression against one of these.
   — see the "ElaboratedCircuit field obligations" section above for the full recipe. Chips with small
   mains (2–5 ops) can keep the `rfl` default; it's cheap there.
 
+- **Omitting an `ElaboratedCircuit` field is a *performance* decision, not only a style one — A/B-time it,
+  per file.** Letting Clean's default tactic fire (see "ElaboratedCircuit field obligations" above) is
+  usually right, but the default **whnf's the entire chip `main`**, while a hand-written
+  `simp only [circuit_norm, main, <subcircuits>]` never does. Measured across 19 `Native/Chips` files:
+
+  | what `main` composes | effect of omitting the field |
+  |---|---|
+  | `AddressOperation` **+ `U16MSBOperation`** | **+63% to +132%**, or an outright `timeout at whnf` |
+  | `AddressOperation` only | −3% (safe) |
+  | ALU chips whose `output_eq` body already read `simp only [main, circuit_norm]` | ~0% (safe) |
+
+  The driver is **not** "is it a load chip" — it is whether `main` pulls in the sign-extension block
+  (`LoadDouble`/`StoreDouble` are fine; `LoadHalf`/`LoadWord`/`LoadByte`/`Lt`/`Mul` are not), and the ALU
+  chips are neutral only because their hand-written body unfolded `main` anyway. **The trap:** the defaults
+  *succeed* on these files, so an untimed edit reports a clean −2 lines while silently adding 60–130%, and a
+  full `lake build` will not catch it either (+3s on a 2.5s module vanishes inside a ~480s build). These
+  files sit at a ~2.2s import floor, so real deltas are compressed — validate your instrument on a
+  known-regressing file before trusting a null result. **Ordering:** run any omission pass *before* a
+  ceiling pass, because a defaulted `output_eq` can manufacture a fresh ceiling.
+
 - **`set_option linter.all false` on the generated `Extracted/` modules removes the linter tax.** The
   ~76 auto-gen modules carry it in their headers; keep it when regenerating (the linter passes over the
   monolithic generated terms were a measurable chunk of their cost).
 
-- **`maxHeartbeats` tightening is the *wrong* lever — don't chase the ceilings.** The heavy Shift/DivRem
-  proofs are kernel / type-checking-bound, not heartbeat-bound: `ShiftLeftChip/Soundness/Sll.soundness`
-  measures at **72** elaboration heartbeats against its 4M ceiling. The high ceilings are non-binding safety
-  margins; lowering them has no wall-clock effect and only risks a future spike. Real cost is term-intrinsic
-  (the `2^64` reductions, the product-glue `simpa`s) — chase *that* (the abstract-`BitVec` helpers + shared-tail
-  dedup below), not the `set_option` numbers.
+- **An elaboration budget is the *wrong* lever — chase the cost, not the number.** The heavy Shift/DivRem
+  proofs are kernel / type-checking-bound; their real cost is term-intrinsic (the `2^64` reductions, the
+  product-glue `simpa`s), so the fix is always the abstract-`BitVec` helpers + shared-tail dedup below.
+  Even where a floor genuinely sits above the 200k default, moving the number buys no wall-clock — only
+  folding the term does. And **measure with a low ceiling, not `#count_heartbeats`**, which runs with an
+  unlimited budget and under-reports (Clean's `doc/performance-problems.md` §"Measuring honestly").
 
-- **Shared-tail dedup for many-conjunct soundness proofs (the DivRem pattern).** When N conjunct files
-  each prove `GeneralFormalCircuit.Soundness` over the *same* `main`, they each re-elaborate the
-  byte-identical post-instruction "requirements tail" (readers + `is_real` + channel obligations) at a
-  high `maxHeartbeats` — N× the same work. Extract it once: a `requirements_holds` lemma proving the
-  tail with **raw** (un-`circuit_proof_start`'d) binders, a `SpecObligation Spec` wrapper, and a
-  `soundness_of_specObligation` that reassembles a full `Soundness` from a per-conjunct `SpecObligation`
-  plus the shared tail. Each conjunct then proves only its chip-specific `Spec` via a `spec_proof_start`
-  elab tactic (mirrors `circuit_proof_start`'s setup but unfolds `SpecObligation`, so it does *less*
-  work). See `Proofs/Chips/DivRemChip/Soundness/Tail.lean`. **Landmine:** `requirements_holds` must be
-  applied *by-term* on raw binders — after `circuit_proof_start` the decomposed context (destroyed
-  `input_var` binders, consumed `h_holds`) no longer matches, which is exactly why the tail lemma takes
-  raw binders and the `SpecObligation` indirection exists. The ShiftRight/ShiftLeft conjuncts share an
-  analogous `cpuA/msb*/aluA` block that is a candidate for the same treatment.
+- **Nested `let` chains elaborate super-linearly — hoist them.** The elaborator's cost for a term
+  `let E0 := …; let E1 := …; …; [E_i, …]` grows much faster than the chain: the generated
+  `SystemOracle/Global` parts measured 535 bindings → 2 s, 668 → 4 s, 1 111 → 18 s, 1 649 → 30 s
+  and 14 GB (62 s / 124 CPU-s for the module solo, 435–706 s on the 4-vCPU runner, plus the tree's
+  only file-level `maxHeartbeats` and four `maxRecDepth` sites). The kernel was 39 ms of that — it
+  is elaboration. One top-level `def` per binding, applied to the same binders, is the same list
+  definitionally and linear to elaborate: 0.9 s for the 1 649-binding part, 7 s for the module.
+  Generated code gets this from `_hoist_let_chains` in `update_extracted.py` (2026-09, fork
+  PR #51); hand-written code should never build such chains inside one term in the first place.
+  Entry chunking does not help when one entry's closure is the chain (the Poseidon output).
+
+- **Chunk a destructuring at ≈ 80+ conjuncts — and not below.** `rintro`/`obtain`/`cases` on a
+  right-nested conjunction is super-linear in its length, so a long pattern should be split into
+  chunks of about twenty through a `rest` tail (`obtain ⟨a, …, t, rest⟩ := h` then
+  `obtain ⟨u, …, rest⟩ := rest`; keep the last chunk at two or more names, since a one-name tail
+  is not a conjunction). Measured 2026-09-22 across every site of ≥ 30 conjuncts in the tree:
+  121 conjuncts (`DivRemChip/Evidence`) −81 % file CPU, 80 (`Faithful/SyscallInstrsChip`) −55 %,
+  but 43–53 (`ShiftRight`/`ShiftLeft` soundness, `MulOperation/Formal`, `DivRemOperation/Core`)
+  −3 % to nothing — below the threshold it is churn, so leave those alone.
+
+- **Never let `circuit_norm` normalise a whole chip row when a projection will do.** Four bus
+  lemmas (`{add,sub,subw,mul}Chip_memoryInteractionValues_eq`) rewrote the row view with
+  `← inputEq / ← outputEq` and then ran `simp only [circuit_norm]` over `circuit.output`; the
+  resulting proof terms cost the **kernel** 10.6, 11, 11 and 15.8 s — 48 of the two files'
+  114 CPU-s, and the files sat on the alignment build's critical path. The DivRem lemma beside
+  them was already under a second because it projects the view through four small scalar lemmas
+  (`divRemViewOf_{state,adapter,isReal_eval,rdWrite}`) first, so `circuit_norm` never sees the
+  row. Copying that shape (a `rfl` `rowOutput_eq`, the four projections through the generated
+  per-field `eval_*` lemmas, then the bus lemma) took `Grounding/RTypeChips` 61.7 → 10.2 CPU-s
+  and `GroundingAdapter` 52.3 → 10.6 (fork PRs #55). When a kernel figure dominates a file,
+  `-Dtrace.profiler` names the declaration; the fix is almost always to keep the big value folded.
+
+- **Per-field `simp only [circuit_norm]` on a struct is quadratic in the field count.** A lemma
+  `(ProvableStruct.eval env s).f = eval env s.f` proved by `cases s; simp only [circuit_norm]`
+  normalises the *whole* struct's evaluation before projecting, so `n` such lemmas cost `n²`: the
+  45-field `DivRemChip.Columns` spent 27 s of `simp` on its 90 generated lemmas (45 CPU-s for an
+  83-line file, the #1 core module on the runner). On the constructor literal `cases s` exposes,
+  `ProvableStruct.eval` reduces definitionally, so the projection is **`rfl`** (5 CPU-s for the
+  same 90); a congruence consequence is the field's `eval_f` lemma plus the *one* Clean lemma for
+  the field's kind (`ProvableType.eval_field` / `eval_fields` / `ProvableStruct.eval_eq_eval`),
+  never the whole `circuit_norm` set. `provable_struct_eval_lemmas` does this (fork PR #52); apply
+  the same rule to any hand-written per-field lemma.
+
+- **A wholesale `import Mathlib.Tactic` can silently change what your code *means*.** It pulls in
+  `Mathlib.Algebra.EuclideanDomain.Field`, whose instance makes `/` and `%` typecheck on a field:
+  two test modules wrote `⟨clock / 2 ^ 24, clock % 2 ^ 24, …⟩` at `Fp` and got the *field's*
+  Euclidean quotient and remainder on coerced operands (`clk_low` identically 0, `clk_high` a
+  field inverse) instead of the intended ℕ arithmetic. The tests passed because nothing there
+  constrained the decomposition. Narrowing the import (fork PR #54) turned it into an instance
+  error. Compute in ℕ and cast (`((clock % 2 ^ 24 : ℕ) : Fp)`), and treat "it only compiles with
+  the whole tactic library imported" as a signal to look at the elaborated term.
+
+- **`interpretation` in the profiler is Mathlib's tactics, and it is where whole modules go.**
+  Lean-core tactics (`omega`, `decide`, `bv_decide`, `simp`, `rfl`) are native; Mathlib's
+  (`fin_cases`, `aesop`, `linarith`/`nlinarith`, `push_cast`, `interval_cases`, `ring`'s
+  extensions, `norm_num` extensions) run in the IR interpreter, and so do Clean's and ours. This
+  cannot be precompiled from here (Mathlib is not precompiled upstream). Two measured cases:
+  `Model/Register`'s 62 lemmas `reg_idx_to_Register idx = .x_k ↔ idx = k#5` by
+  `fin_cases idx <;> trivial` = 16 s of interpretation in a module that otherwise costs 5 s;
+  `revert idx; decide +kernel` (kernel evaluation of the decidable instance — not `native_decide`)
+  is 0.7 s (module −53 % CPU, fork PR #48). `ShiftRightChip/Core`'s four `h_rem_lt` goals of the
+  form `(hl.val * N + ll.val) + 2 ^ 16 * ll'.val < N * 2 ^ 16` cost ≈ 5 s of `nlinarith` each;
+  with the `< 65536` bound already in context they are linear over the atoms `hl.val * N`, and
+  `omega` closes them in milliseconds (module −44 %, fork PR #49). Rule: over a small finite type,
+  `decide +kernel`; when a goal is linear in its product atoms, `omega`; reach for `nlinarith`
+  only for genuinely nonlinear facts, and reach for a lemma before a 30-way enumeration.
+  Attribution: `-Dtrace.profiler.output` (docs/agents/build-profiling.md), which names the tactic
+  call; the plain profiler only names the interpreted constant.
+
+- **A per-module Lake option is a one-module library.** Lake applies `leanOptions` per library,
+  and the last declared library matching a module owns it, so `[[lean_lib]] name = "X" roots =
+  ["A.B.C"]` declared after `A`'s library gives exactly `A.B.C` a different option set. That is how
+  the generated `LeanRV64D.RvfiDii` gets `backward.do.legacy` (718 s → 2.5 s, fork PR #46) after
+  the library-wide option turned out to break other generated modules (the legacy elaborator
+  rejects `← doElem` forms). Options are traced, so any such change is one cold rebuild.
+
+- **For many-case chips, extract semantic evidence instead of splitting full circuit soundness.** The old
+  DivRem architecture proved nine `GeneralFormalCircuit.Soundness` theorems over the same enormous `main`
+  and shared their requirements tail through a custom `SpecObligation` tactic. Lean 4.30/4.31 made even
+  goal normalization dominate, and the whole stack was retired. The replacement has four layers:
+  (1) a stable contract (`Semantics/Specs/DivRem.lean`), (2) circuit-independent evidence types and
+  evidence→ISA proofs (`Proofs/Chips/DivRemChip/Cases.lean`), (3) reusable field/carry assembly lemmas, and
+  (4) one generated-row→evidence theorem. Pair quotient/remainder cases so arithmetic is proved once;
+  model exceptional branches as explicit constructors; keep final output routing separate. Use local
+  helper lemmas inside layer (4) for offset plumbing, but do not export N operation-shaped circuit proofs.
 
 ## Golf & cleanup discipline
 
-How to golf/clean a proof without breaking the repo's invariants (axiom-clean, 0-warning, no `info:`).
-Distilled from the 2026-06-22/23 cleanup campaign (109 files, −591 lines, axiom-cleanliness preserved). The
-remaining deferred cleanup TODOs live under `docs/roadmap.md` § "Cleanup / polish backlog"; the available
-cleanup skills are catalogued at the end of this section.
+Keep proofs kernel-checked, warning-free and within the existing elaboration budget. The approved
+consolidation permits complete API/statement migrations with all consumers updated; source
+compatibility and documentation-driven wrappers are not requirements. Review intended semantic
+changes explicitly and measure performance-sensitive proof changes downstream.
 
 **Instant, always-safe wins** (the bulk of the line savings):
 - `:= by rfl` → `:= rfl`; `show T from by tac` → `show T by tac`; `rw […] at h; exact h` → `rwa […] at h`;
   `refine F ?_; exact e` → `exact F e`; `simp only […] at h ⊢; exact h` → `simpa only […] using h`.
 - Merge adjacent identical `simp only`/`rw`; inline a single-use `have x := e` that has **no** `by` body.
 - Reach for mathlib instead of a hand proof: `zero_ne_one`, `Int.eq_zero_of_abs_lt_dvd`, etc.
+
+**Before golfing a `have`, search for it — by far the most common finding is that the lemma already exists
+and simply is not cited.** This repo has good shared substrate — `Math/ShiftBounds.lean` (`lo_hi_lt`,
+`hi_lo_lt`, `factor_le`), `Math/Word.lean`'s `val_N_zmod_p` / `val_N_ne_zero` families, `Math/Gate.lean`'s
+`bool_val_le`, `Math/EvalVec.lean`'s `vec4_eval` — and proofs all over the tree re-derive those exact facts
+by hand. Measured instances: a 20-line `key` in `ShiftLeftChip/Populate.lean` that was literally
+`ShiftBounds.hi_lo_lt`; `two_ne_zero_one` (13 lines) and `h64ne` (6 lines) hand-rolling `val_2_zmod_p` /
+`val_64_zmod_p`; four hand-rolled copies of mathlib's own `Nat.cast_ofNat` sitting next to a sibling file
+that used the real one. `lean_local_search` on the statement shape plus a grep of the `Math/` families is
+cheaper than any tactic golf, and it is where the lines actually are.
+
+> **Cashing a lever does not have to mean rewriting with it.** Measured on `AddOperation.soundness`:
+> `rw [Nat.cast_ofNat]` (forward, against a goal) is safe, but `rw [← Nat.cast_ofNat]` rewrites the `6`
+> opcode column, and pinning it as `rw [← Nat.cast_ofNat (n := 16)]` does **not** rescue it — it targets the
+> right column but yields `↑(OfNat.ofNat 16)`, a *different spelling* from `↑16`, which is a live
+> char-for-char hazard against the downstream `byteRowSpec_range` match. The safe way to retire a
+> hand-rolled copy in the `←` direction is to **keep the local `have` and prove it by the real lemma** —
+> `have c16 … := Nat.cast_ofNat` instead of `:= by norm_cast`. The duplication is gone, every downstream
+> `rw [← c16]` keeps its exact spelling, and nothing moves.
 
 **The dominant structural win — eval-map factoring.** Chip/op `Formal.lean` proofs repeat a per-limb
 `have eX : Expression.eval env input_var_X[i] = input_X[i] := by rw [← hX]; simp [Vector.getElem_map]`, one per
@@ -611,6 +1043,20 @@ investigated and is **not** worth it: it saves only ~1 line/helper while re-chur
 `Formal.lean` files plus a foundational rebuild, at form-variation risk. (The narrower length-4 `#v` → `Vector.map`
 fold *was* worth hoisting — it's the shared `SP1Clean.vec4_eval` in `Math/EvalVec.lean`, used across the
 Mul/Lt/Bitwise/Shift `Formal` proofs + the DivRem completeness `Driver`.)
+
+> **Then take the second step: partially apply the helper.** Collapsing each repeated bridge to a one-liner
+> is only half the win. On `Proofs/Operations/DivRemOperation/Core.lean` the same two-line
+> `rw [← h, Vector.getElem_map]` bridge appeared **176 times**; folding to one-liners took 352 → 176 lines,
+> and *partial application* — replacing each per-index family with one **quantified `simp only` rule** —
+> took 176 → **25**. Total −466 (−40% of the file), elaboration 19.0s → 15.8s. Whenever you have collapsed
+> N copies to N one-liners, ask whether one quantified rule replaces the whole family.
+>
+> **Landmine: the quantified `simp only` rule only fires when the helper's bound *is* the vector's own
+> length.** `StoreWordChip`'s `eoap : ∀ i (hi : i < 2), … prev_value[i] = …` is stated at bound 2 over a
+> **length-4** `Word`, so the `getElem` side condition becomes a derived `omega` term rather than `hi`
+> itself and simp cannot key the pattern. It **fails silently** — no tactic error — and surfaces four lines
+> later as `Application type mismatch` on the consuming `exact`. When the bound and the length disagree,
+> leave that helper at explicit indices.
 
 **Kernel-safe dedup on the bit-shift / DivRem cores** (the `2^64` landmine zone — read the "Bit-shift chip
 soundness" § first). A heavy file may repeat a byte-identical `have` block across N sibling lemmas. You can
@@ -623,116 +1069,219 @@ is **not** interchangeable with `(16 - … : ZMod p)`. The heavy `2^64`-scale wo
 abstract-`BitVec` helpers (`srl_toNat`/`sra_toNat`) — leave those alone. Worked example: `inner_val`/`inner_hi_val`
 in `Proofs/Chips/ShiftLeftChip/Core.lean`.
 
+> **Scope refinement on that hard constraint (measured).** What matters is the **ascription position**,
+> because that decides which numeral gets elaborated at which type. It is **not** about redundant outer
+> parens: `((16 : ZMod p) - X).val` and `(16 - X : ZMod p).val` elaborate to the same term, and every
+> downstream `rw` fires across that spelling. Treat differing *ascription placement* as blocking; treat
+> cosmetic parenthesisation as fine — the stricter reading costs real golf for no safety.
+>
+> **A hoisted `have key := fun … =>` binding has no expected type**, so named arguments like `(cb4 := cb4)`
+> become mandatory where the original `exact` did not need them. Give `key` an explicit `∀` type and the trap
+> disappears; that is the better habit. **Private visibility cannot cross a module boundary.**
+> Choose visibility for the intended API and reuse: a shared helper may be public when its consumers
+> need it. The compiled-library trust check includes private declarations, so neither visibility nor
+> duplicated helpers should be chosen to stabilize an audit artifact. Measure downstream elaboration
+> before moving a performance-sensitive helper.
+
 **Traps — `have`s that look dead but are load-bearing** (verify with `lean_goal` / a build before removing):
 - `have hp : 2 ^ 17 < p := Fact.out` (and `have : 131072 < p`) — feeds a downstream `omega` that needs the
   magnitude; grep shows one occurrence (its own line) yet `omega` consumes it implicitly.
-- `haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩` — supplies an instance to later
+- `have : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩` (`have`, not `haveI` — Mathlib's
+  `haveILetI` linter flags the latter in a proof) — supplies an instance to later
   `ZMod.val`/`omega` steps. There is **no** global `NeZero p` instance, *on purpose*: a `Fact (2^17 < p)`-derived
-  one would make the pervasive `omit [Fact (2^17 < p)] in` clauses illegal (`Model/ByteTable.lean:84`). A
-  `Fact p.Prime`-derived global instance *might* survive the `omit` pattern (it depends on primality, not the
-  magnitude) and eliminate most of the ~185 `haveI` copies — but it cuts against the documented local-instance
-  discipline and risks instance-resolution surprises, so it's an owner decision, not a drive-by change.
+  one would make the pervasive `omit [Fact (2^17 < p)] in` clauses illegal (`Model/ByteTable.lean:84`).
+
+> **The mechanism that decides this whole class, measured directly: `Fact p.Prime` synthesizes *both*
+> `NeZero p` and `Fact (1 < p)` as instances, while `Fact (2 ^ N < p)` synthesizes *neither*.** So the
+> `have : NeZero p := ⟨…⟩` idiom above is **redundant wherever `Fact p.Prime` is also in the variable
+> block** — which is everywhere in this tree, since that is the standard variable block. A sweep on this
+> basis removed **149 such locals across 68 files**, with only **3 keeps**.
+>
+> The 3 keeps are all one mechanism, and it is *not* about the proof: in each case the local is the **only
+> consumer of the `2 ^ N` instance**, so deleting it makes that section variable unused and the linter's
+> suggested `omit … in` fix would change the signature. Those are
+> `MulOperation/RawSpec.signExtend128_toNat` and `BranchChip/Decision.{zero_ne_one',val_of_bool}`. Keeping
+> the local is cheaper than a `set_option` line, so keep it.
+>
+> **Instrument caveat, learned the hard way: a `lake env lean` verdict taken while a `lake build` is in
+> flight can produce a spurious LIVE** — the build transiently removes a dependency's `.olean`, the
+> post-deletion run fails for an environmental reason, and the outputs differ. It cannot produce a
+> spurious DEAD (a baseline failure aborts the comparison), so the error is one-directional and safe, but
+> it will waste a re-run. Do not measure this class while a build is running.
+>
+> Stronger than diffing the printed signature: **require the probe's stdout *and* stderr to be
+> byte-identical** before and after deletion. That also catches a newly-emitted
+> `linter.unusedSectionVars` warning, which is the actual failure mode.
+
+> **Apparent dead `have`/`obtain` bindings are load-bearing far more often than not — verify by
+> elaboration, never by grep.** Two systematic sweeps produced **27** and **9** candidates whose names had
+> exactly one occurrence in the file, and *every one of them was live*: most fed the **next line's**
+> `subst`, or were consumed implicitly by a downstream bare `omega`. One (`providerBound`) silently fed
+> `get_elem_tactic` for an index that appears in a **statement**, so deleting it would have changed a
+> signature. A single-occurrence grep is evidence of nothing here.
+>
+> **And do not judge `Fact`/`NeZero` locals by inspection or by their derivation source** — that heuristic
+> has now been wrong in *both* directions (all four `2 ^ 17`-derived `NeZero p` copies in
+> the bitwise witness proofs (now `Circuits/Gadgets/Bitwise/Witness.lean`) turned out dead, while the same shape is load-bearing
+> elsewhere). What decides it is whether `Fact p.Prime` is already in that declaration's **elaborated
+> signature**: the hazard is not that the proof breaks (a broken proof is loud and safe) but that deleting
+> the local can make `Fact p.Prime` newly *used*, which **adds a binder to the signature** — a quiet
+> statement change. Two consequences:
+> - **The standing cheap check is `linter.unusedSectionVars`.** Zero warnings ⟺ every section instance is
+>   still used ⟺ no binder was dropped. So if a golf stops using an instance, the fix is **not** `omit`
+>   (which removes the binder and *changes the signature*) but `set_option linter.unusedSectionVars false in`,
+>   which keeps the auto-included binder and leaves the signature byte-identical
+>   (`LtOperationSigned.zero_ne_one'` is the worked case). A *brand-new* declaration takes the ordinary
+>   `omit [Fact (2 ^ 17 < p)] in` instead, because it has no prior signature to preserve.
+> - **The recipe is `#check`, delete, re-elaborate, `#check` again**, comparing the printed signatures
+>   byte-for-byte. Re-elaboration alone is necessary but *not* sufficient — a signature can gain a binder
+>   while every proof still compiles.
+>
+> In-proof `have`s that re-derive `Fact (2 ^ 17 < p)` under a stronger hypothesis are dead by construction,
+> since `Math/Word.lean` declares `instFact_2_17_of_2_24` and `instFact_2_24_of_2_25`.
+
+- **`have ⟨…⟩ := h` destructures *without consuming*; `rcases`/`obtain` clears `h`.** Where a proof needs a
+  hypothesis both whole *and* destructured, the usual `refine ⟨valid, ?_⟩` + `rcases valid` dance is
+  unnecessary — `have ⟨_, …, shardLayout, halts, _⟩ := valid` keeps `valid` in scope. Worth checking wherever
+  a hypothesis is reintroduced right after being cased on.
+
+- **Two declarations can be the same declaration definitionally without looking it.**
+  `Soundness/TimeExtraction.lean` had three payoff theorems with byte-identical bodies because
+  `Readers.RegisterAccessTimestamp.Spec` applied to `real` *is* `ActiveTimestampBounds …`, and
+  `RegisterAccessCols.Spec` is *defined as* the timestamp `Spec`; two collapsed to three-line term
+  applications of the first. When sibling theorems share a proof body verbatim, check whether their
+  hypotheses are defeq before assuming they are genuinely different results.
+
+**Tactic dedup with `local macro` — the most effective lever in `Soundness/`, and six traps that all fail
+far from their cause.** A repeated *tactic shape* (as opposed to real mathematics, which wants a lemma) is
+best deduplicated with a `local macro`. It is an established construct in the grounding layer — ~50 of them,
+`lake lint` passes over them — and macros are **not declarations**: they never enter a signature multiset and
+never reach the axiom probe. Two break-evens, both measured, and they are different numbers: **lines ≈5 call
+sites**; **time is much lower**, because a controlled A/B isolated the cost to *declaration* rather than
+expansion (body alone 5.178s · body + 4 macros **unused** 5.403s · body + 40 expansions 5.454s), i.e.
+**~0.07s per macro declared and expansions are free**. Don't declare a macro you use twice; don't hesitate
+over expansion count. The traps:
+
+1. **Definition-site identifier resolution.** A macro body resolves identifiers where the macro is
+   *defined*, so placing it before a constant it cites fails at **every call site** with ``Unknown
+   identifier `foo✝` `` — which reads like a typo or a stale name. Place the macro *after* what it
+   references.
+2. **A quotation-local `rfl` binds a name instead of substituting.** In an `rcases` pattern it introduces a
+   *variable* called `rfl`, and the failure surfaces ~20 lines later as `Application type mismatch` on
+   `rfl`, nowhere near the macro. Fix: ``mkIdent `rfl``.
+3. **An antiquotation's category must match the splice site.** `unfolds:term,*` cannot splice into
+   `simp only [$unfolds,*]`: it fails at the *macro definition* with `Lean.Syntax.TSepArray `term ","`
+   vs `TSepArray [simpStar, simpErase, simpLemma]`, and then every call site — up to 1500 lines away —
+   reports the useless `Tactic '…' has not been implemented`. Declare it
+   `unfolds:Lean.Parser.Tactic.simpLemma,*` (bare `simpLemma` is not in scope outside `Lean.Parser.Tactic`).
+4. **`local macro` is scoped to the enclosing `section`, not the file.** Declaring one inside a `section`
+   makes every call site in *later* sections report a bare `error: unknown tactic`, which reads like a parser
+   bug. Hoist the macro block above the first `section`.
+5. **A macro whose *definition* fails still registers its syntax**, so every call site reports ``Tactic
+   `…` has not been implemented`` and the real error at the definition is completely hidden. When you see
+   "has not been implemented", scroll up to the definition — the diagnosis is never at the call site.
+6. **`String.take` returns `String.Slice` in 4.31**, so `.toUpper` on it fails with `Invalid field
+   'toUpper': The environment does not contain 'String.Slice.toUpper'`. Use `String.capitalize` when deriving
+   names inside a macro.
+
+What a macro *cannot* reach: caller binders (`env`, `input`, `real`, `decoded`, `hchip`, `guarantees`) are
+unreachable from a quotation without `Lean.mkIdent`, and repetition that is a **term inside a `have` type**
+rather than a tactic shape needs an ordinary (`private`) helper lemma instead. And prefer macros that
+generate **tactics** over macros that generate **declarations**: the latter removes parsed signatures from
+the source text, making public interfaces easier to review. The compiled-library trust check
+handles either form and does not depend on source-level signatures.
 
 **Don't golf:**
 - **`Faithful/*` anchors** — conservative only (drop `by exact` / dead `let` / `from by`); never restructure
   proof terms or statement forms; they are *syntactic* faithfulness anchors.
-- **`Spec`/`Assumptions`/statement forms**, `set_option`/`maxHeartbeats`, `ElaboratedCircuit` field structure.
+- **`Spec`/`Assumptions`/statement forms**, `set_option` directives, `ElaboratedCircuit` field structure.
 - **Auto-gen** — `Extracted/`, `*Vectors.lean`, `Native/Operations/*/RawSpec`, etc.; banner-check the header.
 - **Narrative comments on kernel-sensitive Shift/DivRem files** — they document the `2^64` / `id (ZMod p)`
   landmines + proof roadmaps; they are the institutional memory of *why* the proof is shaped that way. (A
   blanket comment-strip on `ShiftLeftChip/Soundness/Sll` was reverted for exactly this.)
 
-**Verify every batch:** `lake build SP1Clean` clean (0 warn, no `info:`), `bash scripts/check_no_skipkerneltc.sh`,
-`sorry` grep = only `SP1GatedVm.lean`, then `scripts/run_audit.sh` periodically (the axiom census must stay
-identical). On heavy files watch the per-file elaboration time in the build log and **revert on regression**.
+**Verify every batch:** `lake build SP1Clean` clean (0 warn, no `info:`), then
+`scripts/run_audit.sh` (zero proof deferrals, citation checks, and the compiled-library trust
+policy). `scripts/check_current_docs.py` checks documentation links and module docstrings. On heavy files watch the per-file elaboration time in the build log and **revert on regression**.
+
+> **Never *infer* an axiom change from the tactics you removed — measure both versions.** A report that
+> replacing some `omega` calls in `FormalModel/Contracts/Chips.lean` had dropped `Classical.choice` was
+> false in both halves once measured in place: `rv64_addw_eq` never carried it, and `rv64_mulw_eq` went
+> `[propext]` → `[propext, Quot.sound]`, a strict *addition* — the opposite direction from the claim. Nothing
+> left the permitted set, so the change was admissible, but the claim was not. **Run `#print axioms` on the
+> pre-edit version too, or say nothing about axioms.**
 
 **Merge gotcha (post-`git merge`):** an auto-merge can *silently duplicate* a lemma that both branches added
 near each other — no conflict marker, but `lake build` fails with "`<name>` has already been declared". Always
 run the full `lake build` after a merge even when `git status` shows no conflicts (`Proofs/Chips/BitwiseChip/
 Bridge.lean` hit this when upstream #101's immediate-type bridges met a golfed copy).
 
-**Available cleanup skills:**
-- **`/cleanup`** — the per-file 7-phase workflow (style audit → per-decl golf → simplify → verify). Best for a
-  handful of named files.
-- **`/cleanup-all`** — the orchestrator marathon (dispatches per-batch workers across the whole tree). Best for a
-  project-wide sweep; honor the repo guardrails (auto-gen exclusion, axiom-clean, heavy-core caution).
-- **`/decompose-proof`** — break one long proof into named sub-lemmas.
-- **`/split-file`** — split an over-long file along namespace/section seams.
-- **`Skill(simplify)`** — a holistic reuse/altitude review pass on a file (invoked inside `/cleanup` Phase 6.5).
+## Interaction projection and recovery kernels
 
-## "emitted = projection": `<b>Lookups_eq_emitted` (proving a trace projection IS the emission)
+The former `Soundness/*Consistency.lean` integer `*Lookups` shadows and their
+`<bus>Lookups_eq_emitted` proofs were retired in 2026-08. Live soundness reads the actual typed Clean
+interaction ledger in `Soundness/TypedState.lean`, `TypedProgram.lean`, and `TypedMemory.lean`; do not
+introduce a parallel hand-written bus projection.
 
-Goal: prove a hand-written trace-level projection (`Soundness/*Consistency.lean`'s `stateLookups`,
-`memoryLookups`, `programLookups`) equals the `toAccess`-image of what the circuit *actually emits* on that
-channel — turning the projection from a parallel shadow into a derived theorem. **State, Program, and Memory
-are DONE** (`stateLookups_eq_emitted`, `programLookups_eq_emitted`, `memoryLookups_eq_emitted`, all
-axiom-clean). **Only Byte remains** (its emits are *carried by* the `RAC ⊃ RAT` subcircuits + `pullIf`
-form — a recovery-*through*-nesting, not the drop-based recovery below).
+Two lower-level tools remain useful. `Model/InteractionRecovery.lean` recovers or filters channel
+interactions through composed subcircuits. `Model/InteractionProjection.lean` evaluates an
+`AbstractInteraction` to the integer `LookupAccess` orientation used by completeness and exact
+transport (`AbstractInteraction.toAccess`, `signedVal`, and the per-message `toAccess_*` kernels).
+When proving a typed emission-shape theorem, prefer the compositional helpers in `TypedProgram` and
+the reader-local `<reader>_*Interactions` lemmas over unfolding a whole chip.
 
-Two foundations files: `Model/InteractionProjection.lean` (`AbstractInteraction.toAccess env`,
-`signedVal` = the centered representative for `-is_real`-valued mults, and the per-channel
-`toAccess_emitted_<msg>` kernels) and `Model/InteractionRecovery.lean` (the subcircuit-drop toolkit).
-
-**Kernel form (critical).** `Channel.emit` produces `_root_.emitted`, and `circuit_norm` unfolds the
-`@[circuit_norm] Channel.emitted` def to it — so the `toAccess_emitted_<msg>` kernels are stated on
-`emitted (channel := <chan>) mult msg` (the `_root_.emitted` form), **not** `chan.emitted`. This lets the
-kernel fire by `simp` directly, with no per-emit `rw [show … = chan.emitted … from rfl]` re-fold (which
-doesn't scale past 1 emit). Kernel proof: `simp only [..., emitted, ...]` then a trailing `simp` — but the
-9/16-field `toElements` unfold must be `simp only` (deterministic, linear); plain `simp` over the full set
-blows up at `whnf` for the bigger structs.
-
-**The recipe (worked for Program + Memory — a *composed* reader, `RTypeReader`):**
-1. **Drop the byte-only subcircuits.** `have hnil : ∀ inp o, interactionsWith <chan>
-   (RegisterAccessCols.elaborated.main inp o).2 = [] := by intro inp o; apply
-   interactionsWith_main_snd_eq_nil; simp [circuit_norm, ElaboratedCircuit.channels]`. The `.2`-form
-   `interactionsWith_main_snd_eq_nil` (InteractionRecovery) matches what `circuit_norm` leaves
-   (`(main … off).2`, since `Circuit.operations c off = (c off).2`); it discharges `<chan> ∉ circuit.channels`
-   from `ElaboratedCircuit.channels_subset` — needs the *symmetric* channel-distinctness
-   (`memoryChannel_eq_byteChannel_false` etc.) + `ElaboratedCircuit.channels` in the simp set.
-2. **Drop the `op_a_0 === 0` Equality gates.** `have heq := fun n inp =>
-   filter_interactions_formalAssertion_eq_nil (Gadgets.Equality.circuit id) <chan> (n := n) inp
-   List.not_mem_nil List.not_mem_nil` (the `===` desugars to `Gadgets.Equality.circuit id`, a
-   `FormalAssertion` with no channels; TypeMap is `id` not `field`; `List.not_mem_nil` takes the element
-   *implicitly* — no `_`).
-3. **Reduce `interactionsWith` to the target emits.** `simp only [<rdr>.main, circuit_norm, hnil, heq,
-   <otherchan>_eq_<chan>_false, if_false]` — the other bus's emits collapse via the explicit
-   channel-distinctness `= False` lemma + `if_false` (`circuit_norm` alone leaves the `if … = … then`).
-4. **Apply the kernel + bind.** `simp only [toAccess_emitted_<msg>]` then `simp [circuit_norm,
-   signedVal_is_real hp2 h_real, signedVal_neg_is_real hp2 h_real, <Lookups>, <Access>, h_*]`. Realization
-   hyps: WITNESSED columns as `env.get <offset> = r.cols.…` (`circuit_norm` turns `eval env (var ⟨off⟩)` into
-   `env.get off`); INPUT fields as `Expression.eval env input.… = …`; SUBCIRCUIT-output columns as
-   `Expression.eval env (RegisterAccessCols.elaborated.output ⟨…⟩ <off>).field = …` (these stay `eval env
-   (output …)`, NOT `env.get`). `hp2 : 2 < p` from `Fact (2^17 < p)`.
-
-**Byte (deferred — the different case; see `../architecture.md` §"Interaction half" and `../roadmap.md`).**
-Byte's emits are *the content* of the `RAC ⊃ RAT` subcircuits (they
-don't drop), so recovery must *recover* their emits through two levels of nesting (the State
-`exposedChannels` route composed through nesting), plus a `pullIf` kernel (mult `-is_real`,
-value-folded `is_real*value`). First the **byte faithfulness cleanup** removed the divergent reader byte
-checks (CPUState's 4 `pc`, `RegisterAccessCols`'s 4 `prev_value`) SP1 has no analog of — so the readers now
-emit exactly `ByteConsistency.byteRows`'s 8 checks, which is what makes byte `eq_emitted` well-posed.
-
-## `ChipAir` / `Machine` (the cross-chip bus aggregate)
-
-`Model/ChipAir.lean`: `ChipAir {name, perRow : Row → LookupAccessList, included}`, `Machine := List
-(ChipAir Row)`, `Machine.busAggregate`/`busBalance` over the *computable* `InteractionBus`
-core (never `noncomputable interactionsWith`). `multiplicitySum_busAggregate_cons` decomposes a machine's
-per-key sum into per-chip sums. (The bespoke per-bus `ChipAir`s + `Machine` that drove the retired
-`TraceValid` capstone lived in `Soundness/MachineConsistency.lean`, removed 2026-06-05; the surviving
-statement-layer infra is `Model/ChipAir.lean`, and the live cross-chip argument is the gated
-`Soundness/GatedVm/` path.) **Gotcha:** `Machine` is an `abbrev` for `List`, so `m.busAggregate`
-dot-notation resolves to `List.busAggregate` — call `Machine.busAggregate m` explicitly. Statement layer
-only: it makes Σsends = Σreceives expressible; it does not derive the per-bus meaning (those stay threaded).
-
-## Build-validation gotcha (repeat from LEAN_SAIL_NOTES)
+## Build & verification gotchas (partly a repeat from LEAN_SAIL_NOTES)
 
 - **`lake build <module>` is the only authoritative signal.** The lean-lsp diagnostics/`lean_goal`
   results can go stale and report a clean state while `lake build` still fails. Capture build output to a
   logfile and check the exit code; an empty log + `Build completed successfully` = real success.
+- **`lake env lean <file>` does NOT rebuild edited dependencies — it silently checks against stale oleans.**
+  `lake env` **only sets the environment; it builds nothing.** Measured: after one file was edited, its source
+  was **4 hours newer than its `.olean`** while a `lake env lean` run on a *dependent* module resolved happily
+  against the stale one and reported green. So the instrument is **no better than the LSP on flags**
+  (neither applies the package options unless passed explicitly) and **weaker on freshness** (the LSP at least
+  answers `Imports are out of date and must be rebuilt`). Neither is a pass oracle for a *pair* of edited
+  files. Mitigations, in order: (1) work **deepest-first**, so each file is verified before its dependencies
+  move; (2) after editing a dependency run `lake build <Dep.Module>` to refresh its olean, *then* re-verify the
+  dependents; (3) treat a full `lake build SP1Clean` as the only joint confirmation. `lake env lean` also
+  exits 0 on a Lean stack overflow, so it is sound only as a **falsifier**: a reported error is real, a clean
+  run certifies nothing.
+- **Diagnosing a stale olean:** compare `<Mod>.trace` against `<Mod>.trace.nobuild`. And if a module you
+  touched does not appear in a build's job list, delete its `.olean`/`.ilean`/`.trace`/`.hash` and rebuild it
+  explicitly — that distinguishes a genuine cached pass from an olean written seconds earlier by a dying
+  process, which a 1-second no-op rerun cannot. **A rebuild on an immediate second `lake build` means the
+  first run never persisted that olean, so the first run was not a pass.**
+- **Absence from an *in-progress* job list is not evidence of a cache hit.** Lake prints a job line only on
+  *completion*, so a 286s module is invisible for its entire run. Job-list absence is only meaningful once the
+  build has exited. Relatedly, the critical path of a build is usually a module the edit never touched:
+  `Faithful.DivRemChip.Exact` measured **298s of a 356s build** while not being in that round's changed set at
+  all. Do not attribute build wall-clock to the files you edited.
+- **Lake 4.31 in this toolchain has no `-j` option** — only `-J/--json` (`lake build SP1Clean -j 3` fails
+  with `unknown short option '-j'`, and there is no top-level `-j` either). Control build concurrency by not
+  running anything else, not by a flag.
+- **Two different `lean` process shapes; they need different patterns.** *LSP file workers* are
+  `lean --worker -Dserver.reportDelayMs=0 file:///…`, children of `lean --server` — these are what leak and
+  hold GB after an agent exits (7 stale workers holding 22 GB RSS has been observed), and
+  `pkill -f "lean --worker"` is the correct reaper. *Build workers* spawned by `lake build` have argv
+  `lean --tstack=400000 -Dlinter.style.…` with **no `--worker` token**, so that grep pattern reports
+  *nothing* mid-build — which reads as a hang. For build liveness use **`ps -ef | grep tstack`**, then
+  `ps -o command= -p <pid>` to name the exact file being elaborated. **Never kill `lean --server` / `lake
+  serve`**: the `lean-lsp` MCP server *is* that process, and killing it drops the MCP connection for the whole
+  session.
+- **When a build genuinely is hung, `sample <pid>` is the diagnostic — not RSS.** RSS is actively
+  misleading: a *healthy* run plateaus at ~3.2 GB within 40 s (that is just the import footprint), which is
+  indistinguishable from stuck. A stack sample discriminates immediately — `Lean_Meta_isDefEqDelta` /
+  `whnfImp` / `unfoldDefinition` / `reduceRec` is a delta-unfolding blowup, not progress. It is cheap; reach
+  for it before killing or before waiting longer.
+- **Audit-harness behavior.** `scripts/run_audit.sh` checks current built libraries against the
+  explicit trust policy, invokes source/pin/coverage/citation/semantic-contract gates, and writes only
+  ignored diagnostic reports. No theorem registration or census update is required. Generated native
+  axiom counters are normalized by the pinned scanner; a new native proof owner or external axiom
+  requires an explicit policy review. `--update` is retired.
 - Work one file and one build at a time; avoid batching many edit + LSP calls in a single turn.
 - **LSP times out on a big chip file → introspect via a scratch `import`.** `lean_goal` on a 600+-line chip
   (e.g. `ShiftLeftChip.lean`'s completeness) times out because it re-elaborates the whole file. Instead write
-  a throwaway `SP1Clean/Scratch.lean` = `import …<Chip>` + `example : …Completeness … := by
+  a throwaway Lean scratch file = `import …<Chip>` + `example : …Completeness … := by
   circuit_proof_start; sorry`; the import is served from the cached olean, so only the tiny `example`
   elaborates live and `lean_goal` returns the full proof state instantly. Delete the scratch before
   committing (it lands in the lake glob).

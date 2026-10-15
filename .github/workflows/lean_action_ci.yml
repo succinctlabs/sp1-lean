@@ -1,106 +1,363 @@
 name: Lean Action CI
 
+# GitHub-hosted runners only (`ubuntu-latest`: 4 vCPU / 16 GB; a personal account cannot use larger
+# runners). Three measures make that feasible:
+#
+# 1. Mathlib is never stored in the GitHub Actions cache. lean-action's `use-mathlib-cache` runs
+#    `lake exe cache get` (about 6 GB of oleans, one to two minutes), which keeps every cache entry
+#    well below the 10 GB per-repository limit; the same tool also restores Batteries, Aesop, Qq,
+#    ProofWidgets, importGraph, LeanSearchClient and plausible (measured 2026-09-21; `Cli` is not
+#    among them), so those seven are excluded from our entries too (`CACHE_PATHS`). NB the path list is part of the entry's version hash: editing it
+#    invalidates every existing entry, so bump `SP1_CACHE_VERSION` in the same change.
+# 2. The project build (`.lake/build`) and the remaining package checkouts are cached under a key
+#    `<prefix>-<kind>-<sha>-<run id>-<attempt>` (`prefix` = version + OS + toolchain/manifest
+#    hash; `kind` = `core` for core-only runs, `align` for full runs, with `-pr<N>` on a PR's
+#    own ref). Which entry a job restores is decided BY LINEAGE, not by recency: `scripts/ci/cache_pick.py`
+#    walks the first-parent history of the commit (a PR's `HEAD^1` is the `main` tip its merge
+#    tree contains) and returns the exact key of the nearest ancestor's build, own-PR entries
+#    first; the two `restore-keys` are the same for the case where the listing fails. A bare
+#    `<prefix>-` fallback is never used — it matched whatever was written last, and rebuilt a
+#    scripts-only PR from a stale tree once (582 modules, 22 minutes).
+# 3. The build is resumable. `lake build` runs under a 5-hour `timeout` and the cache is saved on
+#    success or failure — never on a CANCELLED job: a cancelled `lake build` can leave a truncated
+#    `.olean` behind its already-written trace and poison every later restore (seen 2026-09-20).
+#    Pushes to a PR supersede each other; runs on `main` QUEUE instead (a cancelled `main` build
+#    saved nothing and the next run started from the entry before it). A poisoned entry is purged
+#    with the `Cache cleanup` workflow's `delete_key` input, or by bumping `SP1_CACHE_VERSION`.
+#
+# One runner builds the core and, when requested, the full alignment/test closure, then runs
+# lint once and all export/backend/trust gates. `build-full` preserves the full-check status
+# name and reports the result of that runner; it does not restore or rebuild anything.
+# Full checks run on every PR, main push, weekly schedule and alignment/clean dispatch.
+# A core-only dispatch or ci-testing push still builds/tests/lints just the core.
+#
+# PR caches are invisible to main. After all full checks pass, the runner uploads the completed
+# build as an artifact named by the PR head; main finds it through the merge's second parent.
+# Lake still checks the merged tree's content hashes. Squash merges/missing artifacts fall back
+# to lineage. The archive includes alignment and full tests, the most expensive outputs.
+#
+# A second, pin-keyed cache retains native dependency objects missing from Mathlib's download.
+# Only a successful full build saves it, after building backendGadgets. Weekly/manual clean
+# builds discard project outputs once; core and full then share the fresh build directory.
+# Every build uses --wfail --iofail. Measurement: docs/agents/build-profiling.md.
+
 on:
-  # Run on push to `master` or any pull requests
   push:
     branches: ["main", "ci-testing"]
   pull_request:
+    types: [opened, synchronize, reopened]
+  schedule:
+    - cron: "17 3 * * 1"
   workflow_dispatch:
+    inputs:
+      clean_build:
+        description: "Discard project build outputs and run all checks (reuse dependencies)"
+        type: boolean
+        default: false
+      alignment:
+        description: "also run full alignment, tests, lint and trust checks"
+        type: boolean
+        default: false
+
+env:
+  # Bump to invalidate every cache entry (toolchain and manifest changes already rekey; a change to
+  # CACHE_PATHS requires it). Keep cache-cleanup/build-experiment in sync (gated by tests).
+  SP1_CACHE_VERSION: v2
+  CACHE_PATHS: |
+    .lake/build
+    .lake/packages/*
+    !.lake/packages/mathlib
+    !.lake/packages/batteries
+    !.lake/packages/aesop
+    !.lake/packages/Qq
+    !.lake/packages/proofwidgets
+    !.lake/packages/importGraph
+    !.lake/packages/LeanSearchClient
+    !.lake/packages/plausible
+  # Mathlib's cache supplies generated C, but not these objects and their Lake traces/hashes.
+  # Keep this list separate from CACHE_PATHS: its exclusions apply to all matching paths.
+  NATIVE_CACHE_PATHS: |
+    .lake/packages/mathlib/.lake/build/ir/**/*.c.o*
+    .lake/packages/batteries/.lake/build/ir/**/*.c.o*
+    .lake/packages/aesop/.lake/build/ir/**/*.c.o*
+    .lake/packages/Qq/.lake/build/ir/**/*.c.o*
+    .lake/packages/proofwidgets/.lake/build/ir/**/*.c.o*
+    .lake/packages/importGraph/.lake/build/ir/**/*.c.o*
+    .lake/packages/LeanSearchClient/.lake/build/ir/**/*.c.o*
+    .lake/packages/plausible/.lake/build/ir/**/*.c.o*
 
 jobs:
   guards:
     # Lightweight source-policy gates — run on a standard runner in parallel with the
     # heavy build so a forbidden pattern blocks the PR in seconds without a Lean build.
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - name: No skipKernelTC in source
         run: scripts/check_no_skipkerneltc.sh
       - name: No native_decide in the main SP1Clean library
         run: scripts/check_no_native_decide.sh
+      - name: Elaboration-budget escape hatches confined to the measured allowlist
+        run: scripts/check_option_escapes.sh
+      - name: Witness-generation escape hatches (enforced — the witgen cutover is complete)
+        run: scripts/check_no_witness_native.sh --enforce
+      - name: Independent SP1 witness inputs are structurally clean
+        run: python3 scripts/check_witgen_export.py --source-only
+      - name: Recorded pins match the build graph
+        run: scripts/check_pins.py
+      - name: Trust policy is well-formed
+        run: python3 scripts/check_trust.py --validate-policy-only
+      - name: Audit tooling regressions
+        run: python3 -m unittest discover -s scripts/tests -p 'test_*.py'
+      - name: Root index imports every module
+        run: scripts/check_root_index.sh
+      - name: SP1 field has one Lean owner
+        run: scripts/check_sp1_field_singleton.sh
+      - name: Shared shard vocabulary has one owner
+        run: scripts/check_shared_vocabulary.sh
+      - name: Documentation links and module docstrings
+        run: python3 scripts/check_current_docs.py
+      - name: Layering contract holds
+        run: scripts/check_layering.sh
 
   build:
-    runs-on:
-      [
-        runs-on,
-        runner=64cpu-linux-x64,
-        spot=false,
-        disk=large,
-        "run-id=${{ github.run_id }}",
-      ]
-
+    runs-on: ubuntu-latest
+    # Below GitHub's 6-hour job limit; individual builds have a 5-hour timeout. Cache saving
+    # runs after ordinary build failures, but a cancelled/timed-out job is never saved.
+    timeout-minutes: 350
+    # PR pushes supersede each other; `main` queues (one running + one pending per group).
+    concurrency:
+      group: core-${{ github.ref }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+    permissions:
+      actions: write
+      contents: read
+      pull-requests: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      CLEAN_BUILD: ${{ github.event_name == 'schedule' || inputs.clean_build == true }}
+      FULL_BUILD: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && (inputs.alignment || inputs.clean_build)) || github.event_name == 'pull_request' }}
+      # Three concurrent `lean` processes (each `-j2` from the lakefile): the 2026-09-21 matrix on
+      # this runner (fork issue #39) — 4 × 4 threads 32.4 min cold, 3 × 2 threads 26.9 min.
+      LEAN_NUM_THREADS: "3"
+    outputs:
+      full-build: ${{ env.FULL_BUILD }}
     steps:
       - uses: actions/checkout@v4
-      # Test that the project builds without failure
-      # Note: defaults to ignore warnings and deprecations, maybe change eventually
-      # lean-action's `use-github-cache` caches the WHOLE `.lake` (project build + deps) under a
-      # commit-keyed key (`lake-<os>-<arch>-<toolchain>-<manifest>-<sha>`) with a manifest-prefix
-      # `restore-keys` fallback. So this build is incremental from the most recent prior commit, and the
-      # exact-`<sha>` cache it saves is what the `lint`/`test` jobs restore (an exact hit → `lake build`
-      # there just replays, no recompilation). No separate per-commit project cache is needed.
-      - uses: leanprover/lean-action@v1
         with:
-          build: "true"
+          # the lineage walk needs history
+          fetch-depth: 0
+      - name: Runner inventory
+        run: lscpu
+      - name: Free disk space if the image is short of it
+        # The image has ~110 GB free; the toolchain, mathlib oleans, the project build and the
+        # cache archives need about 16 GB. The removal (30–230 s) only runs if that ever changes.
+        run: |
+          avail=$(df --output=avail -BG / | tail -1 | tr -dc 0-9)
+          if [ "$avail" -lt 25 ]; then
+            sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL \
+              /usr/local/share/boost /usr/local/.ghcup
+          fi
+          df -h /
+      - name: Compute cache keys and pick the entry to restore
+        id: key
+        run: |
+          prefix="sp1-${SP1_CACHE_VERSION}-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}"
+          echo "prefix=${prefix}" >> "$GITHUB_OUTPUT"
+          kind=core
+          if [ "$FULL_BUILD" = "true" ]; then kind=align; fi
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            pr="${{ github.event.pull_request.number }}"
+            echo "key=${prefix}-${kind}-pr${pr}-${{ github.event.pull_request.head.sha }}-${{ github.run_id }}-${{ github.run_attempt }}" >> "$GITHUB_OUTPUT"
+            git rev-list --first-parent -n 30 HEAD^1 > lineage.txt
+            python3 scripts/ci/cache_pick.py --mode pr --pr "$pr" --prefix "$prefix" --lineage lineage.txt >> "$GITHUB_OUTPUT"
+          else
+            echo "key=${prefix}-${kind}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}" >> "$GITHUB_OUTPUT"
+            git rev-list --first-parent -n 30 HEAD > lineage.txt
+            python3 scripts/ci/cache_pick.py --mode main --prefix "$prefix" --lineage lineage.txt >> "$GITHUB_OUTPUT"
+          fi
+          cat "$GITHUB_OUTPUT"
+      - name: Hand-off from the merged PR (pushes to main)
+        id: handoff
+        if: github.event_name == 'push' && env.CLEAN_BUILD != 'true'
+        run: |
+          h2=$(git rev-parse --verify -q HEAD^2 || true)
+          if [ -z "$h2" ]; then echo "not a merge commit; lineage restore"; exit 0; fi
+          id=$(gh api "repos/${{ github.repository }}/actions/artifacts?name=lake-full-build-${h2}&per_page=1" --jq '.artifacts[0].id // empty')
+          if [ -z "$id" ]; then echo "no hand-off artifact for ${h2}; lineage restore"; exit 0; fi
+          gh api "repos/${{ github.repository }}/actions/artifacts/${id}/zip" > handoff.zip
+          unzip -q handoff.zip && tar --zstd -xf lake-build.tar.zst && rm -f handoff.zip lake-build.tar.zst
+          gh api -X DELETE "repos/${{ github.repository }}/actions/artifacts/${id}" || true
+          echo "restored=true" >> "$GITHUB_OUTPUT"
+          du -sh .lake/build
+      - name: Restore the project build cache (by lineage)
+        if: steps.handoff.outputs.restored != 'true'
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.CACHE_PATHS }}
+          key: ${{ steps.key.outputs.pick || format('{0}-none', steps.key.outputs.prefix) }}
+          restore-keys: |
+            ${{ steps.key.outputs.fallback1 }}
+            ${{ steps.key.outputs.fallback2 }}
+      - name: Discard project outputs for a clean build
+        if: env.CLEAN_BUILD == 'true'
+        run: rm -rf .lake/build
+      - uses: leanprover/lean-action@v1
+        # Installs the pinned toolchain and fetches the mathlib olean cache; the build itself runs
+        # in the next step so it can be bounded by `timeout`.
+        with:
+          build: "false"
           test: "false"
           lint: "false"
-          use-github-cache: "true"
+          use-mathlib-cache: "true"
+          use-github-cache: "false"
+      - name: Restore native dependency objects
+        id: native-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.NATIVE_CACHE_PATHS }}
+          key: sp1-native-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}
+      - name: Build (resumable — a cold cache may need one re-run)
+        run: timeout 5h lake build --wfail --iofail
+      - name: Core tests (lake test = SP1CoreTest, with the warning/info gates)
+        # Test modules are the ONLY place `native_decide` is allowed, gated separately from the
+        # `native_decide`-free main build; their oleans ride in the same cache entry.
+        run: timeout 5h lake build --wfail --iofail SP1CoreTest
+      - name: Full build (resumable — a cold cache may need one re-run)
+        if: env.FULL_BUILD == 'true'
+        run: timeout 5h lake --no-cache build --wfail --iofail SP1Clean ToClean ToMathlib ToPolyFun backendGadgets
+      - name: Full test library (lake build SP1CleanTest)
+        if: env.FULL_BUILD == 'true'
+        run: timeout 5h lake build --wfail --iofail SP1CleanTest
+      - name: Save native dependency objects
+        if: success() && env.FULL_BUILD == 'true' && steps.native-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.NATIVE_CACHE_PATHS }}
+          key: ${{ steps.native-cache.outputs.cache-primary-key }}
+      - name: Save the project build cache
+        if: success() || failure()
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.CACHE_PATHS }}
+          key: ${{ steps.key.outputs.key }}
+      - name: Environment linters (full scope)
+        if: env.FULL_BUILD == 'true'
+        run: lake lint -- --no-build
+      - name: Environment linters (core-only runs)
+        if: env.FULL_BUILD != 'true'
+        run: lake exe runLinter --no-build SP1Clean.Core ToClean ToMathlib ToPolyFun
+      - uses: dtolnay/rust-toolchain@1.95.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            rust/sp1-comparison
+            rust/witgen-interp
+          key: clean-export
+      - name: Built-in ensemble export and Rust backend comparison
+        run: /usr/bin/time -v bash scripts/check_ensemble_export.sh
+      # Native witness artifacts are generated under .lake, checked against independent SP1
+      # dumps and regenerated for determinism. Their Rust comparison uses the same runner.
+      - name: Library examples and adversarial witnesses
+        if: env.FULL_BUILD == 'true'
+        id: examples
+        env:
+          SP1_PR_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: python3 scripts/check_examples.py
+      - name: Upload example evidence
+        if: always() && env.FULL_BUILD == 'true' && steps.examples.outcome != 'skipped'
+        uses: actions/upload-artifact@v4
+        with:
+          name: examples-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .lake/build/examples/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Fresh deterministic witnesses and Rust comparison
+        if: env.FULL_BUILD == 'true'
+        id: witgen
+        run: python3 scripts/check_witgen_export.py
+      - name: Upload witness export evidence
+        if: always() && env.FULL_BUILD == 'true' && steps.witgen.outcome != 'skipped'
+        uses: actions/upload-artifact@v4
+        with:
+          name: witgen-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .lake/witgen-export/
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Pinned Node for backend conformance
+        if: env.FULL_BUILD == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+          cache: npm
+          cache-dependency-path: tools/backend-gadgets/package-lock.json
+      - name: Install pinned backend checker
+        if: env.FULL_BUILD == 'true'
+        run: npm ci --prefix tools/backend-gadgets
+      - name: Clean WASM and R1CS gadget conformance
+        if: env.FULL_BUILD == 'true'
+        run: scripts/check_backend_gadgets.sh
+      - name: Compiled trust-checker regression fixtures
+        if: env.FULL_BUILD == 'true'
+        run: lake env python3 scripts/test_trust_integration.py
+      - name: Release audit and compiled-library trust policy
+        if: env.FULL_BUILD == 'true'
+        run: scripts/run_audit.sh
+      - name: Upload trust diagnostics
+        if: always() && env.FULL_BUILD == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: trust-policy-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .lake/build/trust/
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Pack the completed PR build for main
+        if: github.event_name == 'pull_request'
+        run: |
+          dirs=".lake/build"
+          for d in .lake/packages/*/; do
+            case "$d" in
+              */mathlib/|*/batteries/|*/aesop/|*/Qq/|*/proofwidgets/|*/importGraph/|*/LeanSearchClient/|*/plausible/) ;;
+              *) dirs="$dirs ${d%/}" ;;
+            esac
+          done
+          # shellcheck disable=SC2086
+          tar --zstd -cf lake-build.tar.zst $dirs
+      - name: Hand off the completed PR build
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: lake-full-build-${{ github.event.pull_request.head.sha }}
+          path: lake-build.tar.zst
+          overwrite: true
+          if-no-files-found: error
+          retention-days: 3
+          compression-level: 0
+      - name: Garbage-collect the cache by rule
+        if: github.event_name != 'pull_request' && (success() || failure())
+        run: python3 scripts/ci/cache_gc.py --repo "${{ github.repository }}" --prefix "${{ steps.key.outputs.prefix }}" --apply
+      - name: Drop this PR's older cache entries
+        if: github.event_name == 'pull_request' && (success() || failure())
+        run: |
+          python3 scripts/ci/cache_gc.py --repo "${{ github.repository }}" --prefix "${{ steps.key.outputs.prefix }}" \
+            --only-ref "refs/pull/${{ github.event.pull_request.number }}/merge" --apply
 
-  lint:
-    # Environment linters (`lake lint` → the `sp1Lint` lintDriver; a curated subset of the Batteries
-    # `#lint` linters over the hand-written `SP1Clean.*` declarations; see AGENTS.md § Linters). Split
-    # into its own job so it is clearly independent in the checks list. `needs: build` so it runs after
-    # the build job has saved its exact-`<sha>` `.lake` cache; lean-action below restores that on an exact
-    # hit, so `lake build` just replays the already-built project (no recompilation) before `lake lint`.
-    # If that cache were ever absent, lean-action's manifest-prefix `restore-keys` fallback does a correct
-    # incremental build instead, so the job stays correct either way.
+  build-full:
+    # Keep the status check name stable. A failed/cancelled/skipped build cannot pass this gate.
     needs: build
-    runs-on:
-      [
-        runs-on,
-        runner=64cpu-linux-x64,
-        spot=false,
-        disk=large,
-        "run-id=${{ github.run_id }}",
-      ]
-
+    if: >-
+      always() && (
+        (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+        github.event_name == 'schedule' ||
+        (github.event_name == 'workflow_dispatch' && (inputs.alignment || inputs.clean_build)) ||
+        github.event_name == 'pull_request')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
     steps:
-      - uses: actions/checkout@v4
-      - uses: leanprover/lean-action@v1
-        with:
-          build: "true"
-          test: "false"
-          lint: "false"
-          use-github-cache: "true"
-      - name: Environment linters (lake lint)
-        run: lake lint
-
-  test:
-    # Conformance tests (`lake test` → the `SP1CleanTest` testDriver: the witness-generation and
-    # whole-trace `native_decide` anchors checked against batteries dumped from SP1's real Rust prover).
-    # These live in their own library — the ONLY place `native_decide` is allowed — so they are gated
-    # here, separately from the `native_decide`-free main build. Split into its own job (in parallel with
-    # `lint`) so the trusted-compiler checks are clearly independent in the checks list. `needs: build`
-    # so it runs after the build job has saved its exact-`<sha>` `.lake` cache; lean-action below restores
-    # that on an exact hit, so `lake build` replays the already-built main library (no recompilation) and
-    # `lake test` only elaborates the test modules. If that cache were ever absent, lean-action's
-    # manifest-prefix `restore-keys` fallback does a correct incremental build instead.
-    needs: build
-    runs-on:
-      [
-        runs-on,
-        runner=64cpu-linux-x64,
-        spot=false,
-        disk=large,
-        "run-id=${{ github.run_id }}",
-      ]
-
-    steps:
-      - uses: actions/checkout@v4
-      - uses: leanprover/lean-action@v1
-        with:
-          build: "true"
-          test: "false"
-          lint: "false"
-          use-github-cache: "true"
-      - name: Conformance tests (lake test)
-        run: lake test
+      - name: Full validation passed
+        env:
+          BUILD_RESULT: ${{ needs.build.result }}
+          FULL_BUILD: ${{ needs.build.outputs.full-build }}
+        run: test "$BUILD_RESULT" = success && test "$FULL_BUILD" = true

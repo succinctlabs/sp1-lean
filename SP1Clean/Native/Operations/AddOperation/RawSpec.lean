@@ -7,7 +7,7 @@ import Mathlib.Tactic.IntervalCases
 The structural carry-bool + limb-range form `RawSpec`, and the two native carry-chain theorems
 (`addSemantics_of_carries` / `carries_of_addSemantics`) the gadget's soundness/completeness route
 through. Uses only the local `limb_lift`/`val_65536_*` foundations. The `FormalAssertion` contract
-lives in the sibling `Formal` module; `Operations/AddOperation.lean` re-exports all three. -/
+lives in `Proofs/Operations/AddOperation/Formal.lean`. -/
 
 namespace SP1Clean.AddOperation
 
@@ -27,7 +27,6 @@ list — four `Range` byte sends). -/
 def InteractSpec (value : Word (ZMod p)) : Prop :=
   value[0].val < 65536 ∧ value[1].val < 65536 ∧ value[2].val < 65536 ∧ value[3].val < 65536
 
-set_option maxHeartbeats 16000000 in
 /-- Forward (soundness) core — native port of `AddOperation.spec`: the carry-bool +
 range form implies the result is a 64-bit value equal to the BitVec sum. -/
 theorem addSemantics_of_carries {a b value : Word (ZMod p)}
@@ -40,7 +39,6 @@ theorem addSemantics_of_carries {a b value : Word (ZMod p)}
   refine ⟨h_isU64_v, ?_⟩
   obtain ⟨ha0, ha1, ha2, ha3⟩ := Word.lt_cases_of_isU64 ha
   obtain ⟨hbb0, hbb1, hbb2, hbb3⟩ := Word.lt_cases_of_isU64 hb
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have h65inv : (65536 : ZMod p) * (65536 : ZMod p)⁻¹ = 1 :=
     mul_inv_cancel₀ val_65536_ne_zero
   rw [← BitVec.toNat_inj, BitVec.toNat_add,
@@ -70,14 +68,12 @@ theorem addSemantics_of_carries {a b value : Word (ZMod p)}
   have hc3_lt : c3.val ≤ 1 := by rcases hc3 with h | h <;> simp [h, ZMod.val_zero, ZMod.val_one]
   omega
 
-set_option maxHeartbeats 16000000 in
 /-- Backward (completeness) core — native port of `AddOperation.spec_inv`: a 64-bit
 value equal to the BitVec sum witnesses the unique boolean carry chain + ranges. -/
 theorem carries_of_addSemantics {a b value : Word (ZMod p)}
     (ha : a.isU64) (hb : b.isU64) (hv : value.isU64)
     (h_bv : value.toBitVec64 = a.toBitVec64 + b.toBitVec64) :
     AssertSpec a b value ∧ InteractSpec value := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have hp : 2 ^ 17 < p := Fact.out
   obtain ⟨ha0, ha1, ha2, ha3⟩ := Word.lt_cases_of_isU64 ha
   obtain ⟨hbb0, hbb1, hbb2, hbb3⟩ := Word.lt_cases_of_isU64 hb

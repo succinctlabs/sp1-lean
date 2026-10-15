@@ -1,17 +1,18 @@
-# docs/agents/ — contributor / agent techniques
+# Specialized contributor notes
 
-The fiddly proof- and build-level techniques used while working on the proofs. These are the
-*how-to-make-the-proofs-go* references; for *what the project proves and how much it means*, see the
-reader-facing docs one level up (start with [`../architecture.md`](../architecture.md) and
-[`../release-audit.md`](../release-audit.md)).
+Start with [contributing](../contributing.md), [semantics](../semantics.md) and
+[assurance](../assurance.md). Read Clean's pinned proving/performance documentation before local
+recipes.
 
-## Index
+- [Proof patterns](proof-patterns.md): SP1-specific proof and performance pitfalls. The approved
+  complete API migration supersedes historical source-compatibility restrictions.
+- [Build profiling](build-profiling.md): measurement tools and interpretation.
+- [Porting a chip](porting-recipe.md): circuit/proof workflow while the current layout remains.
+- [Lean/Sail dependencies](lean-sail-notes.md): pairing and temporary compatibility choices.
+- [Clean extensions](clean-upstream.md): To-Upstream policy and canonical API gaps.
+- [Sail generation](sail-model-provenance.md): owned pipeline and platform configuration.
+- [Legacy Rust extraction](extraction.md): reproduction of migration evidence until retirement.
 
-- [porting-recipe.md](porting-recipe.md) — step-by-step checklist to port a new chip from the Add/Bitwise template: create the four artifacts, wire the root import, verify build + axioms.
-- [proof-patterns.md](proof-patterns.md) — the witnessed-`FormalCircuit` soundness/completeness skeleton; `ZMod p` / `Word` / `circuit_proof_start` landmines; `maxHeartbeats` floors; the `ElaboratedCircuit` field-obligation recipe; the **Golf & cleanup discipline** section (how to golf/clean proofs safely).
-- [lean-sail-notes.md](lean-sail-notes.md) — the Lean 4.28 environment: toolchain pins, why public Clean `main`, the GitHub-fetched Sail deps, the `lake update` toolchain-bump trap, and the Clean-main ↔ Batteries `Fin.foldl` collision and its fix.
-- [extraction.md](extraction.md) — the constraint-extraction pipeline (`sp1-constraint-compiler` → `update_extracted.py` → Lean) and the DSL contract.
-Point-in-time snapshots (regenerate before release) live under [`../snapshots/`](../snapshots/):
-- [../snapshots/axiom-ledger.md](../snapshots/axiom-ledger.md) — the machine-checked `#print axioms` inventory per theorem.
-- [../snapshots/compile-profile.md](../snapshots/compile-profile.md) — per-module elaboration profile + worst offenders + common threads.
-- [mul-operation-learnings.md](mul-operation-learnings.md) — Mul-specific soundness/completeness pitfalls (the 16-limb schoolbook multiply).
+Current progress belongs to [tracking issues](../roadmap.md). Keep profiles and experimental
+transcripts with their review artifact. The capstone definition manifest is a reviewed semantic
+input; trust reports are generated diagnostics, not a declaration census.

@@ -1,0 +1,399 @@
+import SP1Clean.Model.Machine.Execution
+import SP1Clean.Model.BusMessages
+
+/-! # Ordinary-window micro-time
+
+This module is the proved register/RAM interpretation used by the current ordinary-row grounding
+theorem. New whole-machine statements use `Machine.SP1MachineModel.schedule`; the fixed eight-tick
+definitions here remain an explicitly scoped compatibility layer until timed grounding is generalized.
+
+- `clkNat` — the ℕ-decoded bus clock (`clk_high · 2^24 + clk_low`, the split every State/Memory message
+  carries); `timeNat` projections for both message types.
+- **The ordinary window convention**: execution step `k` occupies `[c0 + 8k, c0 + 8(k+1))`
+  (`c0` = the committed genesis clock; every chip advances by `ordinaryClkInc = CLK_INC = 8`).
+  Intra-row effect times: a RAM write lands at `ramEffectOffset = +1`, a register write at
+  `regEffectOffset = +4`; reads/read-backs at `+2`/`+3` observe pre-effect **register** content but
+  post-effect **RAM** content (the RAM effect at `+1` has already landed). The constants
+  and their Rust provenance (`CLK_INC`, `MemoryAccessPosition`) are documented at their
+  definitions below.
+- `MemLoc` — the register-file/RAM split of the Memory bus's 3-limb address (registers are
+  `addr0 < 32 ∧ addr1 = addr2 = 0`, the shape `MemoryMsg.Spec` names; RAM locations are SP1's
+  canonical aligned 8-byte cells, not overlapping byte-addressed windows).
+- `chainState` — the trajectory as a function: `k` iterations of the official interpreter `try_step`
+  (`Option`-valued past a failing step), with the bridge to the relational `SailChain`.
+- `microValue` — the location's content at a micro-time `τ`: the pre- or post-state of window `k`'s
+  step according to the effect-time convention. -/
+
+namespace SP1Clean.Semantics
+
+open Sail LeanRV64D LeanRV64D.Functions
+open SP1Clean.Soundness.Target
+open SP1Clean.Channels (StateMsg MemoryMsg)
+
+variable {p : ℕ}
+
+/-! ## Bus time -/
+
+/-- The ℕ-decoded bus clock (no-wraparound is supplied where consumed, from the rows' in-circuit
+`clk_low` byte bounds). -/
+def clkNat (hi lo : ZMod p) : ℕ := hi.val * 2 ^ 24 + lo.val
+
+/-- A State message's time. -/
+def StateMsg.timeNat (m : StateMsg (ZMod p)) : ℕ := clkNat m.clk_high m.clk_low
+
+/-- A Memory message's time (slots 0/1 of the arity-9 tuple). -/
+def MemoryMsg.timeNat (m : MemoryMsg (ZMod p)) : ℕ := clkNat m.clk_high m.clk_low
+
+/-- The 3-limb pc recombined as the Sail 64-bit pc. -/
+def pcBits (pc0 pc1 pc2 : ZMod p) : BitVec 64 :=
+  BitVec.ofNat 64 (pc0.val + pc1.val * 2 ^ 16 + pc2.val * 2 ^ 32)
+
+/-- A State message's pc, using the same recombination as the official-Sail row bridge. -/
+def StateMsg.pcBits (m : StateMsg (ZMod p)) : BitVec 64 :=
+  _root_.SP1Clean.Semantics.pcBits m.pc0 m.pc1 m.pc2
+
+/-! ## Memory locations -/
+
+/-- An SP1 RAM location is an aligned 8-byte cell.  The 61-bit index is the aligned byte address
+divided by eight; representing the quotient directly makes non-overlap structural. -/
+abbrev RamCell := BitVec 61
+
+/-- The canonical byte address of an SP1 RAM cell. -/
+def RamCell.baseAddr (cell : RamCell) : BitVec 64 :=
+  BitVec.ofNat 64 (cell.toNat * 8)
+
+/-- A Memory-bus location: a register (index < 32, the `addr1 = addr2 = 0` shape) or an aligned
+8-byte RAM cell.  Rust's `CompressedMemory` keys load/store records by `addr & !7`; using the cell
+index here keeps the semantic key at exactly that granularity. -/
+inductive MemLoc
+  | reg (idx : BitVec 5)
+  | ram (cell : RamCell)
+deriving DecidableEq
+
+namespace MemLoc
+
+/-- The canonical byte address carried by the three Memory-bus address limbs.  Register records
+use their index; RAM records use the aligned eight-byte cell base.  This belongs to the semantic
+location type rather than to either trace compiler so soundness and completeness cannot disagree
+about the address represented by a `MemLoc`. -/
+def busAddress : MemLoc → ℕ
+  | .reg index => index.toNat
+  | .ram cell => cell.toNat * 8
+
+/-- The Memory bus carries only 48 address bits and reserves `0..31` for register records.  A RAM
+location is canonically representable exactly when its aligned base lies in the remaining 48-bit
+address space. -/
+def CanonicalAddress : MemLoc → Prop
+  | .reg _ => True
+  | .ram cell => 32 ≤ cell.toNat * 8 ∧ cell.toNat * 8 < 2 ^ 48
+
+theorem busAddress_lt_two_pow_48 {loc : MemLoc}
+    (canonical : loc.CanonicalAddress) : loc.busAddress < 2 ^ 48 := by
+  cases loc with
+  | reg index => exact lt_trans index.isLt (by norm_num)
+  | ram cell =>
+      simp only [CanonicalAddress] at canonical
+      exact canonical.2
+
+/-- Canonical register/RAM address encoding is injective.  The lower-bound clause is load-bearing:
+without it, aligned RAM addresses `0,8,16,24` collide with the reserved register shapes. -/
+theorem busAddress_injective_of_canonical {left right : MemLoc}
+    (leftCanonical : left.CanonicalAddress) (rightCanonical : right.CanonicalAddress)
+    (addressEq : left.busAddress = right.busAddress) : left = right := by
+  cases left with
+  | reg leftIndex =>
+      cases right with
+      | reg rightIndex =>
+          simp only [busAddress] at addressEq
+          congr 1
+          exact BitVec.eq_of_toNat_eq addressEq
+      | ram rightCell =>
+          exfalso
+          have leftLt : leftIndex.toNat < 32 := leftIndex.isLt
+          simp only [CanonicalAddress] at rightCanonical
+          simp only [busAddress] at addressEq
+          omega
+  | ram leftCell =>
+      cases right with
+      | reg rightIndex =>
+          exfalso
+          have rightLt : rightIndex.toNat < 32 := rightIndex.isLt
+          simp only [CanonicalAddress] at leftCanonical
+          simp only [busAddress] at addressEq
+          omega
+      | ram rightCell =>
+          simp only [busAddress] at addressEq
+          congr 1
+          apply BitVec.eq_of_toNat_eq
+          omega
+
+end MemLoc
+
+/-- Decode a Memory message's 3-limb address into its location (register ⟺ the register shape).
+RAM messages are interpreted at SP1's canonical 8-byte-cell granularity.  Faithful load/store rows
+already carry the aligned address; division by eight additionally makes the semantic boundary total
+for provider records. -/
+def MemoryMsg.locOf (m : MemoryMsg (ZMod p)) : MemLoc :=
+  if m.addr0.val < 32 ∧ m.addr1 = 0 ∧ m.addr2 = 0 then
+    .reg (BitVec.ofNat 5 m.addr0.val)
+  else
+    .ram (BitVec.ofNat 61
+      ((m.addr0.val + m.addr1.val * 2 ^ 16 + m.addr2.val * 2 ^ 32) / 8))
+
+/-- A Memory-bus record with the canonical register address shape decodes to that register.  The
+field equality is the form supplied by the Program/decode layer, while the result is the typed
+location consumed by timed grounding. -/
+theorem MemoryMsg.locOf_register [Fact p.Prime] [Fact (2 ^ 17 < p)]
+    (message : MemoryMsg (ZMod p)) (index : BitVec 5)
+    (addr0 : (index.toNat : ZMod p) = message.addr0)
+    (addr1 : message.addr1 = 0) (addr2 : message.addr2 = 0) :
+    MemoryMsg.locOf message = MemLoc.reg index := by
+  unfold MemoryMsg.locOf
+  rw [← addr0, addr1, addr2]
+  have indexLtP : index.toNat < p := by
+    have := index.isLt; have := Fact.out (p := 2 ^ 17 < p); omega
+  simp only [ZMod.val_natCast, Nat.mod_eq_of_lt indexLtP, index.isLt, true_and, if_true,
+    BitVec.ofNat_toNat, BitVec.setWidth_eq]
+
+/-- The 8-byte little-endian RAM word at `a` (the Memory bus's value granularity). -/
+def ramWord64? (s : SailState) (a : BitVec 64) : Option (BitVec 64) := do
+  let b0 ← s.mem.get? a.toNat
+  let b1 ← s.mem.get? (a.toNat + 1)
+  let b2 ← s.mem.get? (a.toNat + 2)
+  let b3 ← s.mem.get? (a.toNat + 3)
+  let b4 ← s.mem.get? (a.toNat + 4)
+  let b5 ← s.mem.get? (a.toNat + 5)
+  let b6 ← s.mem.get? (a.toNat + 6)
+  let b7 ← s.mem.get? (a.toNat + 7)
+  pure (b7 ++ b6 ++ b5 ++ b4 ++ b3 ++ b2 ++ b1 ++ b0)
+
+/-- A Sail state's content at a location: the 64-bit register value, or the 8-byte RAM word. -/
+def locContent (s : SailState) : MemLoc → Option (BitVec 64)
+  | .reg i => s.get_reg? i
+  | .ram cell => ramWord64? s cell.baseAddr
+
+/-! ## The trajectory as a function -/
+
+/-- Compatibility name for the canonical Lean-native machine step. -/
+noncomputable abbrev stepOnce := SP1Clean.Machine.stepOnce
+
+/-- Compatibility name for the canonical PolyFun machine trajectory. -/
+noncomputable abbrev chainState := SP1Clean.Machine.trajectory
+
+/-- The function ↔ relation bridge: a defined `chainState` is a `SailChain`. -/
+theorem sailChain_of_chainState {s0 s : SailState} :
+    ∀ {k : ℕ}, chainState s0 k = some s → SailChain k s0 s := by
+  intro k
+  induction k generalizing s with
+  | zero => intro h; cases h; exact .refl s0
+  | succ k ih =>
+    intro h; change (Machine.trajectory s0 k).bind Machine.stepOnce = some s at h
+    rcases hbind : Machine.trajectory s0 k with _ | s'
+    · rw [hbind] at h; cases h
+    · rw [hbind, Option.bind_some] at h; unfold Machine.stepOnce at h
+      rcases hrun : (try_step 0 false).run s' with b | e
+      · rw [hrun] at h; cases h; exact (ih hbind).snoc ⟨_, hrun⟩
+      · rw [hrun] at h; cases h
+
+/-- The front-step unfolding: `chainState` is defined by appending at the tail, but a chain peels at
+the head — one determined first step shifts the origin. -/
+theorem chainState_succ_front {s0 s1 : SailState} (h : stepOnce s0 = some s1) :
+    ∀ k, chainState s0 (k + 1) = chainState s1 k := by
+  intro k
+  induction k with
+  | zero => exact h
+  | succ k ih => exact congrArg (·.bind Machine.stepOnce) ih
+
+/-- Determinism, the other direction: a `SailChain` forces the `chainState` value. -/
+theorem chainState_of_sailChain {s0 s : SailState} :
+    ∀ {k : ℕ}, SailChain k s0 s → chainState s0 k = some s := by
+  intro k h
+  induction h with
+  | refl s => rfl
+  | @step n s s' _ hstep _ ih =>
+    obtain ⟨b, hrun⟩ := hstep
+    have hstep1 : Machine.stepOnce s = some s' := by unfold Machine.stepOnce; rw [hrun]
+    rw [chainState_succ_front hstep1 n]; exact ih
+
+/-! ## The location content at a micro-time
+
+The window arithmetic below is SP1's, not ours. The three constants name the two Rust sources
+they must track (at the release revision in `scripts/provenance.json`):
+
+- `crates/core/executor/src/lib.rs` — `pub const CLK_INC: u32 = 8`: every ordinary (non-syscall)
+  row advances the bus clock by eight, so execution step `k` occupies `[c0 + 8k, c0 + 8(k+1))`.
+- `crates/core/executor/src/events/memory.rs` — `enum MemoryAccessPosition { UntrustedInstruction
+  = 0, Memory = 1, C = 2, B = 3, A = 4 }`: the executor timestamps each access in a window at
+  `clk + position`. A RAM access therefore lands at offset `+1`; the operand reads (`C`, `B`)
+  observe at `+2`/`+3`; and the `op_a` register write lands at `+4`.
+
+`Machine.ordinarySchedule` (`Model/Machine/Schedule.lean`) carries the same numbers structurally
+as its `accesses` phase list; the timed grounding engine consumes only the schedule's `duration`
+(the `accesses` phase list is descriptive), and
+`supported_core_native_sound_scheduled`'s `UsesOrdinarySchedule` hypothesis is what pins a
+machine model to this window shape; the plain-Sail capstone states the eight-tick count directly.
+`microValue` uses the constants directly in its window arithmetic. -/
+
+/-- SP1's ordinary clock increment (Rust `CLK_INC = 8`): the width of one ordinary execution
+window, and the modulus of the intra-window offset arithmetic below. Structurally this is
+`Machine.ordinarySchedule.duration`. -/
+abbrev ordinaryClkInc : ℕ := 8
+
+/-- The intra-window offset at which a RAM effect lands (Rust `MemoryAccessPosition::Memory = 1`).
+Register-operand reads at `+2`/`+3` (`C`/`B`) come *after* it, so they observe **post-effect** RAM
+content (register content stays pre-effect there — the register write lands at `+4`). -/
+abbrev ramEffectOffset : ℕ := 1
+
+/-- The intra-window offset at which the `op_a` register write lands (Rust
+`MemoryAccessPosition::A = 4`). -/
+abbrev regEffectOffset : ℕ := 4
+
+/-- The intra-window offset at which the `op_b` register read observes (Rust
+`MemoryAccessPosition::B = 3`). Named alongside `regEffectOffset` so the trace layer's operand
+timestamps can cite the Rust constant rather than repeat the literal. -/
+abbrev regBOffset : ℕ := 3
+
+/-- The intra-window offset at which the `op_c` register read observes (Rust
+`MemoryAccessPosition::C = 2`). -/
+abbrev regCOffset : ℕ := 2
+
+/-- **The intra-row effect convention, as a function.** `microValue s0 c0 loc τ`: the content of
+`loc` at micro-time `τ` on the trajectory from `s0` with genesis clock `c0`. Window
+`k = (τ − c0) / ordinaryClkInc`, offset `δ = (τ − c0) % ordinaryClkInc`; the window's step has
+taken effect at `loc` iff `τ` is at/after the location's effect offset (`ramEffectOffset` /
+`regEffectOffset`, the Rust `MemoryAccessPosition` values). Pre-genesis times read the initial
+state. -/
+noncomputable def microValue (s0 : SailState) (c0 : ℕ) (loc : MemLoc) (τ : ℕ) : Option (BitVec 64) :=
+  if τ < c0 then
+    locContent s0 loc
+  else
+    let k := (τ - c0) / ordinaryClkInc
+    let δ := (τ - c0) % ordinaryClkInc
+    let takePost : Bool := match loc with
+      | .reg _ => regEffectOffset ≤ δ
+      | .ram _ => ramEffectOffset ≤ δ
+    (chainState s0 (if takePost then k + 1 else k)).bind (locContent · loc)
+
+/-! ## Timelines — the row-dependent step clock
+
+`microValue` above hardwires the uniform eight-tick window.  A `Timeline` generalizes the step ↔
+bus-clock mapping to row-dependent window widths (SP1's syscall rows occupy `264 = 8 · 33` ticks
+while ordinary instruction rows occupy `8`): `start n` is the bus clock at which semantic step `n`
+begins, and consecutive steps are at least the ordinary window apart.  The uniform timeline
+recovers today's model (`Timeline.ordinary`, with `microValueT_ordinary` the reader bridge), and
+the timed grounding walk is stated over an arbitrary timeline so mixed-duration shards are
+expressible. -/
+
+/-- The bus clock at the start of each semantic step: at least `ordinaryClkInc` apart. -/
+structure Timeline where
+  start : ℕ → ℕ
+  gap : ∀ n, start n + 8 ≤ start (n + 1)
+
+namespace Timeline
+
+/-- The uniform eight-tick timeline of the ordinary instruction profile. -/
+def ordinary (c0 : ℕ) : Timeline where
+  start := fun n => c0 + 8 * n
+  gap := fun n => by omega
+
+@[simp] lemma ordinary_start (c0 n : ℕ) : (ordinary c0).start n = c0 + 8 * n := rfl
+
+/-- The terminal-wide-row timeline: `N` ordinary eight-tick windows, one window of width
+`D ≥ 8` (SP1's syscall/HALT window is `264 = 8 · 33`), then ordinary windows again (the tail
+totalizes the function; a halting shard has no rows there).  This is the shape the halt-shard
+grounding walks. -/
+def terminal (c0 N D : ℕ) (hD : 8 ≤ D) : Timeline where
+  start := fun n => if n ≤ N then c0 + 8 * n else c0 + 8 * N + D + 8 * (n - N - 1)
+  gap := fun n => by split_ifs <;> omega
+
+@[simp] lemma terminal_start_le {c0 N D : ℕ} (hD : 8 ≤ D) {n : ℕ} (h : n ≤ N) :
+    (terminal c0 N D hD).start n = c0 + 8 * n := by
+  simp [terminal, h]
+
+@[simp] lemma terminal_start_succ {c0 N D : ℕ} (hD : 8 ≤ D) :
+    (terminal c0 N D hD).start (N + 1) = c0 + 8 * N + D := by
+  simp [terminal]
+
+lemma start_add_le (tl : Timeline) (n k : ℕ) : tl.start n + 8 * k ≤ tl.start (n + k) := by
+  induction k with
+  | zero => simp
+  | succ k ih =>
+    have := tl.gap (n + k)
+    show tl.start n + 8 * (k + 1) ≤ tl.start (n + k + 1)
+    omega
+
+lemma start_le_of_le (tl : Timeline) {n m : ℕ} (h : n ≤ m) : tl.start n ≤ tl.start m := by
+  have hs := tl.start_add_le n (m - n)
+  rw [show n + (m - n) = m by omega] at hs
+  omega
+
+lemma start_lt_of_lt (tl : Timeline) {n m : ℕ} (h : n < m) : tl.start n < tl.start m := by
+  have hs := tl.start_add_le n (m - n)
+  rw [show n + (m - n) = m by omega] at hs
+  have h1 : 1 ≤ m - n := by omega
+  omega
+
+lemma start_zero_add_le (tl : Timeline) (n : ℕ) : tl.start 0 + 8 * n ≤ tl.start n := by
+  simpa using tl.start_add_le 0 n
+
+/-- The semantic step active at bus time `τ`: the greatest `n` with `start n ≤ τ`. -/
+noncomputable def stepOf (tl : Timeline) (τ : ℕ) : ℕ :=
+  Nat.findGreatest (fun n => tl.start n ≤ τ) τ
+
+lemma stepOf_le_self (tl : Timeline) (τ : ℕ) : tl.stepOf τ ≤ τ :=
+  Nat.findGreatest_le τ
+
+/-- Characterization: `stepOf τ = n` exactly on `[start n, start (n + 1))`. -/
+lemma stepOf_eq (tl : Timeline) {τ n : ℕ} (hlo : tl.start n ≤ τ) (hhi : τ < tl.start (n + 1)) :
+    tl.stepOf τ = n := by
+  have hn_le : n ≤ τ := by
+    have := tl.start_zero_add_le n
+    omega
+  refine Nat.le_antisymm ?_ (Nat.le_findGreatest hn_le hlo)
+  rcases Nat.lt_or_ge n (tl.stepOf τ) with hgt | hle
+  · exfalso
+    have hspec : tl.start (tl.stepOf τ) ≤ τ := by
+      unfold stepOf
+      exact Nat.findGreatest_spec (P := fun m => tl.start m ≤ τ) hn_le hlo
+    have hmono : tl.start (n + 1) ≤ tl.start (tl.stepOf τ) := tl.start_le_of_le (by omega)
+    omega
+  · exact hle
+
+@[simp] lemma stepOf_ordinary (c0 τ : ℕ) (h : c0 ≤ τ) :
+    (ordinary c0).stepOf τ = (τ - c0) / 8 := by
+  refine stepOf_eq _ ?_ ?_ <;> simp only [ordinary_start] <;> omega
+
+end Timeline
+
+/-- **The timeline reader**: `microValue` generalized to row-dependent window widths.  Within step
+`n`'s window `[start n, start (n + 1))`, the step's effect is visible from the location's effect
+offset onward; pre-genesis times read the initial state.  `microValueT_ordinary` recovers the
+uniform reader. -/
+noncomputable def microValueT (s0 : SailState) (tl : Timeline) (loc : MemLoc) (τ : ℕ) :
+    Option (BitVec 64) :=
+  if τ < tl.start 0 then
+    locContent s0 loc
+  else
+    let k := tl.stepOf τ
+    let δ := τ - tl.start k
+    let takePost : Bool := match loc with
+      | .reg _ => regEffectOffset ≤ δ
+      | .ram _ => ramEffectOffset ≤ δ
+    (chainState s0 (if takePost then k + 1 else k)).bind (locContent · loc)
+
+/-- The uniform timeline recovers the eight-tick reader. -/
+lemma microValueT_ordinary (s0 : SailState) (c0 : ℕ) (loc : MemLoc) (τ : ℕ) :
+    microValueT s0 (Timeline.ordinary c0) loc τ = microValue s0 c0 loc τ := by
+  by_cases h : τ < c0
+  · unfold microValueT microValue
+    rw [if_pos (show τ < (Timeline.ordinary c0).start 0 by
+        simp only [Timeline.ordinary_start]; omega), if_pos h]
+  · unfold microValueT microValue
+    rw [if_neg (show ¬ τ < (Timeline.ordinary c0).start 0 by
+        simp only [Timeline.ordinary_start]; omega), if_neg h]
+    have hstep := Timeline.stepOf_ordinary c0 τ (by omega)
+    simp only [hstep, Timeline.ordinary_start]
+    have hδ : τ - (c0 + 8 * ((τ - c0) / 8)) = (τ - c0) % 8 := by omega
+    rw [hδ]
+
+end SP1Clean.Semantics

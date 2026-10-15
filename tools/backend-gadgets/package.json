@@ -1,0 +1,8 @@
+{
+  "name": "sp1-backend-gadget-conformance",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Pinned standalone Clean WASM/R1CS conformance tools",
+  "engines": { "node": "22.16.0" },
+  "dependencies": { "snarkjs": "0.7.6" }
+}

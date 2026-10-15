@@ -1,0 +1,154 @@
+import SP1Clean.Proofs.Completeness.NativeStateAgreement
+import SP1Clean.Proofs.Completeness.NativeMemoryAgreement
+import SP1Clean.Proofs.Completeness.NativeBoundaryAgreement
+import SP1Clean.Soundness.AIRCompleteness
+
+/-!
+# Native ensemble completeness
+
+This machine-completeness layer consumes the deterministic trace compiler from the assembly
+stratum and closes the last Clean-specific fact: simultaneous balance of all seven registered ensemble
+channels.  Keeping it here preserves the architecture's `machine → assembly → machine
+completeness` direction; the proof-independent trace map remains available below this capstone.
+-/
+
+namespace SP1Clean.Soundness
+
+open SP1Clean.LookupAccessList
+open SP1Clean.TraceGen
+open SP1Clean.Execution
+
+variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 25 < p)]
+
+local instance nativeCompletenessFieldBound : Fact (2 ^ 24 < p) :=
+  ⟨by have := Fact.out (p := 2 ^ 25 < p); omega⟩
+
+/-- All registered Clean channels balance for the deterministic trace.  Byte/Program use direct
+field-valued canonical closure; State/Memory use the two structural hand-offs. -/
+theorem NativeTraceReady.balancedChannels
+    {statement : SupportedCoreStatement p} {execution : Machine.EventExecutionTrace}
+    (ready : NativeTraceReady statement execution)
+    (publicWellFormed : statement.publicValues.LimbBounds)
+    (capacity : (nativeTrace statement execution).witness.ChannelCapacity p) :
+    (nativeTrace statement execution).witness.BalancedChannels := by
+  let compiled := TraceGen.compileExecution statement.program execution
+    (nativeInitialClock statement)
+  let stateKeys := chainTokens
+    (stateInitToken (nativeTrace statement execution),
+      chronologicalStateLinks (p := p) compiled.routedEvents,
+      stateFinalToken (nativeTrace statement execution))
+  let memoryKeys := (memoryHandoffChains (p := p) compiled.memoryHistory).flatMap chainTokens
+  exact (nativeBaseTrace statement execution).canonicalClosure_balancedChannels_of_handoff
+    (ready.wellFormed publicWellFormed) ready.demandServable
+    (ready.skeletonNonpositive publicWellFormed) stateKeys memoryKeys
+    (ready.stateLedgerPerm publicWellFormed) ready.memoryLedgerPerm
+    ((nativeBaseTrace statement execution).canonicalClosure.haltTablePadding).2
+    ((nativeBaseTrace statement execution).canonicalClosure.haltTablePadding).1
+    ready.exitZero ((Air.Flat.EnsembleWitness.channelCapacity_iff _ _).mp capacity)
+
+/-- Functional completeness of the native ensemble on its exact deterministic compiler image.
+The witness map is independent of the proof of admissibility. -/
+noncomputable def supported_core_native_functionalCompleteness
+    :
+    WitnessRelation.FunctionalCompleteness (SupportedCoreNativeRelation (p := p))
+      (SupportedCoreNativeAdmissibleShardRelation (p := p)) where
+  map statement witness :=
+    (nativeTrace statement
+      (witness.evaluatedTrace (supportedCoreShardModel (p := p)))).witness
+  map_valid statement witness valid := by
+    obtain ⟨semantic, ready, fits⟩ := valid
+    let execution := witness.evaluatedTrace (supportedCoreShardModel (p := p))
+    have publicWellFormed :=
+      Execution.SupportedCoreShardExecutionValid.publicValuesWellFormed semantic
+    have constraints := ready.constraints publicWellFormed
+    have balanced := ready.balancedChannels publicWellFormed fits
+    exact ⟨⟨nativeTrace_witness_publicInput statement execution, constraints, balanced⟩,
+      ready.semanticBoundary semantic, (nativeTrace statement execution).syscallTableInactive⟩
+
+/-- Capacity-aligned functional completeness.
+
+The witness constructor is the same `nativeTrace`; the additional target fact follows from the
+shared semantic row budget and the proved one-active-row-per-transition equation.  Thus the paired
+soundness/completeness API uses `SupportedCoreNativeShardRelation` on the AIR side without defining
+a second compiler or trace. -/
+noncomputable def supported_core_native_shard_functionalCompleteness
+    :
+    WitnessRelation.FunctionalCompleteness (SupportedCoreNativeShardRelation (p := p))
+      (SupportedCoreNativeAdmissibleShardRelation (p := p)) :=
+  (supported_core_native_functionalCompleteness (p := p)).restrictAir
+    (fun _ witness => Model.Core.Profile.WithinOrdinaryRowLimit
+      (realDecodedInstructionRows witness.data witness.tables).length) (by
+    intro statement witness valid
+    obtain ⟨semantic, ready, -⟩ := valid
+    let execution := witness.evaluatedTrace (supportedCoreShardModel (p := p))
+    obtain ⟨-, -, -, -, -, -, -, limit⟩ :=
+      Execution.SupportedCoreShardExecutionValid.evaluatedTrace_facts semantic ready.syscallFree
+    change
+      Model.Core.Profile.WithinOrdinaryRowLimit
+        (realDecodedInstructionRows (nativeTrace statement execution).witness.data
+          (nativeTrace statement execution).witness.tables).length
+    rw [ready.activeInstructionRows_length
+      (Execution.SupportedCoreShardExecutionValid.publicValuesWellFormed semantic)]
+    exact limit)
+
+/-- Existential form of deterministic whole-ensemble completeness. -/
+theorem supported_core_native_complete :
+    WitnessRelation.Complete (SupportedCoreNativeRelation (p := p))
+      (SupportedCoreNativeAdmissibleShardRelation (p := p)) :=
+  (supported_core_native_functionalCompleteness (p := p)).complete
+
+/-- Existential projection of capacity-aligned native completeness. -/
+theorem supported_core_native_shard_complete :
+    WitnessRelation.Complete (SupportedCoreNativeShardRelation (p := p))
+      (SupportedCoreNativeAdmissibleShardRelation (p := p)) :=
+  (supported_core_native_shard_functionalCompleteness (p := p)).complete
+
+/-- Bidirectional correctness on the **syscall-free sub-language** of the shared bounded shard
+relation, conditional only on the transparent compiler-domain closure theorem.  The semantic
+language now also contains halting shards (the shared `.halted` case); native soundness lands in
+the ordinary sub-language because the current ensemble grounds all-ordinary traces, and the
+compiler direction targets exactly that sub-language (`NativeTraceReady.syscallFree`).  Halting
+shards join both directions with the terminal halt row.  The unqualified correctness name remains
+reserved until `NativeShardTraceTotal` is proved. -/
+theorem supported_core_native_shard_correct_of_totality
+    (total : NativeShardTraceTotal (p := p)) :
+    WitnessRelation.Correct (SupportedCoreNativeOrdinaryShardRelation (p := p))
+      (Execution.SupportedCoreOrdinaryShardExecutionRelation (p := p)) where
+  sound := by
+    intro statement witness valid
+    obtain ⟨semanticWitness, semantic, ordinary, -⟩ :=
+      supported_core_native_shard_execution statement witness valid
+    exact ⟨semanticWitness, semantic, ordinary⟩
+  complete := by
+    intro statement witness valid
+    obtain ⟨semantic, ordinary⟩ := valid
+    refine ⟨_, (supported_core_native_shard_functionalCompleteness (p := p)).map_valid statement
+      witness ⟨semantic, total statement witness semantic ordinary⟩, ?_⟩
+    exact (nativeTrace statement
+      (witness.evaluatedTrace (supportedCoreShardModel (p := p)))).realHaltRows_nil
+
+/-- Public-language equality on the syscall-free sub-language, a direct consequence of the same
+single totality theorem. -/
+theorem supported_core_native_shard_language_eq_of_totality
+    (total : NativeShardTraceTotal (p := p)) :
+    WitnessRelation.language (SupportedCoreNativeOrdinaryShardRelation (p := p)) =
+      WitnessRelation.language
+        (Execution.SupportedCoreOrdinaryShardExecutionRelation (p := p)) :=
+  (supported_core_native_shard_correct_of_totality total).language_eq
+
+/-- A supported admissible execution proves the literal Clean `Ensemble.Statement` at the
+statement's public boundary. -/
+theorem sp1Ensemble_statement_of_supported_execution
+    (statement : SupportedCoreStatement p) (witness : Machine.CoreShardSemanticWitness)
+    (valid : SupportedCoreNativeAdmissibleShardRelation statement witness) :
+    (sp1Ensemble (p := p)).Statement statement.publicValues := by
+  obtain ⟨semantic, ready, fits⟩ := valid
+  let execution := witness.evaluatedTrace (supportedCoreShardModel (p := p))
+  have publicWellFormed :=
+    Execution.SupportedCoreShardExecutionValid.publicValuesWellFormed semantic
+  exact ⟨(nativeTrace statement execution).witness,
+    nativeTrace_witness_publicInput statement execution,
+    ready.constraints publicWellFormed,
+    ready.balancedChannels publicWellFormed fits⟩
+
+end SP1Clean.Soundness

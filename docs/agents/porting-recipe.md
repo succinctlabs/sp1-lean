@@ -1,7 +1,7 @@
 # Porting recipe — adding a new chip
 
 A checklist for porting one SP1 instruction/operation into the four-artifact chain. The two complete templates
-are **Add** (carry arithmetic) and **Bitwise** (byte-level via `ByteXorTable`); clone whichever is closer.
+are **Add** (carry arithmetic) and **Bitwise** (typed byte-channel interactions); clone whichever is closer.
 Read `../architecture.md` first for what each artifact is, and `proof-patterns.md` for the proof skeleton.
 
 ## Reference sources (read-only)
@@ -27,10 +27,9 @@ future chip. Keep these files axiom-clean.
 - Namespace `SP1Clean.<Op>Operation`. Variable block `{p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]`.
 - `main`: witness the result limbs/bytes; impose byte/range checks as **`byteChannel` pulls**
   (`byteChannel.pullIf input.is_real ⟨opcode, is_real * value, width, 0⟩`, `Model/Channels.lean`)
-  — the single shared byte foundation, faithful to SP1's `send_byte`. The legacy local-column
-  `Gadgets.ToBits.rangeCheck` / `ByteXorTable` + opcode-selected Lagrange pattern is **superseded** (kept
-  only in `BitwiseU16Operation`, which can't compose the byte-level op — FormalCircuit duality). See
-  `proof-patterns.md` for the pull recipe and the sub-gadget composition rule below.
+  — the single shared byte foundation, faithful to SP1's `send_byte`. The byte providers discharge those requests with polynomial bit decomposition;
+  `ToClean/Gadgets/BitwiseByte.lean` supplies the bundled lookup-free bitwise gadget.
+  Do not reintroduce legacy static lookups in an exportable component.
 - `RawSpec` (carry-bool/range or per-byte form), the `*_of_<raw>` / `<raw>_of_*` cores, the semantic `Spec`,
   `soundness`, `completeness`, and `circuit : FormalCircuit`.
 - Verify: `#print axioms <Op>Operation.circuit` is clean.
@@ -59,17 +58,27 @@ entangled chips DivRem/ShiftLeft/ShiftRight keep `Defs` in `Proofs/Chips/` inste
   add the SP1 alignment send (`Range(next_pc[0]/4, 14)`). JALR also commits an `lsb` witness
   (`witnessField (fun env => ↑((env add_value[0]).val % 2))`, +1 to `localLength`) with a binary gate, and
   feeds CPUState the **LSB-cleared** limb `add_value[0] - lsb` (RISC-V's `& ~1`). The `Spec` adds the gated
-  jump/link `toBitVec64` identities (mirror `Proofs/Chips/JalChip.lean` / `Proofs/Chips/JalrChip.lean`).
+  jump/link `toBitVec64` identities (mirror `Proofs/Chips/JalChip/` / `Proofs/Chips/JalrChip/`).
 - `elaborated` (`localLength`, channel lists — propagated from the subcircuits), `Assumptions`/`Spec`
   (semantic, `is_real`-gated, via `FormalModel/Contracts/Chips.lean`'s `RTypeChipSpec` builder), `ProverAssumptions`/
   `ProverSpec`, `soundness` (`circuit_proof_start [RTypeChipSpec]`), `completeness`, `circuit`.
-- Mirror `Proofs/Chips/AddChip.lean` for a `FormalAssertion` gadget (reader composition + `witnessVector populate`
-  + the `RTypeChipSpec` soundness recipe), or `Proofs/Chips/BitwiseChip.lean` for a witnessing `FormalCircuit`
+- **The `circuit_output_eq` fold (do this — it keeps the grounding/memory closed-forms cheap and is guarded).**
+  Right after `def circuit`, add `@[circuit_norm] theorem <op>Chip_circuit_output_eq (input) (offset) :
+  (<Op>Chip.circuit (p := p)).output input offset = <the elaborated.output struct> := rfl` (copy the RHS from
+  the `elaborated` instance in `Defs`; for auto-elaborated chips extract it via `lean_goal` on the LHS). Then
+  close any per-chip closed-form (`<op>Chip_memoryInteractionValues_eq`, the grounding contracts) with
+  `simp only [circuit_norm, …]` — never full `simp`, never `simp [circuit]`. **Never add an
+  elaboration-budget directive**: `scripts/check_option_escapes.sh` (CI) fails on any `maxHeartbeats`/
+  `maxRecDepth` site that is not allowlisted. Fold instead — see `proof-patterns.md` §"Elaboration
+  budgets". If the tag perturbs this chip's own proofs, drop `@[circuit_norm]` and
+  pass the plain lemma explicitly.
+- Mirror `Proofs/Chips/AddChip/Formal.lean` for a `FormalAssertion` gadget (reader composition + `witnessVector populate`
+  + the `RTypeChipSpec` soundness recipe), or `Proofs/Chips/BitwiseChip/Formal.lean` for a witnessing `FormalCircuit`
   gadget (`subcircuit <Op>Operation.circuit` returning the gadget output directly).
 
 ### 3. `Proofs/Chips/<Op>Chip/Bridge.lean` — native Sail bridge
 (imports `Proofs/Chips/<Op>Chip/Formal`.)
-- Narrowed imports (see LEAN_SAIL_NOTES — `Mathlib.Tactic` + `Mathlib.Data.ZMod.Basic` + `Std.Data.ExtDHashMap`).
+- Narrowed imports (see `lean-sail-notes.md` — `Mathlib.Tactic` + `Mathlib.Data.ZMod.Basic` + `Std.Data.ExtDHashMap`).
 - `spec_<op>` (RISC-V Sail execution via `SailWrap`), `sp1_<op>` (writes
   `toBitVec64 (<Op>Operation.resultWord …)`), and `correct_<op>_native` sourcing the identity from the chip's
   `Spec`. For multi-variant ops, one `<op>_chip_reaches_sail_<variant>` per opcode (extract the right `Spec`
@@ -78,17 +87,20 @@ entangled chips DivRem/ShiftLeft/ShiftRight keep `Defs` in `Proofs/Chips/` inste
   single value that enters the op's rows into the heterogeneous trace + soundness capstone with **no central
   edit**. Set `name := "<SP1 MachineAir::name>"` (the chip's `name()` in `../sp1`, e.g. `"Add"`); its `view`
   projects the adapter through `cols.adapter.toAdapterView` (so an `ALUTypeReader` row and an `RTypeReader`
-  row populate the same reader-agnostic `Trace.AdapterView`); `reaches_sail` is the `<op>_chip_reaches_sail`
-  lemma applied verbatim.
+  row populate the same reader-agnostic `Trace.AdapterView`); its `advance` field packages the
+  `<op>_chip_reaches_sail` bridge lemma in the uniform interface (the legacy `sailEquiv`/`reaches_sail`
+  registration path is retired).
 
 ### 3b. Wire the chip into the registry + coverage table
-- Add the `kind` to `Soundness/ChipRegistry.lean`'s `allChipKinds` and bump `allChipKinds_length` (N→N+1).
-- Add a `CoverageEntry` to `Soundness/Coverage.lean`'s `coverage` (the chip, its SP1 opcodes, and the
-  `RdGuard`), in `allChipKinds` order — `coverage_kinds_eq_registry`'s `rfl` enforces the orders match. Update
-  `wiredNames`/`completeChipNames` (if its `circuit.completeness` is sorry-free) and the routing cascades in
-  `routeOf`/`routeName` (mirroring SP1's `tracing.rs` arm); the `by decide` ledger guards re-check the rest.
-- A heterogeneous trace mixing the new op with Add/Sub then rides the gated capstone via `allChipsTrace`
-  (`Soundness/AllChips.lean`) + `gatedExecution_allChips` (`Soundness/GatedVm/Bridge.lean`).
+- Add one entry to `Soundness/SupportedMachine.lean`'s `supportedChips`: the Clean table, `ChipKind`, SP1
+  opcodes, and `RdGuard`, mirroring the corresponding `tracing.rs` arm. Bump `supportedChips_length` (N→N+1).
+  `allChipKinds`, `sp1Tables`, `coverage`, `routeOf`, and `routeName` are projections/searches of this one
+  descriptor; the decidable ledger guards re-check the resulting coverage.
+- The registry projections then carry the new chip through typed decode, grounding, and the
+  `supported_core_native_sound` capstone via `Soundness/LocalExecution.lean`'s generic dispatcher —
+  no capstone case split is added. Also register the chip's `ChipGroundingContracts` instance
+  (`Soundness/ChipContracts.lean`) and its whole-chip `ChipFaithful` anchor
+  (`Faithful/<Op>Chip.lean` + `Faithful/SupportedMachine.lean`).
 
 ### 4. `Faithful/<Op>.lean` — constraint anchor
 - Import the generated `Extracted/<Op>` and the shared datatype (`Model/SP1Constraint.lean`:
@@ -101,7 +113,7 @@ entangled chips DivRem/ShiftLeft/ShiftRight keep `Defs` in `Proofs/Chips/` inste
   `ByteOpcode.ofNat_*`/`constrain_*` lemmas, and `bool_iff`. The split groups asserts and interactions into two
   clauses, so a trailing `tauto` (or `ring_nf; tauto`) reassociates where `RawSpec` interleaves them.
 - For a **composed** op, split with `SP1Constraints.allHold_append` and collapse each `is_real = 1`-gated
-  sub-list via its own anchor (keeps the residual `tauto` small) — see `Faithful/{Addw,LtOperationSigned,
+  sub-list via its own anchor (keeps the residual `tauto` small) — see `Faithful/{AddwChip,LtOperationUnsigned,
   IsZeroWordOperation}.lean`.
 - `NeZero p` via `⟨(Nat.Prime.pos Fact.out).ne'⟩`; `omit [Fact (2^17 < p)] in` if unused;
   `set_option linter.unusedSimpArgs false in` *before* the doc-comment if needed.
@@ -111,18 +123,68 @@ entangled chips DivRem/ShiftLeft/ShiftRight keep `Defs` in `Proofs/Chips/` inste
 - `lake build SP1Clean` → **0 errors / 0 warnings** (see build-concurrency rules in AGENTS.md; kill stale
   builds first).
 - Axiom-check every headline theorem (`lean_verify` or `#print axioms`): only
-  `[propext, Classical.choice, Quot.sound]` (+ `Lean.ofReduceBool`/`trustCompiler` if `bv_decide` was used),
+  `[propext, Classical.choice, Quot.sound]` (+ generated `._native.bv_decide.ax_*` constants if `bv_decide` was used),
   **no `sorryAx`**.
+
+## Exportable witness authoring
+
+Use Clean's built-in witness IR and emitter; `scripts/check_no_witness_native.sh` rejects
+Lean-closure witness sites. Start with Clean's `doc/witgen-authoring.md`. Add and Bitwise show
+vector and struct payloads; Mul shows shared arithmetic through `Witgen.M`.
+
+1. Keep a value-level `populate` and author `populateIR` or `populateFE` beside it using Clean's
+   `WitgenIR`/`FExpr`. Prove evaluation agrees with `populate` under the necessary operand bounds.
+   Keep expensive payloads folded; expose per-cell evaluation lemmas over abstract operands.
+2. Put opcode selectors in ordinary inputs. Derive activity and computed decisions from them.
+   Instruction components do not read prover hints. Providers with external data have separate
+   contracts; do not confuse those with instruction selectors.
+3. Use `witnessVectorIR` or `witness (populateFE …)` in `main`. Completeness transports generated
+   cells through the evaluation lemma, then reuses the value-level semantic proof. Bound `U64Expr`
+   arithmetic explicitly so its wraparound agrees with the intended natural-number computation.
+4. Prove environment locality in the feature's `Witgen.lean`. Feed input evaluation equalities to
+   payload congruence lemmas and `h_agree.get_eq` to reads of earlier witness cells. Zero-witness
+   subcircuits use Clean's standard congruence lemmas. Keep `u64Wrap`'s arithmetic tactic out of
+   unbounded congruence simplification (`-Witgen.u64Wrap`).
+5. Update `#assert_exportable`'s cell count, root imports and every physical-row consumer. Regenerate
+   the legacy witness fixtures and built-in Rust export, then compare against independently
+   generated SP1 rows, including padding and mutations. These tests do not prove lowering correct.
+
+**DivRem-scale lessons (the 30-site terminal port).** Binding rules learned closing the largest
+chip, in force for any future site of comparable depth:
+
+- *Structural simps take `Witnessable.witness_provable`, never the bare `Witnessable.witness`
+  projection* — simp cannot unfold a class projection on a named instance (Clean's own
+  `Basic.lean` note), and one dead token turned a 39s output lemma into a >10-minute hang. The
+  whole `populateRow`-output lemma is just `simp only [circuit_norm, populateRow, populatedRowAt]`
+  (the bespoke unfold list was both slower and wrong).
+- *Congr lemmas obey a phase-order rule*: the operand/hint leaf facts must sit **in the same
+  `simp only` that unfolds the payload** — once the push forms an `if` whose baked `Decidable`
+  instance contains the leaf, no later pass reaches it. An unsolved same-tree congr usually means
+  one sub-`def` is missing from the unfold list (diff the two sides modulo `env`/`env'` renaming
+  to find the residual); `interval_cases i` is needed exactly at literal-`#v` payload indexing;
+  variable-`k` dispatch (`if k < 4`) goes compositional (`split_ifs` helpers), literal-`k` needs
+  `reduceDIte` **plus** `Nat.reduceLT`. Struct-read cells keep the struct folded and close by
+  `if_congr` + `exact` chains through an explicitly instantiated `Witgen.getElem_eval_toElements`
+  (its `size` side-condition is not simp-dischargeable, and the struct-eval terms match only up
+  to instance paths).
+- *Completeness pins bridge through instantiated site evals*: one block of named-argument
+  `have eX := <site>FE_eval (env := env) (vB := B) … (hWB := hbpvE) …` facts (element facts
+  `hbpvE` from `rw [← hbpv, Vector.getElem_map]`), then each pin is
+  `simp only [circuit_norm, …, eX, hFlags] at h` — `circuit_norm` is required (it reduces the
+  reconstructed-input struct-literal projections inside `h`). Literal-index `h_env` applications
+  must be `⟨k, by omega⟩` (`Fin.instOfNat`'s coercion resists the `Fin.val` lemmas). Struct pins
+  never simp the big hypothesis: `dsimp only [] at h` (proj-of-mk), then `refine h.trans ?_` and
+  an `exact` chain through `getElem_eval_ofFExprs` / `Vector.getElem_cast _` /
+  `getElem_eval_toElements` / `congrArg` of the struct eval.
 
 ## Scope notes
 
 - Register/memory reads and the PC next-state are **native readers** now: the chip composes
   `Readers.CPUState.circuit` + the register adapter reader (`RTypeReader`/`ALUTypeReader`) as subcircuits
-  (§2). The trace-level bus projections (`Soundness/{State,Program,Memory}Consistency.lean`) read a
-  **reader-agnostic `Trace.AdapterView`** that every reader projects into via `<Reader>.toAdapterView`
-  (R-type ⇒ `op_c := #v[op_c,0,0,0]`, `imm_c := 0`; the op_c memory pair and Program tuple then degenerate
-  to the scalar shape). `ProgramChip.ProgramRow` carries `op_c : Word` + `imm_c` to match. The cross-row
-  links (PC chain, offline-memory) stay threaded honest assumptions (`TraceStateLink`/`TraceMemoryLink`).
+  (§2). `Soundness/RowView.lean` supplies the reader-agnostic `Trace.AdapterView` and normalized
+  State/Program access views; `TypedState`, `TypedProgram`, and `TypedMemory` consume the actual Clean
+  interactions directly. R-type projects `op_c := #v[op_c,0,0,0]`, `imm_c := 0`, while
+  `ProgramChip.ProgramRow` carries `op_c : Word` + `imm_c` to match the common shape.
 - **`x0`-destination / result-discarding chips (the `AluX0` variant).** SP1 routes any instruction writing
   `x0` to a dedicated chip (loads → `LoadX0`, ALU ops → `AluX0`); `Coverage.routeOf` keys on
   `(opcode, rd == x0)`. Such a chip has **no arithmetic gadget** (the result is discarded) — it composes only
@@ -133,7 +195,8 @@ entangled chips DivRem/ShiftLeft/ShiftRight keep `Defs` in `Proofs/Chips/` inste
   ends in `wX_bits 0#5 result` and `run_wX_bits` collapses a write to `x0` to a no-op **regardless of the
   result**, one *generic* family-core lemma per Sail instruction family (RTYPE/RTYPEW/ITYPE/MUL/MULW) proves
   `spec_<op> ≡ sp1_<chip>` for *every* opcode — **no `execute_*_pure = RV64.*` result-correctness lemma
-  needed** — and `ChipKind.sailEquiv` is the ungated N-way conjunction. The register reads (`h_rs1`/`h_rs2`)
+  needed** — and the chip's `ChipKind.advance` discharges every routed opcode through that single
+  family-core lemma. The register reads (`h_rs1`/`h_rs2`)
   only make the Sail reads *succeed*; their values are discarded. If SP1's adapter call is a plain method
   (e.g. `eval_op_a_immutable`), not an `SP1Operation`, the reader is **inlined** in the extracted
   `asserts`/`interactions` (no `<Reader>.asserts` sub-call), so the `Faithful/` anchor discharges it directly
@@ -146,33 +209,26 @@ entangled chips DivRem/ShiftLeft/ShiftRight keep `Defs` in `Proofs/Chips/` inste
   struct *size*, `subcircuit` consumes full *localLength*), making the default `output_eq` false — place such
   a subcircuit **last** in the return struct, or supply a custom offset-based `output`. This bites Mul/Div
   (compose witnessing `U16toU8`); Lt does **not** (composes `U16Compare` as a `localLength-0` assertion).
-- **Shifts (SRL/SRA/SRLW/SRAW), in progress as a *chip skeleton* (no operation gadget).** SP1 inlines the
-  limb decomposition of the register read into the chip asserts, so `ShiftRightChip` is a skeleton: `main`
-  emits the ~58 inline `=== 0` asserts + 9 byte-range pulls, the semantic flag-gated `Spec` is in
-  `FormalModel/Contracts/Chips.lean`, and the native arithmetic is ported into `Native/Operations/ShiftRightMath.lean` (all four
-  variant `*_close_su16_*_case` lemmas, axiom-clean). The `Spec` shifts the **register reads**
-  (`adapter.op_b_memory.prev_value` by `op_c_memory.prev_value`), not a separate `op_b_val`. The **SRL
-  soundness conjunct is fully proven** (conversion + Stage A + the 4×16 leaf dispatch into `srl_close_su16_*`),
-  and **both faithful anchors** are proven & axiom-clean. The `sra_div_to_bitvec_{false,true}` conversion
-  helpers (SRA's `b_msb` case-split) are in place. **Remaining:** the SRA/SRLW/SRAW `Spec` conjuncts (each
-  reuses the SRL dispatch skeleton across the msb/sign-fill cases — SRA ~2× SRL), the three `U16MSB`
-  subcircuit `Assumptions`, and completeness (a deferred `sorry`; needs a `populate` + `ProverHint` opcode
-  threading). See `proof-patterns.md` "Bit-shift chip soundness". **Mul/Div** are a later track (Mul's
-  carry-chain witnessing + `output_eq` + completeness are still open).
+- **Shifts (SRL/SRA/SRLW/SRAW).** SP1 inlines the limb decomposition of the register read into the chip
+  assertions. Keep the expensive shift values folded and use the abstract-`BitVec` helper pattern in
+  `Proofs/Chips/ShiftRightChip/` and `ShiftLeftChip/`; all variants, completeness, Sail bridges, and
+  whole-chip faithfulness are now proved. Mul and DivRem are likewise completed and are useful examples
+  of splitting pure arithmetic evidence from one whole-chip row proof.
 - **Memory chips (LoadDouble / StoreDouble are the templates).** A memory op composes one extra subcircuit —
   `Readers.MemoryAccess.circuit` (the real-48-bit-address `send prev` / `receive new` pair + the timestamp
   gates) — between the address gadget and the adapter, and the address is the **`AddressOperation` gadget**
-  output (`rs1 + signExtend(imm)`, 3 limbs), *not* a register index. Clone `Proofs/Chips/LoadDoubleChip.lean` (a
+  output (`rs1 + signExtend(imm)`, 3 limbs), *not* a register index. Clone `Proofs/Chips/LoadDoubleChip/` (a
   read: `MemoryAccess` `new_value = memory_access.prev_value`, adapter `ITypeReader` with op_a a **write**) or
-  `Proofs/Chips/StoreDoubleChip.lean` (a write: `new_value = adapter.op_a_memory.prev_value` = rs2, adapter
+  `Proofs/Chips/StoreDoubleChip/` (a write: `new_value = adapter.op_a_memory.prev_value` = rs2, adapter
   `ITypeReaderImmutable` with op_a a **read**, and **no** chip-level `op_a_0` gate). Honest preconditions: the
   chip `Assumptions` commit a valid aligned non-reserved address (operand `isU64` + `(rs1+imm)%2^64 < 2^48` +
-  `≥ 2^16` + 8-aligned) — `AddressOperation`'s inverse gate + offset range-check need them. The bridge ports
+  `≥ 2^16` + 8-aligned) — `AddressOperation`'s inverse gate + offset range-check need them
+  (the templates live in the `Proofs/Chips/LoadDoubleChip/` and `Proofs/Chips/StoreDoubleChip/` directories). The bridge ports
   the Sail RAM model (`Model/SailMemory.lean`, read **and** write) and takes the bus reads/bytes as
   hypotheses (`lean-sail-notes.md`). `StoreByte` + the sub-word load/store ops drop onto this exact spine —
   only the byte-select/MSB gadgetry is new; no new bus/Sail/trace infrastructure.
-- The faithfulness anchor matches the operation **fragment**; matching `update_constraints.py`'s exact
-  chip-level output is a separate tooling step.
+- The faithfulness anchor matches the operation **fragment**; matching the exact whole-chip output (`update_extracted.py`'s `Extracted/ChipOracle/<Chip>.lean` oracle)
+  is the separate whole-chip `ChipFaithful` step.
 - Completeness is only provable because the gadget is **witnessed** with a **semantic** spec. If you find
   yourself wanting a free combinatorial witness with a pure-semantic spec, completeness will be false — witness
   the value and constrain it instead.

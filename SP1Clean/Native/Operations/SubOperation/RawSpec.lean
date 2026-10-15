@@ -10,18 +10,19 @@ The structural borrow-bool + limb-range form `RawSpec`, and the two native borro
 SP1 implements `a - b` as `a + (2^64 - b)`, using `2^16 - 1 - b[i]` as the added limb with the carry
 **initialized to 1** (`sp1/crates/core/machine/src/operations/sub.rs`). The borrow carry is
 `c_i = (a[i] + 65535 - b[i] - value[i] + c_{i-1}) * 65536⁻¹` (with `c_{-1} = 1`), matching SP1's Rust
-shape verbatim — the faithfulness anchor (`Faithful/Sub.lean`) is a trivial `simp`.
+shape used by this local gadget. Whole-chip faithfulness, not an operation theorem, relates the
+assembled circuit to Rust.
 
 The arithmetic routes the 16-bit complement `bbar := 65535 - b[i]` (a genuine 16-bit value, via
 `val_compl_65535`) through `limb_lift`; the BitVec subtraction goal is converted to addition up front with
 `BitVec.eq_sub_iff_add_eq`. The witnessed circuit (`populate` + `main`/`elaborated`) and its `FormalAssertion`
-contract live in the sibling `Elaborated`/`Formal` modules. -/
+contract live in the sibling `Defs`/`Formal` modules. -/
 
 namespace SP1Clean.SubOperation
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
-/-- The borrow-bool + limb-range form, matching SP1's Rust `SubOperation::eval` verbatim
+/-- The borrow-bool + limb-range form used by the local subtraction gadget
 (carry initialized to `1`, `a[i] + 65535 - b[i] - value[i] + c_in`), stated against the
 result word `value`. -/
 def RawSpec (a b value : Word (ZMod p)) : Prop :=
@@ -32,7 +33,6 @@ def RawSpec (a b value : Word (ZMod p)) : Prop :=
   (c0 = 0 ∨ c0 = 1) ∧ (c1 = 0 ∨ c1 = 1) ∧ (c2 = 0 ∨ c2 = 1) ∧ (c3 = 0 ∨ c3 = 1) ∧
   value[0].val < 65536 ∧ value[1].val < 65536 ∧ value[2].val < 65536 ∧ value[3].val < 65536
 
-set_option maxHeartbeats 16000000 in
 /-- Forward (soundness) core: the borrow-bool + range form implies the result is a 64-bit
 value equal to the BitVec difference. -/
 theorem subSemantics_of_carries {a b value : Word (ZMod p)}
@@ -43,7 +43,6 @@ theorem subSemantics_of_carries {a b value : Word (ZMod p)}
   refine ⟨h_isU64_v, ?_⟩
   obtain ⟨ha0, ha1, ha2, ha3⟩ := Word.lt_cases_of_isU64 ha
   obtain ⟨hbb0, hbb1, hbb2, hbb3⟩ := Word.lt_cases_of_isU64 hb
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have h65inv : (65536 : ZMod p) * (65536 : ZMod p)⁻¹ = 1 :=
     mul_inv_cancel₀ val_65536_ne_zero
   -- Keystone: rewrite the subtraction goal as an addition goal `value + b = a`.
@@ -83,14 +82,12 @@ theorem subSemantics_of_carries {a b value : Word (ZMod p)}
   have hc3_lt : c3.val ≤ 1 := by rcases hc3 with h | h <;> simp [h, ZMod.val_zero, ZMod.val_one]
   omega
 
-set_option maxHeartbeats 16000000 in
 /-- Backward (completeness) core: a 64-bit value equal to the BitVec difference witnesses the
 unique boolean borrow chain + ranges. -/
 theorem carries_of_subSemantics {a b value : Word (ZMod p)}
     (ha : a.isU64) (hb : b.isU64) (hv : value.isU64)
     (h_bv : value.toBitVec64 = a.toBitVec64 - b.toBitVec64) :
     RawSpec a b value := by
-  haveI : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
   have hp : 2 ^ 17 < p := Fact.out
   obtain ⟨ha0, ha1, ha2, ha3⟩ := Word.lt_cases_of_isU64 ha
   obtain ⟨hbb0, hbb1, hbb2, hbb3⟩ := Word.lt_cases_of_isU64 hb

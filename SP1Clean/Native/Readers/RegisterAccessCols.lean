@@ -2,14 +2,14 @@ import SP1Clean.FormalModel.Contracts.Readers
 import SP1Clean.Math.Word
 import SP1Clean.Model.ByteTable
 import SP1Clean.Model.Channels
-import SP1Clean.Extracted.RTypeReader
+import SP1Clean.Circuits.Types.RTypeReader
 import SP1Clean.Native.Readers.RegisterAccessTimestamp
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit
 import Clean.Circuit.Channel
 import Clean.Utils.Tactics.ProvableStructDeriving
 
-/-! # Native register-access reader — one operand's columns as composed Clean `FormalCircuit`s
+/-! # Native register-access reader — one operand's columns as composed Clean `FormalAssertion`s
 
 The per-operand register-access block that `Readers/RTypeReader.lean` composes **three times** (rs1
 read / rs2 read / rd write). Factoring it out is the idiomatic fix for the `circuit_proof_start`
@@ -18,7 +18,7 @@ normalize the whole nested struct in one shot (minutes, then a `whnf` timeout ev
 Composing small sub-circuits instead lets `circuit_norm` treat each as a black box — exactly how
 `Clean/Gadgets/Keccak/KeccakRound.lean` proves a 1288-column state with plain `circuit_proof_start`.
 
-The block is SP1's nested `RegisterAccessCols` (`Extracted/RTypeReader.lean`): a `prev_value : Word`
+The block is SP1's nested `RegisterAccessCols` (`Circuits/Types/RegisterAccess.lean`): a `prev_value : Word`
 plus an `access_timestamp : RegisterAccessTimestamp` of `{prev_low, diff_low_limb}`. The **nesting** is
 what defeated a single inline witness, so we mirror the nesting with **two composed sub-circuits**:
 
@@ -26,16 +26,16 @@ what defeated a single inline witness, so we mirror the nesting with **two compo
   tiny (2-column) inner block that carries SP1's two byte-bus timestamp checks
   (`crates/core/machine/src/air/memory.rs`) as **inline `ByteTable` lookups** (SP1's `send_byte` into
   the preprocessed `ByteChip`), both gated by `is_real`.
-- `RegisterAccessCols.circuit` (here) — witnesses the 4 `prev_value` columns and composes the
-  timestamp sub-circuit, returning the assembled `Extracted.RegisterAccessCols`. Because the timestamp
-  is a sub-circuit *output* (an opaque `varFromOffset`), no nested struct literal is ever witnessed, so
+- `RegisterAccessCols.circuit` (here) — a **zero-witness input-taker**: the chip threads the
+  `prev_value` + nested timestamp block in as the `cols` input, and this reader composes the
+  timestamp sub-circuit on it. No nested struct literal is ever witnessed here, so
   `circuit_norm` stays cheap.
 
 `clk_target` is the operand's access clock (`clk_low + 4/3/2` for op_a/op_b/op_c) — a cross-block
-input, like `RTypeReader`'s `clk_low`. The witnessed timestamp columns are computed from it
-(`prev_low := clk_target - 1`, `diff := 0`, so the scaled numerator is `0`), which is what makes
-completeness hold for every `clk_target`. The `.memory` interactions themselves are off-chip
-membership (their meaning is the trace-level memory bus, `Soundness/MemoryConsistency.lean`), so these
+input, like `RTypeReader`'s `clk_low`. The composing chip's witness closure computes the timestamp
+columns from it (`prev_low := clk_target - 1`, `diff := 0`, so the scaled numerator is `0`), which
+is what makes completeness hold for every `clk_target`. The `.memory` interactions themselves receive
+their cross-row meaning from timed typed-memory grounding, so these
 sub-circuits emit no lookup for them. -/
 
 namespace SP1Clean.Readers
@@ -47,11 +47,8 @@ variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
 
 namespace RegisterAccessCols
 
--- `local` so this convenience instance does not leak into importing files (see `RegisterAccessTimestamp`).
-local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
-
 /-- Witness the 4 `prev_value` columns (`0`) and compose the timestamp sub-circuit, returning the
-assembled `Extracted.RegisterAccessCols`. **SP1's register-access read range-checks no `prev_value`**
+assembled `Circuits.Types.RegisterAccessCols`. **SP1's register-access read range-checks no `prev_value`**
 (`crates/core/machine/src/air/memory.rs:122-166`: it only sends/receives the Memory interactions and the
 timestamp check) — the operand's `isU64` is a *received* fact from the writer (the offline-memory balance),
 not a local check here, so this reader imposes none. The only byte-bus checks are the two timestamp checks
@@ -66,20 +63,17 @@ def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) Unit := do
 instance elaborated : ElaboratedCircuit (ZMod p) Inputs unit main where
   localLength _ := 0
   output _ _ := ()
-  -- the composed timestamp sub-assertion's two checks are gated receives (mult `-is_real`):
-  -- `byteChannel` is in BOTH the guarantee and the requirement list.
+  -- the composed timestamp sub-assertion's two checks are gated receives (mult `-is_real`): their
+  -- `byteChannel` *guarantee* propagates up here (the *requirement* is discharged inside the sub — W11
+  -- Phase 0c — so `byteChannel` is dropped from `channelsWithRequirements` below).
   channelsWithGuarantees := [byteChannel.toRaw]
-  channelsWithRequirements := [byteChannel.toRaw]
 
--- Expose the declared channel lists + `localLength` as `@[circuit_norm]` rfl-lemmas so the composing
+-- Expose the declared channel list + `localLength` as `@[circuit_norm]` rfl-lemmas so the composing
 -- `RTypeReader`'s `channelsLawful` / `circuit_proof_start` is discharged automatically.
+-- (`channelsWithRequirements` now lives on `circuit` below; Clean's generic def-lemma reduces it.)
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma channelsWithGuarantees_eq :
     ((elaborated (p := p)).channelsWithGuarantees
-      : List (RawChannel (ZMod p))) = [byteChannel.toRaw] := rfl
-set_option linter.unusedSectionVars false in
-@[circuit_norm] lemma channelsWithRequirements_eq :
-    ((elaborated (p := p)).channelsWithRequirements
       : List (RawChannel (ZMod p))) = [byteChannel.toRaw] := rfl
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma localLength_eq (x : Var Inputs (ZMod p)) :
@@ -104,9 +98,13 @@ theorem completeness : FormalAssertion.Completeness (ZMod p) main Assumptions Sp
 /-- The outer register-access reader as a Clean `FormalAssertion`: takes the chip-owned `cols` block plus
 `is_real`/`clk_target`, composes the timestamp sub-assertion, with `Spec` the propagated byte bounds. -/
 def circuit : FormalAssertion (ZMod p) Inputs :=
+  -- `byteChannel` dropped (W11 Phase 0c): the composed `RegisterAccessTimestamp` sub-assertion now
+  -- discharges its own off-gate byte-pull `Requirements` (inline `is_real` gate), so it contributes no
+  -- `byteChannel` requirement here; only its `byteChannel` *guarantee* still propagates up.
   { main, elaborated,
     Assumptions := Assumptions, Spec := Spec,
-    soundness := soundness, completeness := completeness }
+    soundness := soundness, completeness := completeness,
+    channelsWithRequirements := [] }
 
 set_option linter.unusedSectionVars false in
 @[circuit_norm] lemma circuit_localLength (x : Var Inputs (ZMod p)) :

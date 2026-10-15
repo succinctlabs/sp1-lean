@@ -1,0 +1,85 @@
+name: Sail Model Regeneration
+
+# The in-tree `LeanRV64D/` library is GENERATED: the pinned rems-project/sail compiler run over the
+# pinned riscv/sail-riscv sources with the checked-in SP1 platform config. This workflow is the
+# machine check that the committed tree is exactly that generator output — it rebuilds the model
+# from the pins in `scripts/provenance.json` and fails on any byte difference,
+# so regeneration is idempotent and hand edits cannot hide in the generated tree.
+#
+# Steps mirror the script's modes: `--deps` (the OCaml switch and the Sail compiler, cached by
+# toolchain pins; measured 6.5 minutes cold on ubuntu-latest, seconds warm), `--make-config` (the
+# committed config must be base ⊕ overlay for the pinned sail-riscv), `--sp1` (identity against the
+# pinned SP1 snapshot, the gate; ~16 minutes), and `--stock` (identity against the opencompl base,
+# which documents that the SP1 config is the only difference; ~12 minutes). Whole job: ~36 minutes
+# cold, ~30 warm.
+#
+# Runs on demand, monthly, and on pull requests that touch the generator, its config, the generated
+# tree itself, the manifest (a lean-sail re-pin), or this file.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "41 4 1 * *"
+  pull_request:
+    paths:
+      - "scripts/sail-config/**"
+      - "scripts/provenance.json"
+      - "LeanRV64D/**"
+      - "LeanRV64D.lean"
+      - "lake-manifest.json"
+      - ".github/workflows/sail-regen.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    env:
+      SAIL_GEN_DIR: ${{ github.workspace }}/.sail-gen
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read the toolchain provenance
+        id: pins
+        run: |
+          python3 - <<'PY'
+          import json, os
+          sail = json.load(open('scripts/provenance.json'))['sail']
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
+              print('SAIL_SHA=' + sail['compilerRevision'], file=out)
+              print('OCAML_VERSION=' + sail['ocamlVersion'], file=out)
+          PY
+
+      - name: System packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y opam cmake z3 libgmp-dev pkg-config zlib1g-dev m4
+
+      - name: Restore the Sail toolchain (opam root with the built compiler)
+        id: sail-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.opam
+          key: sail-toolchain-${{ runner.os }}-ocaml${{ steps.pins.outputs.OCAML_VERSION }}-${{ steps.pins.outputs.SAIL_SHA }}
+
+      - name: Initialise opam (cold cache only)
+        if: steps.sail-cache.outputs.cache-hit != 'true'
+        run: opam init --bare --disable-sandboxing --no-setup --yes
+
+      - name: Build the pinned Sail compiler (cold cache only)
+        if: steps.sail-cache.outputs.cache-hit != 'true'
+        run: scripts/sail-config/generate_lean_rv64d.sh --deps
+
+      - name: The committed config is base ⊕ overlay for the pinned sail-riscv
+        run: |
+          scripts/sail-config/generate_lean_rv64d.sh --make-config
+          git diff --exit-code -- scripts/sail-config/sp1_rv64d_cfg.json
+
+      - name: Regenerate with the SP1 config and compare with the in-tree copy (the idempotence gate)
+        run: scripts/sail-config/generate_lean_rv64d.sh --sp1
+
+      - name: Regenerate with the stock config and compare with the opencompl base
+        run: scripts/sail-config/generate_lean_rv64d.sh --stock

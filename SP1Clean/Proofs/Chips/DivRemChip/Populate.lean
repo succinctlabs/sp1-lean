@@ -1,10 +1,10 @@
 import SP1Clean.Math.Word
-import SP1Clean.Native.Operations.U16MSBOperation.Populate
-import SP1Clean.Native.Operations.U16CompareOperation.Populate
-import SP1Clean.Native.Operations.MulOperation.Populate
-import SP1Clean.Native.Operations.IsZeroWordOperation.Populate
-import SP1Clean.Native.Operations.IsEqualWordOperation.Populate
-import SP1Clean.Native.Operations.LtOperationUnsigned.Populate
+import SP1Clean.Circuits.Gadgets.U16MSB
+import SP1Clean.Circuits.Gadgets.U16Compare
+import SP1Clean.Circuits.Gadgets.Mul.Witness
+import SP1Clean.Circuits.Gadgets.IsZeroWord
+import SP1Clean.Circuits.Gadgets.IsEqualWord
+import SP1Clean.Circuits.Gadgets.LtUnsigned
 import SP1Clean.Native.Operations.AddOperation.Populate
 
 /-! # `DivRemChip` — native witness generation (`populate`)
@@ -12,11 +12,9 @@ import SP1Clean.Native.Operations.AddOperation.Populate
 SP1's `DivRemChip::generate_trace_into` (`alu/divrem/mod.rs:231-570`) ported to Lean: the honest
 witness assignments for every committed column block, each a **pure function of the raw register
 reads** `B`/`C` (`adapter.op_b/c_memory.prev_value`) and the eight variant flags `f` (plus the
-`is_real` input `ir` where SP1 gates the populate on a real event). The flags are **not** computable
-from the row inputs — the prover supplies them via the `"div_rem_flags"` `ProverHint` key, one-hot
-`[div, divu, rem, remu, divw, remw, divuw, remuw]` on real rows; the key's **absence defaults to the
-padding template** `is_divu = 1` (SP1's padded rows are "0 divided by 1": `is_divu = 1`,
-`op_c read = Word(1)`, everything live derived from that — `mod.rs:549-569`).
+`is_real` input `ir` where SP1 gates the populate on a real event). Seven selectors are explicit circuit inputs. `selectorFlags` inserts the derived DIVU
+selector as their complement; zero selector inputs choose DIVU. Padding uses SP1's
+"0 divided by 1" template: DIVU selected and the `op_c` read equal to `Word(1)`.
 
 The division core `quotBits`/`remBits` is the `BitVec` port of the executor's
 `get_quotient_and_remainder` (`executor/src/utils.rs:73-93`): divisor-zero branched **first**
@@ -38,14 +36,28 @@ open Circuit
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
 
-local instance : Fact (2 ^ 17 < p) := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
 local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 24 < p); omega⟩
 
-/-- The eight honest variant flags `[div, divu, rem, remu, divw, remw, divuw, remuw]` from the
-`"div_rem_flags"` hint key. Falls back to the **padding template** `is_divu = 1` when the key is
-absent (SP1's padded rows are `0 / 1` `DIVU` rows, not all-zero — `mod.rs:560-568`). -/
-def hintFlags (h : ProverHint (ZMod p)) : Vector (ZMod p) 8 :=
-  ((h "div_rem_flags" 8)[0]?).getD #v[0, 1, 0, 0, 0, 0, 0, 0]
+/-- The eight variant selectors, deriving DIVU as the complement of the other seven.
+Zero selector inputs encode DIVU, including SP1's padding template. -/
+def selectorFlags (g : Vector (ZMod p) 7) : Vector (ZMod p) 8 :=
+  #v[g[0], 1 - (g[0] + g[1] + g[2] + g[3] + g[4] + g[5] + g[6]),
+     g[1], g[2], g[3], g[4], g[5], g[6]]
+
+omit [Fact (2 ^ 24 < p)] in
+/-- The selector sum is one for arbitrary inputs, including malformed selectors. -/
+@[simp] theorem selectorFlags_sum_eq_one (g : Vector (ZMod p) 7) :
+    (selectorFlags g)[0] + (selectorFlags g)[1] + (selectorFlags g)[2] + (selectorFlags g)[3] +
+      (selectorFlags g)[4] + (selectorFlags g)[5] + (selectorFlags g)[6] + (selectorFlags g)[7] = 1 := by
+  simp only [selectorFlags, Vector.getElem_mk, List.getElem_toArray, List.getElem_cons_zero,
+    List.getElem_cons_succ]
+  ring
+
+omit [Fact (2 ^ 24 < p)] in
+/-- Zero selector inputs select DIVU. -/
+theorem selectorFlags_zero :
+    selectorFlags (p := p) #v[0, 0, 0, 0, 0, 0, 0] = #v[0, 1, 0, 0, 0, 0, 0, 0] := by
+  simp [selectorFlags]
 
 /-- The four base-2^16 limbs of a `ℕ` (the u64 bit pattern → committed word). -/
 def wordOfNat (n : ℕ) : Word (ZMod p) :=
@@ -192,7 +204,7 @@ def populateRemNeg (B C : Word (ZMod p)) (f : Vector (ZMod p) 8) : ZMod p :=
 /-- The `is_overflow_b` struct: populated on real rows only (zero on padding), with the
 word-truncated form `(b as u32, i32::MIN)` on the W-variants and `(b, i64::MIN)` otherwise. -/
 def ovbWitness (ir : ZMod p) (B : Word (ZMod p)) (f : Vector (ZMod p) 8) :
-    Extracted.IsEqualWordOperation (ZMod p) :=
+    Circuits.Types.IsEqualWordOperation (ZMod p) :=
   if ir = 1 then
     if f[4] + f[5] + f[6] + f[7] = 1 then
       IsEqualWordOperation.populate #v[B[0], B[1], 0, 0] #v[0, 32768, 0, 0]
@@ -201,7 +213,7 @@ def ovbWitness (ir : ZMod p) (B : Word (ZMod p)) (f : Vector (ZMod p) 8) :
 
 /-- The `is_overflow_c` struct: `(c as u32, -1i32)` on the W-variants, `(c, -1i64)` otherwise. -/
 def ovcWitness (ir : ZMod p) (C : Word (ZMod p)) (f : Vector (ZMod p) 8) :
-    Extracted.IsEqualWordOperation (ZMod p) :=
+    Circuits.Types.IsEqualWordOperation (ZMod p) :=
   if ir = 1 then
     if f[4] + f[5] + f[6] + f[7] = 1 then
       IsEqualWordOperation.populate #v[C[0], C[1], 0, 0] #v[65535, 65535, 0, 0]
@@ -247,7 +259,7 @@ def populateMaxAbsCOr1 (C : Word (ZMod p)) (f : Vector (ZMod p) 8) : Word (ZMod 
 /-- The `is_c_0` struct, populated **ungated** on the computational `c` (SP1 calls
 `is_c_0.populate` on padding rows too — `mod.rs:568`). -/
 def isC0Witness (C : Word (ZMod p)) (f : Vector (ZMod p) 8) :
-    Extracted.IsZeroWordOperation (ZMod p) :=
+    Circuits.Types.IsZeroWordOperation (ZMod p) :=
   IsZeroWordOperation.populate (cComp C f)
 
 /-- The `remainder_check_multiplicity = is_real · (1 − is_c_0.result)` gate cell. -/
@@ -261,7 +273,7 @@ def ltGate (ir : ZMod p) (C : Word (ZMod p)) (f : Vector (ZMod p) 8) : ZMod p :=
 `MulOperation.populate 0 (1,0,0,0)` would fill `c_lower_byte[0] = 1`, which SP1's padding does
 not). -/
 def populateMulLower (ir : ZMod p) (B C : Word (ZMod p)) (f : Vector (ZMod p) 8) :
-    Extracted.MulOperation (ZMod p) :=
+    Circuits.Types.MulOperation (ZMod p) :=
   if ir = 1 then MulOperation.populate (populateQuotComp B C f) (cComp C f) 0 0 0
   else MulOperation.zeroCols
 
@@ -269,7 +281,7 @@ def populateMulLower (ir : ZMod p) (B C : Word (ZMod p)) (f : Vector (ZMod p) 8)
 the signed pair, unsigned otherwise); the W-variants leave it all-zero (SP1 `mod.rs:484-503` — the
 upper Mul's multiplicity is `is_real_not_word`). -/
 def populateMulUpper (ir : ZMod p) (B C : Word (ZMod p)) (f : Vector (ZMod p) 8) :
-    Extracted.MulOperation (ZMod p) :=
+    Circuits.Types.MulOperation (ZMod p) :=
   if ir = 1 ∧ f[0] + f[1] + f[2] + f[3] = 1 then
     MulOperation.populate (populateQuotComp B C f) (cComp C f) (f[0] + f[2]) 0 0
   else MulOperation.zeroCols

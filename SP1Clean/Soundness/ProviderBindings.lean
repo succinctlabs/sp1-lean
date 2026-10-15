@@ -1,0 +1,400 @@
+import SP1Clean.Soundness.SP1Ensemble
+import SP1Clean.Soundness.TypedInteractions
+import SP1Clean.Soundness.TypedState
+import SP1Clean.Model.Semantics.Truth
+import SP1Clean.FormalModel.Execution
+
+/-! # Semantic bindings for preprocessed and boundary tables
+
+Clean channel balance proves that consumers match some provider contribution; it does not prove that
+the provider is the committed program or the selected initial machine state.  These predicates state
+that companion boundary honestly.  They are deliberately separate from raw AIR satisfaction and do
+not contain an execution trajectory.
+-/
+
+open LeanRV64D.Defs
+
+namespace SP1Clean.Soundness
+
+open Air.Flat Circuit
+open SP1Clean.Channels
+open SP1Clean.Semantics
+open SP1Clean.Soundness.Target
+open SP1Clean.Execution
+
+variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 24 < p)]
+
+/-- The provider-table indices in the stable 25-chip + 30-provider witness layout. -/
+def programProviderIndex : ℕ :=
+  instructionTableCount + byteProviderTableCount + rangeProviderTableCount
+def memoryInitProviderIndex : ℕ := programProviderIndex + 1
+def memoryFinalizeProviderIndex : ℕ := programProviderIndex + 2
+
+/-- The fixed SP1 ensemble layout always contains its Program-provider table. -/
+theorem programProviderIndex_lt_tablesLength
+    (witness : EnsembleWitness (sp1Ensemble (p := p))) :
+    programProviderIndex < witness.tables.length := by
+  rw [← witness.same_length]
+  simp [programProviderIndex, instructionTableCount, byteProviderTableCount,
+    rangeProviderTableCount, sp1Ensemble_tables, sp1Tables_length,
+    sp1ProviderTables_length]
+
+/-- The fixed SP1 ensemble layout always contains its Memory-init provider table. -/
+theorem memoryInitProviderIndex_lt_tablesLength
+    (witness : EnsembleWitness (sp1Ensemble (p := p))) :
+    memoryInitProviderIndex < witness.tables.length := by
+  rw [← witness.same_length]
+  simp [memoryInitProviderIndex, programProviderIndex, instructionTableCount,
+    byteProviderTableCount, rangeProviderTableCount, sp1Ensemble_tables, sp1Tables_length,
+    sp1ProviderTables_length]
+
+/-- The physical Program-provider table selected by the stable ensemble layout. -/
+noncomputable def programProviderTable
+    (witness : EnsembleWitness (sp1Ensemble (p := p))) : Table (ZMod p) :=
+  witness.tables[programProviderIndex]'(programProviderIndex_lt_tablesLength witness)
+
+/-- Optional indexing recovers the canonical Program-provider table. -/
+theorem programProviderTable_getElem?
+    (witness : EnsembleWitness (sp1Ensemble (p := p))) :
+    witness.tables[programProviderIndex]? = some (programProviderTable witness) := by
+  rw [List.getElem?_eq_getElem (programProviderIndex_lt_tablesLength witness)]
+  rfl
+
+/-- The physical Memory-init provider table selected by the stable ensemble layout. -/
+noncomputable def memoryInitProviderTable
+    (witness : EnsembleWitness (sp1Ensemble (p := p))) : Table (ZMod p) :=
+  witness.tables[memoryInitProviderIndex]'(memoryInitProviderIndex_lt_tablesLength witness)
+
+/-- Optional indexing recovers the canonical Memory-init provider table. -/
+theorem memoryInitProviderTable_getElem?
+    (witness : EnsembleWitness (sp1Ensemble (p := p))) :
+    witness.tables[memoryInitProviderIndex]? = some (memoryInitProviderTable witness) := by
+  rw [List.getElem?_eq_getElem (memoryInitProviderIndex_lt_tablesLength witness)]
+  rfl
+
+/-- The stable Memory-init witness position is the range-checking push circuit. -/
+theorem memoryInitProviderTable_component
+    (witness : EnsembleWitness (sp1Ensemble (p := p))) :
+    (memoryInitProviderTable witness).component = { circuit := MemoryProviderChip.circuit } := by
+  unfold memoryInitProviderTable
+  have aligned := witness.same_circuits memoryInitProviderIndex (by
+    simp [memoryInitProviderIndex, programProviderIndex, instructionTableCount,
+      byteProviderTableCount, rangeProviderTableCount, sp1Ensemble_tables,
+      sp1Tables_length, sp1ProviderTables_length])
+  exact aligned.symm.trans (by rfl)
+
+/-- The Memory-init circuit's own constraints prove every active push's channel requirement. -/
+theorem memoryInitProviderTable_requirements
+    (witness : EnsembleWitness (sp1Ensemble (p := p)))
+    (constraints : witness.Constraints) :
+    (memoryInitProviderTable witness).ChannelRequirements witness.data memoryChannel.toRaw := by
+  let table := memoryInitProviderTable witness
+  apply table.channelRequirements_of_requirements
+  intro row rowMem
+  exact (Component.weakSoundness_of_no_guarantees table.component
+    (by rw [show table.component = { circuit := MemoryProviderChip.circuit } from
+      memoryInitProviderTable_component witness]; rfl)
+    (by rw [show table.component = { circuit := MemoryProviderChip.circuit } from
+      memoryInitProviderTable_component witness]; trivial)
+    (constraints table (List.getElem_mem (memoryInitProviderIndex_lt_tablesLength witness)) row rowMem)).2
+
+/-- The fixed SP1 ensemble layout always contains its Memory-finalize provider table. -/
+theorem memoryFinalizeProviderIndex_lt_tablesLength
+    (witness : EnsembleWitness (sp1Ensemble (p := p))) :
+    memoryFinalizeProviderIndex < witness.tables.length := by
+  rw [← witness.same_length]
+  simp [memoryFinalizeProviderIndex, programProviderIndex, instructionTableCount,
+    byteProviderTableCount, rangeProviderTableCount, sp1Ensemble_tables, sp1Tables_length,
+    sp1ProviderTables_length]
+
+/-- The physical Memory-finalize provider table selected by the stable ensemble layout. -/
+noncomputable def memoryFinalizeProviderTable
+    (witness : EnsembleWitness (sp1Ensemble (p := p))) : Table (ZMod p) :=
+  witness.tables[memoryFinalizeProviderIndex]'(memoryFinalizeProviderIndex_lt_tablesLength witness)
+
+/-- Optional indexing recovers the canonical Memory-finalize provider table. -/
+theorem memoryFinalizeProviderTable_getElem?
+    (witness : EnsembleWitness (sp1Ensemble (p := p))) :
+    witness.tables[memoryFinalizeProviderIndex]? = some (memoryFinalizeProviderTable witness) := by
+  rw [List.getElem?_eq_getElem (memoryFinalizeProviderIndex_lt_tablesLength witness)]
+  rfl
+
+/-- The stable Memory-finalize witness position is the boundary pull circuit. -/
+theorem memoryFinalizeProviderTable_component
+    (witness : EnsembleWitness (sp1Ensemble (p := p))) :
+    (memoryFinalizeProviderTable witness).component = { circuit := MemoryFinalizeChip.circuit } := by
+  unfold memoryFinalizeProviderTable
+  have aligned := witness.same_circuits memoryFinalizeProviderIndex (by
+    simp [memoryFinalizeProviderIndex, programProviderIndex, instructionTableCount,
+      byteProviderTableCount, rangeProviderTableCount, sp1Ensemble_tables,
+      sp1Tables_length, sp1ProviderTables_length])
+  exact aligned.symm.trans (by rfl)
+
+/-- **The pull-side boundary fact.** The Memory-finalize circuit is the flipped bus's **pull** side:
+`channelsWithRequirements = []`, so it owes no channel requirement in-circuit — a pull *receives* the
+`MemoryMsg.isU64` guarantee (via bus balance against the chips' final pushes) rather than proving it.
+Its `ChannelRequirements memoryChannel.toRaw` therefore holds vacuously, through
+`Table.requirements_of_not_mem_of_constraints`.  This is the pull-side analogue of
+`memoryInitProviderTable_requirements`: it gives the finalize frontier's pulls (the `finM` side of the
+per-`MemLoc` balance) the same `ChannelRequirements` shape the init pushes carry, so the memory-bus
+balance can consume both boundary tables uniformly. -/
+theorem memoryFinalizeProviderTable_requirements
+    (witness : EnsembleWitness (sp1Ensemble (p := p)))
+    (constraints : witness.Constraints) :
+    (memoryFinalizeProviderTable witness).ChannelRequirements witness.data memoryChannel.toRaw := by
+  have tableConstraints : (memoryFinalizeProviderTable witness).Constraints witness.data :=
+    constraints (memoryFinalizeProviderTable witness)
+      (List.getElem_mem (memoryFinalizeProviderIndex_lt_tablesLength witness))
+  refine (memoryFinalizeProviderTable witness).requirements_of_not_mem_of_constraints
+    witness.data tableConstraints ?_
+  rw [Table.channelsWithRequirements, memoryFinalizeProviderTable_component witness]
+  simp [MemoryFinalizeChip.circuit]
+
+/-- Every active Program-provider contribution belongs to the statement's authenticated program:
+a decoded instruction or a transpiled ECALL site. Zero-multiplicity padding imposes no semantic
+condition. Authentication is an external verifying-key contract; canonical physical table data
+only supplies the circuit evaluation environment. -/
+noncomputable def ProgramProviderBound (program : GuestProgram)
+    (witness : EnsembleWitness (sp1Ensemble (p := p))) : Prop :=
+  ∀ interaction,
+    ∀ member : interaction ∈
+      (programProviderTable witness).interactionsWith witness.data programChannel.toRaw,
+    interaction.mult ≠ 0 →
+      Semantics.CommittedProgTruth (TypedInteraction.message
+        { raw := interaction
+          channel_eq := (programProviderTable witness).channel_eq_of_mem_interactionsWith member })
+        program
+
+/-- One active memory-init contribution names the true initial content of its register or aligned
+64-bit RAM cell, at a timestamp no later than the shard's initial State boundary. -/
+def MemoryInitMessageBound (initial : SailState) (initialClock : ℕ)
+    (message : MemoryMsg (ZMod p)) : Prop :=
+  locContent initial (MemoryMsg.locOf message) = some (Word.toBitVec64 message.value) ∧
+    MemoryMsg.timeNat message ≤ initialClock
+
+/-- Every active Memory-init contribution is grounded in the selected local initial state.  Finalizer
+rows are intentionally absent: their values are derived from the ordered memory frontier and balance. -/
+noncomputable def MemoryInitProviderBound
+    (witness : EnsembleWitness (sp1Ensemble (p := p)))
+    (initial : SailState) (initialClock : ℕ) : Prop :=
+  ∀ interaction,
+    ∀ member : interaction ∈
+      (memoryInitProviderTable witness).interactionsWith witness.data memoryChannel.toRaw,
+    interaction.mult ≠ 0 →
+      MemoryInitMessageBound initial initialClock
+        (TypedInteraction.message
+          { raw := interaction
+            channel_eq := (memoryInitProviderTable witness).channel_eq_of_mem_interactionsWith member })
+
+/-- At most one active Memory-init contribution per register or aligned 64-bit RAM cell.  Clean
+channel balance alone cannot force this: two genesis records at one location would let a later pull
+match a stale genesis twin instead of the live frontier record, so per-location uniqueness is part of
+the honest non-execution companion relation the timed grounding engine consumes.  Upstream the
+mechanism is the MemoryGlobal control chain: each row receives/sends an indexed control message,
+asserts `prev_addr < addr` via `LtOperationUnsigned` on comparison rows, and the chain endpoints
+are anchored by the PublicValues table (`previous_init_addr`/`last_init_addr`) — strictly
+increasing exact addresses give per-address uniqueness (the septic-curve Global chip realizes the
+cross-shard bus, idealized here as exact balance).  Note the granularity gap for the eventual
+discharge: this premise is per `locOf` (8-byte RAM cell), while the upstream chain orders exact
+byte addresses with no alignment constraint — closing it needs an alignment/consumability
+argument or a per-address restatement.  Bound here as a named boundary fact, to be discharged by
+the extracted-AIR layer rather than re-derived from the per-row `WordRangeCheck` constraints
+(which cannot see across rows). -/
+noncomputable def MemoryInitProviderUnique
+    (witness : EnsembleWitness (sp1Ensemble (p := p))) : Prop :=
+  (typedTableInteractionsWith (memoryInitProviderTable witness) witness.data memoryChannel).Pairwise
+    fun i₁ i₂ => signedVal i₁.mult ≠ 0 → signedVal i₂.mult ≠ 0 →
+      MemoryMsg.locOf i₁.message ≠ MemoryMsg.locOf i₂.message
+
+/-- **The finalize-provider per-location uniqueness fact** (mirror of `MemoryInitProviderUnique`).  At
+most one active finalize pull per register or aligned 64-bit RAM cell.  Like the init uniqueness, Clean
+channel balance alone cannot force this, so it is an honest boundary companion fact — discharged by the
+extracted-AIR layer, and (like the init one, since 2026-07-20) a field of `InitialBoundaryFacts`. -/
+noncomputable def MemoryFinalizeProviderUnique
+    (witness : EnsembleWitness (sp1Ensemble (p := p))) : Prop :=
+  (typedTableInteractionsWith (memoryFinalizeProviderTable witness) witness.data memoryChannel).Pairwise
+    fun i₁ i₂ => signedVal i₁.mult ≠ 0 → signedVal i₂.mult ≠ 0 →
+      MemoryMsg.locOf i₁.message ≠ MemoryMsg.locOf i₂.message
+
+/-- Every exact active Memory-init push is locally true at the selected shard boundary. The value
+range comes from the provider circuit's proved requirement; only state content and initial timing
+come from `MemoryInitProviderBound`. -/
+theorem MemoryInitProviderBound.localMemTruth_of_mem_produced
+    (witness : EnsembleWitness (sp1Ensemble (p := p)))
+    (constraints : witness.Constraints) (initial : SailState) (initialClock : ℕ)
+    (bound : MemoryInitProviderBound witness initial initialClock)
+    (message : MemoryMsg (ZMod p))
+    (member : message ∈ producedMessages
+      (typedTableInteractionsWith (memoryInitProviderTable witness) witness.data memoryChannel)) :
+    LocalMemTruth initial initialClock message := by
+  have hp : 2 < p := by have := Fact.out (p := 2 ^ 24 < p); omega
+  have isU64 := guarantee_of_mem_producedTableMessages
+    (memoryInitProviderTable witness) witness.data memoryChannel hp
+    (memoryInitProviderTable_requirements witness constraints) message member
+  -- G1: the memory channel's `Guarantees` is now the pair `isU64 ∧ ClkBound`, and `LocalMemTruth`
+  -- consumes both — the value half is the provider's `WordRangeCheck`, the clock half its
+  -- `assertZero clk_low` gate.
+  change MemoryMsg.isU64 message ∧ Channels.MemoryMsg.ClkBound message at isU64
+  obtain ⟨isU64, clkBound⟩ := isU64
+  unfold producedMessages at member
+  obtain ⟨interaction, interactionMem, messageEq⟩ := List.mem_map.mp member
+  obtain ⟨typedMem, positive⟩ := List.mem_filter.mp interactionMem
+  simp only [decide_eq_true_eq] at positive
+  have rawMem : interaction.raw ∈
+      (memoryInitProviderTable witness).interactionsWith witness.data memoryChannel.toRaw := by
+    rw [← typedTableInteractionsWith_raw]
+    exact List.mem_map_of_mem typedMem
+  have multNonzero : interaction.raw.mult ≠ 0 := by
+    intro multZero
+    change signedVal interaction.raw.mult = 1 at positive
+    rw [multZero] at positive
+    simp [signedVal] at positive
+  let rebound : TypedInteraction memoryChannel :=
+    { raw := interaction.raw
+      channel_eq := (memoryInitProviderTable witness).channel_eq_of_mem_interactionsWith rawMem }
+  have semantic := bound interaction.raw rawMem multNonzero
+  change MemoryInitMessageBound initial initialClock rebound.message at semantic
+  have reboundEq : rebound = interaction := TypedInteraction.raw_injective rfl
+  rw [reboundEq, messageEq] at semantic
+  exact Semantics.localMemTruth_of_initial isU64 clkBound semantic.1 semantic.2
+
+/-- The genuinely-external application contracts of the semantic boundary: the provider-table
+semantics and per-location uniqueness facts that no native constraint proves (upstream discharges
+them through the verifying key's preprocessed commitment and its boundary mechanisms).  Everything
+else in the boundary premise is a commitment or start-state fact derivable from a configured,
+committed state; the audit rule (F2) is that these four fields stay visible in the final theorem
+type rather than being folded into derived structure. -/
+structure ProviderBindingContracts (program : GuestProgram)
+    (witness : EnsembleWitness (sp1Ensemble (p := p)))
+    (initial : SailState) (initialClock : ℕ) : Prop where
+  programProvider : ProgramProviderBound program witness
+  memoryProvider : MemoryInitProviderBound witness initial initialClock
+  memoryInitUnique : MemoryInitProviderUnique witness
+  memoryFinalizeUnique : MemoryFinalizeProviderUnique witness
+
+/-- Proof-only facts tying one selected initial Sail state to the public and provider boundary.
+This flat record is the proof-layer carrier consumed by the timed-grounding engine; the public
+premise is the regrouped `SemanticBoundaryBinding` below, and `semanticBoundaryBinding_iff`
+records their equivalence. -/
+structure InitialBoundaryFacts
+    (statement : ProgramStatement (SupportedCorePrefixPublicValues (ZMod p)))
+    (witness : EnsembleWitness (sp1Ensemble (p := p))) (initial : SailState) : Prop where
+  programWellFormed : statement.program.WellFormed
+  programEncodable : Commit.Encodable statement.program
+  initialPc : initial.regs.get? Register.PC = some
+    (supportedPcBits statement.publicValues.init_pc0
+      statement.publicValues.init_pc1 statement.publicValues.init_pc2)
+  romLoaded : RomLoaded statement.program initial
+  configured : SailConfigured initial
+  /-- Program-level compatibility needed only for the final refinement to an unmodified Sail chain.
+  SP1's trusted Program fetch is immutable and separate from mutable data Memory; see
+  `SailCodeMemoryCompatible`. -/
+  codeMemoryCompatible : SailCodeMemoryCompatible statement.program initial
+  programProvider : ProgramProviderBound statement.program witness
+  memoryProvider : MemoryInitProviderBound witness initial statement.initClkNat
+  memoryProviderUnique : MemoryInitProviderUnique witness
+  memoryFinalizeProviderUnique : MemoryFinalizeProviderUnique witness
+
+/-- The selected public boundary is exactly the initial truth needed by shard-local timed grounding.
+No boot or zero-register premise is introduced here. -/
+theorem InitialBoundaryFacts.localStateTruth
+    {statement : ProgramStatement (SupportedCorePrefixPublicValues (ZMod p))}
+    {witness : EnsembleWitness (sp1Ensemble (p := p))} {initial : SailState}
+    (boundary : InitialBoundaryFacts statement witness initial) :
+    LocalStateTruth statement.program initial statement.initClkNat
+      (initialBoundaryStateMessage statement.publicValues) := by
+  apply Semantics.localStateTruth_initial
+  · rfl
+  · simpa [initialBoundaryStateMessage, Semantics.StateMsg.pcBits,
+      Semantics.pcBits, supportedPcBits] using boundary.initialPc
+  · exact boundary.romLoaded
+  · exact boundary.configured
+
+/-- The non-execution companion relation required by supported-core AIR soundness: a well-formed,
+representable program, a shard start state, code/data compatibility, and the four external provider
+contracts. The statement supplies the program and initial clock; raw ensemble validity separately
+binds the witness's public input to this statement. -/
+def SemanticBoundaryBinding
+    (statement : ProgramStatement (SupportedCorePrefixPublicValues (ZMod p)))
+    (witness : EnsembleWitness (sp1Ensemble (p := p))) : Prop :=
+  ∃ initial,
+    statement.program.WellFormed ∧
+    Commit.Encodable statement.program ∧
+    ShardStartState statement initial ∧
+    SailCodeMemoryCompatible statement.program initial ∧
+    ProviderBindingContracts statement.program witness initial statement.initClkNat
+
+/-- Repackage the flat proof-layer record as the regrouped public binding. -/
+theorem InitialBoundaryFacts.binding
+    {statement : ProgramStatement (SupportedCorePrefixPublicValues (ZMod p))}
+    {witness : EnsembleWitness (sp1Ensemble (p := p))} {initial : SailState}
+    (boundary : InitialBoundaryFacts statement witness initial) :
+    SemanticBoundaryBinding statement witness :=
+  ⟨initial, boundary.programWellFormed, boundary.programEncodable,
+    ⟨boundary.initialPc, boundary.romLoaded, boundary.configured⟩,
+    boundary.codeMemoryCompatible,
+    ⟨boundary.programProvider, boundary.memoryProvider, boundary.memoryProviderUnique,
+      boundary.memoryFinalizeProviderUnique⟩⟩
+
+/-- Recover the flat proof-layer record from the regrouped public binding. -/
+theorem SemanticBoundaryBinding.boundaryFacts
+    {statement : ProgramStatement (SupportedCorePrefixPublicValues (ZMod p))}
+    {witness : EnsembleWitness (sp1Ensemble (p := p))}
+    (binding : SemanticBoundaryBinding statement witness) :
+    ∃ initial, InitialBoundaryFacts statement witness initial := by
+  obtain ⟨initial, wellFormed, encodable, start, codeMem, contracts⟩ := binding
+  exact ⟨initial,
+    { programWellFormed := wellFormed
+      programEncodable := encodable
+      initialPc := start.pc
+      romLoaded := start.romLoaded
+      configured := start.configured
+      codeMemoryCompatible := codeMem
+      programProvider := contracts.programProvider
+      memoryProvider := contracts.memoryProvider
+      memoryProviderUnique := contracts.memoryInitUnique
+      memoryFinalizeProviderUnique := contracts.memoryFinalizeUnique }⟩
+
+/-- The public binding and the flat proof-layer record carry exactly the same facts. -/
+theorem semanticBoundaryBinding_iff
+    (statement : ProgramStatement (SupportedCorePrefixPublicValues (ZMod p)))
+    (witness : EnsembleWitness (sp1Ensemble (p := p))) :
+    SemanticBoundaryBinding statement witness ↔
+      ∃ initial, InitialBoundaryFacts statement witness initial :=
+  ⟨SemanticBoundaryBinding.boundaryFacts, fun ⟨_, boundary⟩ => boundary.binding⟩
+
+/-! ## The boot boundary -/
+
+/-- **First-shard strengthening** of the flat boundary record: the selected initial state is a
+genuine boot state — `IsInitialState`, finally consuming the committed data image through its
+`imageLoaded` field, with SP1's zeroed integer register file — the committed initial clock is
+SP1's boot value `1`, and the public initial pc is the program entry point.
+
+Deliberately **additive** over `InitialBoundaryFacts`: `IsInitialState` pins the pc to
+`pc_start`, so this bundle is true only of a first shard; mid-run shards satisfy the base record
+with none of these fields, and the completeness constructor is untouched.  The redundancy is
+one-directional — `isInitial` + `entryPc` re-derive the base record's pc/ROM/configuration
+fields (`BootBoundaryFacts.shardStartState`); the base record is retained whole so every
+`InitialBoundaryFacts` consumer applies unchanged.
+
+Satisfiability status: the joint witness — `IsInitialState` over a program with real ROM and
+image content, together with `RegistersZero` — is `isInitialState_nonvacuous_loaded`
+(`FormalModel/Trace/Witness.lean`). -/
+structure BootBoundaryFacts
+    (statement : ProgramStatement (SupportedCorePrefixPublicValues (ZMod p)))
+    (witness : EnsembleWitness (sp1Ensemble (p := p))) (initial : SailState) : Prop where
+  base : InitialBoundaryFacts statement witness initial
+  isInitial : IsInitialState statement.program initial
+  registersZero : Machine.RegistersZero initial
+  clockOne : statement.initClkNat = 1
+  entryPc : statement.initPcBits = statement.program.pc_start
+
+/-- The boot state is in particular a valid shard start state. -/
+theorem BootBoundaryFacts.shardStartState
+    {statement : ProgramStatement (SupportedCorePrefixPublicValues (ZMod p))}
+    {witness : EnsembleWitness (sp1Ensemble (p := p))} {initial : SailState}
+    (boot : BootBoundaryFacts statement witness initial) :
+    ShardStartState statement initial :=
+  ShardStartState.of_isInitialState boot.isInitial boot.entryPc
+
+end SP1Clean.Soundness

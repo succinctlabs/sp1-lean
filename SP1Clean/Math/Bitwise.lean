@@ -1,7 +1,9 @@
-import SP1Clean.Math.Word
-import Clean.Utils.Bitwise
-import Clean.Utils.Field
-import Mathlib.Tactic.IntervalCases
+module
+
+public import SP1Clean.Math.Word
+public import Clean.Utils.Bitwise
+public import Clean.Utils.Field
+public import Mathlib.Tactic.IntervalCases
 
 /-! # Byte-level bitwise foundations
 
@@ -13,6 +15,8 @@ editing them does not re-elaborate the heavy `AddOperation` carry-chain proofs.
 eight per-byte equalities `r_k = byteOp op b_k c_k` to the 64-bit identity
 `toBitVec64 (reassembled r) = bitOp64 op (…b) (…c)` — the bitwise analog of
 `AddOperation`'s carry-chain reassembly. -/
+
+@[expose] public section
 
 namespace SP1Clean
 
@@ -41,11 +45,10 @@ lemma byteOp_lt256 (op a b : ℕ) (ha : a < 256) (hb : b < 256) :
   have ha8 : a < 2 ^ 8 := by omega
   have hb8 : b < 2 ^ 8 := by omega
   unfold byteOp
-  split
+  split_ifs
   · have := Nat.and_lt_two_pow (n := 8) a hb8; omega
-  · split
-    · have := Nat.or_lt_two_pow (n := 8) ha8 hb8; omega
-    · have := Nat.xor_lt_two_pow (n := 8) ha8 hb8; omega
+  · have := Nat.or_lt_two_pow (n := 8) ha8 hb8; omega
+  · have := Nat.xor_lt_two_pow (n := 8) ha8 hb8; omega
 
 /-- The byte op on `BitVec 64`, opcode-indexed to match `byteOp`. -/
 def bitOp64 (op : ℕ) (x y : BitVec 64) : BitVec 64 :=

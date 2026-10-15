@@ -2,9 +2,13 @@ import SP1Clean.FormalModel.Contracts.Chips
 import SP1Clean.Proofs.Operations.AddOperation.Formal
 import SP1Clean.Native.Readers.CPUState
 import SP1Clean.Native.Readers.ITypeReader
+-- for `eval_registerAccessCols`, a lemma about the shared `Circuits.Types.RegisterAccessCols` struct
+-- that happens to live in the R-type reader's namespace (cf. `AddiChip/Defs.lean`).
+import SP1Clean.Native.Readers.RTypeReader
+import SP1Clean.Native.Readers.RegisterWrite
 import SP1Clean.Model.Channels
 import SP1Clean.Model.ByteTable
-import SP1Clean.Extracted.JalrChip
+import ToClean.Circuit.WitnessCombinator
 import Clean.Circuit.Basic
 import Clean.Circuit.Subcircuit
 import Clean.Circuit.Channel
@@ -21,12 +25,9 @@ SP1's `Jalr` `air.rs:eval`. -/
 namespace SP1Clean.JalrChip
 
 open Circuit
-open Extracted (JalrColumns)
 open SP1Clean.Channels (stateChannel byteChannel memoryChannel programChannel)
 
 variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
-
-local instance : NeZero p := ⟨by have := Fact.out (p := 2 ^ 17 < p); omega⟩
 
 omit [Fact p.Prime] in
 /-- `14 < p`, so the alignment `Range` byte-row width column `14` round-trips through `byteRowSpec_range`. -/
@@ -51,49 +52,129 @@ def lsbBit (input : Inputs (ZMod p)) : ZMod p :=
   (((jumpTargetWord input)[0].val % 2 : ℕ) : ZMod p)
 
 /-- Witness the two add results (`add_operation.value` = `rs1 + imm`, `op_a_operation.value` = `pc + 4`)
-and the `lsb` scalar via `populate`, then compose as Clean `assertion`s. `CPUState` is fed the LSB-cleared
+and the `lsb` scalar via the witness IR, then compose as Clean `assertion`s. `CPUState` is fed the LSB-cleared
 `next_pc`; the link add's gate is `is_real - op_a_0`. -/
-def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var JalrColumns (ZMod p)) := do
-  let add_value ← witnessVector 4 (fun env =>
-    AddOperation.populate
-      #v[env input.adapter.op_b_memory.prev_value[0], env input.adapter.op_b_memory.prev_value[1],
-         env input.adapter.op_b_memory.prev_value[2], env input.adapter.op_b_memory.prev_value[3]]
-      #v[env input.adapter.op_c_imm[0], env input.adapter.op_c_imm[1],
-         env input.adapter.op_c_imm[2], env input.adapter.op_c_imm[3]])
-  let op_a_value ← witnessVector 4 (fun env =>
-    AddOperation.populate
-      #v[env input.state.pc[0], env input.state.pc[1], env input.state.pc[2], 0]
-      #v[4, 0, 0, 0])
-  let lsb ← witnessField (fun env => (((env add_value[0]).val % 2 : ℕ) : ZMod p))
+def main (input : Var Inputs (ZMod p)) : Circuit (ZMod p) (Var Columns (ZMod p)) := do
+  let add_value ← witnessVectorIR 4 (AddOperation.populateIR
+    input.adapter.op_b_memory.prev_value input.adapter.op_c_imm)
+  -- SP1 zero-fills padding and skips the link word for rd = x0.
+  let op_a_value ← witnessVectorIR 4 (AddOperation.populateIRGated
+    (1 - (input.is_real - input.adapter.op_a_0))
+    #v[input.state.pc[0], input.state.pc[1], input.state.pc[2], 0]
+    #v[4, 0, 0, 0])
+  -- The one witness here that reads an *earlier witnessed cell* rather than an input column:
+  -- `add_value[0]` sits below this offset, so honest witness generation still sees it.
+  let lsb ← witnessField ((add_value[0].val % 2).toField)
   let rs1WordV : Word (Expression (ZMod p)) :=
     #v[input.adapter.op_b_memory.prev_value[0], input.adapter.op_b_memory.prev_value[1],
        input.adapter.op_b_memory.prev_value[2], input.adapter.op_b_memory.prev_value[3]]
   let pcWordV : Word (Expression (ZMod p)) :=
     #v[input.state.pc[0], input.state.pc[1], input.state.pc[2], 0]
   lsb * (lsb - 1) === 0
-  assertion Readers.CPUState.circuit
+  let _ ← Readers.CPUState.circuit
     ⟨input.state, #v[add_value[0] - lsb, add_value[1], add_value[2]], 8, input.is_real⟩
   assertion AddOperation.circuit ⟨rs1WordV, input.adapter.op_c_imm, { value := add_value }, input.is_real⟩
   add_value[3] === 0
   assertion AddOperation.circuit
     ⟨pcWordV, #v[4, 0, 0, 0], { value := op_a_value }, input.is_real - input.adapter.op_a_0⟩
   op_a_value[3] === 0
-  assertion Readers.ITypeReader.circuit
+  -- `ITypeReader` is now a `GeneralFormalCircuit` (SC Phase 2pre) — composed via the GFC `CoeFun`
+  -- (`subcircuitWithAssertion`), discarding its `unit` output. Its `Spec` (Contracts) is unchanged.
+  let _ ← Readers.ITypeReader.circuit
     ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high,
      input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc, 47,
      op_a_value[0], op_a_value[1], op_a_value[2], op_a_value[3]⟩
+  -- Option B: the op_a (`rd`) write Memory **push** is composed here (factored OUT of the reader), *after*
+  -- the link `AddOperation`, so `isU64 op_a_value` (the link result / zeroing-gate range-check) discharges its
+  -- requirement. The write access clock is the recombined low clock `+ 4` (matching the reader).
+  assertion Readers.RegisterWrite.circuit
+    ⟨input.state.clk_high, input.state.clk_0_16 + input.state.clk_16_24 * 65536 + 4,
+     input.adapter.op_a, op_a_value, input.is_real⟩
   byteChannel.pullIf input.is_real
     (⟨6, ((add_value[0] - lsb) * (4 : ZMod p)⁻¹),
       Expression.const ((14 : ℕ) : ZMod p), 0⟩ : ByteRow (Expression (ZMod p)))
-  input.is_real * (input.is_real - 1) === 0
-  return ⟨input.state, input.adapter, input.is_real, ⟨add_value⟩, ⟨op_a_value⟩, lsb⟩
+  -- Pinned Rust: `when_not(is_real).assert_zero(op_a_0)`.
+  assertZero ((input.is_real - 1) * input.adapter.op_a_0)
+  assertZero (input.is_real * (input.is_real - 1))
+  return ⟨input.is_real, input.state, input.adapter, ⟨add_value⟩, ⟨op_a_value⟩, lsb⟩
 
-instance elaborated : ElaboratedCircuit (ZMod p) Inputs JalrColumns main where
-  channelsLawful := by simp [circuit_norm, main, AddOperation.circuit, Readers.CPUState.circuit, Readers.ITypeReader.circuit]
-  -- 2 × 4-limb add results + 1 lsb scalar.
-  localLength _ := 9
-  channelsWithGuarantees := [byteChannel.toRaw]
-  channelsWithRequirements :=
-    [byteChannel.toRaw, stateChannel.toRaw, memoryChannel.toRaw, programChannel.toRaw]
+/-- Derive the nine witness cells and the complete four-channel interface structurally from `main`. -/
+instance elaborated : ElaboratedCircuit (ZMod p) Inputs Columns main := by
+  elaborate_circuit
+
+/-- Folded completed-row layout used by the whole-chip Rust AIR codec. -/
+@[circuit_norm] lemma directOutput_eq
+    (input : Var Inputs (ZMod p)) (offset : ℕ) :
+    (elaborated (p := p)).output input offset =
+      (⟨input.is_real, input.state, input.adapter,
+        ⟨Vector.mapRange 4 fun i =>
+          var { index := offset + i }⟩,
+        ⟨Vector.mapRange 4 fun i =>
+          var { index := offset + 4 + i }⟩,
+        var { index := offset + 8 }⟩ :
+        Var Columns (ZMod p)) := rfl
+
+/-- Component-wise evaluation of the independent JALR input prefix. -/
+@[circuit_norm] theorem eval_inputs {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    Eval.eval env input =
+      ({ is_real := Eval.eval env input.is_real,
+         state := Eval.eval env input.state,
+         adapter := Eval.eval env input.adapter } :
+        Inputs F) := by
+  rw [ProvableStruct.eval_eq_eval]; rfl
+
+/-- Component-wise evaluation of the completed JALR row. -/
+@[circuit_norm] theorem eval_columns {F : Type} [FiniteField F]
+    (env : Environment F) (cols : Columns (Expression F)) :
+    Eval.eval env cols =
+      ({ is_real := Eval.eval env cols.is_real,
+         state := Eval.eval env cols.state,
+         adapter := Eval.eval env cols.adapter,
+         add_operation := Eval.eval env cols.add_operation,
+         op_a_operation := Eval.eval env cols.op_a_operation,
+         lsb := Eval.eval env cols.lsb } :
+        Columns F) := by
+  rw [ProvableStruct.eval_eq_eval]; rfl
+
+/-! ### Operand words, in `circuit_norm`'s own orientation
+
+Projection outside `eval`, inert right-hand side — the form `ComputableWitnesses` hands over; see
+`AddChip/Defs.lean` for the rationale. JALR mixes both styles: the jump target adds a register read
+to an immediate (I-type, like Addi), while the link value adds the program counter to a literal
+(like JAL). -/
+
+@[circuit_norm] theorem eval_rs1Prev {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    (ProvableStruct.eval env input).adapter.op_b_memory.prev_value
+      = Vector.map (Expression.eval env) input.adapter.op_b_memory.prev_value := by
+  rw [← ProvableStruct.eval_eq_eval]
+  simp only [eval_inputs, Readers.ITypeReader.eval_cols,
+    Readers.RTypeReader.eval_registerAccessCols]
+  exact ProvableType.eval_fields env _
+
+@[circuit_norm] theorem eval_opCImm {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    (ProvableStruct.eval env input).adapter.op_c_imm
+      = Vector.map (Expression.eval env) input.adapter.op_c_imm := by
+  rw [← ProvableStruct.eval_eq_eval]
+  simp only [eval_inputs, Readers.ITypeReader.eval_cols]
+  exact ProvableType.eval_fields env _
+
+@[circuit_norm] theorem eval_opA0 {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    (ProvableStruct.eval env input).adapter.op_a_0
+      = Expression.eval env input.adapter.op_a_0 := by
+  rw [← ProvableStruct.eval_eq_eval]
+  simp only [eval_inputs, Readers.ITypeReader.eval_cols]
+  exact ProvableType.eval_field env _
+
+@[circuit_norm] theorem eval_statePc {F : Type} [FiniteField F]
+    (env : Environment F) (input : Inputs (Expression F)) :
+    (ProvableStruct.eval env input).state.pc
+      = Vector.map (Expression.eval env) input.state.pc := by
+  rw [← ProvableStruct.eval_eq_eval]
+  simp only [eval_inputs, Readers.CPUState.eval_cols]
+  exact ProvableType.eval_fields env _
 
 end SP1Clean.JalrChip

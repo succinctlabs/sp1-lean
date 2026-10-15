@@ -1,151 +1,233 @@
 name = "sp1-clean-native"
-defaultTargets = ["SP1Clean"]
+# The default build is the CORE: strata 0–6 of `scripts/layering.txt` (the generic/semantic layers
+# and the chip circuits with their proofs), reached through the gated root index
+# `SP1Clean/Core.lean` (library `SP1Core`), plus the three upstream-destined libraries. The
+# SP1-alignment strata 7–11 are built through the umbrella `SP1Clean` by the full CI job
+# on every PR, main update and scheduled run. Measurement behind the split:
+# docs/agents/compile-profile-2026-09.md.
+defaultTargets = ["SP1Core", "ToClean", "ToMathlib", "ToPolyFun"]
 
-moreLeanArgs = ["--tstack=400000"]
+# `-j2`: two elaboration threads per `lean` process. Lake runs one `lean` per core (its pool is
+# `LEAN_NUM_THREADS`, default = cores) and each child would otherwise also take every core for
+# async proof elaboration — 16 threads on the 4-vCPU runner, which cost a third of the build's
+# CPU-seconds in contention (cold build 32.4 min at 4 × 4 vs 26.9 min at 3 × 2, 2026-09-21 matrix,
+# fork issue #39). Two threads keep most of the async benefit for a single heavy module built alone.
+moreLeanArgs = ["--tstack=400000", "-j2"]
+# `allowNonModules` is set per library below (the `SP1Clean/` and test trees are non-module until
+# their migration), not package-wide, so the three module-mode `To*` libraries are enforced.
 
-# `lake lint` driver — the project-local environment-linter pass (`scripts/sp1Lint.lean`). It runs a
-# curated subset of the Batteries `#lint` linters over the hand-written `SP1Clean.*` declarations only,
-# excluding the auto-generated `Extracted/`+`*Vectors` code. We use a thin custom driver (not the stock
-# `runLinter` exe) because `runLinter` scopes by namespace *root*, which cannot exclude `SP1Clean.Extracted`
-# while keeping `SP1Clean.Proofs`. Needs a built project first (env linters read oleans); run after `lake build`.
-lintDriver = "sp1Lint"
+# `lake lint` driver — Batteries' `runLinter` (what Mathlib, cslib and PolyFun use): every default
+# environment linter (`docBlame`, `defsWithUnderscore`, `unusedArguments`, `simpNF`, …) over the
+# declarations of the four hand-written roots. `lake lint` lints the full tree (the alignment
+# job); the core CI job also lints its index with
+# `lake exe runLinter --no-build SP1Clean.Core ToClean ToMathlib ToPolyFun`. `scripts/nolints.json`
+# is the burn-down list of known findings (`scripts/update_nolints.sh` regenerates it), every entry a
+# debt under AGENTS.md; a permanent exception is a `@[nolint …]` attribute at the site
+# with its reason, never an entry. Needs built oleans (`--no-build` refuses to build them; without
+# it `runLinter` builds what is missing).
+lintDriver = "batteries/runLinter"
+lintDriverArgs = ["SP1Clean", "ToClean", "ToMathlib", "ToPolyFun"]
 
-# `lake test` driver — builds/elaborates the top-level `SP1CleanTest` library (the witness- and
-# whole-trace conformance anchors). Those anchors are the project's ONLY `native_decide` (which trusts
-# the whole Lean compiler via `Lean.ofReduceBool`/`Lean.trustCompiler`), so they are quarantined in
-# this test library, OUT of the main `SP1Clean` library — kept `native_decide`-free by the
-# `scripts/check_no_native_decide.sh` source gate (the CI `guards` job + the audit). Run with `lake test`.
-testDriver = "SP1CleanTest"
+# `lake test` driver — builds the core test set (`SP1CoreTest`, below). The full `SP1CleanTest`
+# library (alignment-only anchors included) is built by the full CI job on every PR.
+testDriver = "SP1CoreTest"
 
-# Built-in options only — the Mathlib style linters are applied per-lib via `moreLeanArgs`
-# (see the pillar libraries below), NOT here at package scope: that keeps the auto-gen
-# `SP1Extracted` library cleanly out of the linter set. (Every hand-written pillar transitively
-# imports Mathlib, so the `-D linter.*` options register fine when applied per-lib.)
+# Package-wide options. Lake applies `buildType ++ package ++ library` (the library's win), records
+# them in every module's trace, and feeds them to the language server — editing a line here
+# rebuilds everything.
+#
+# Linters: Mathlib's standard syntactic set, on for the whole package.
+#  * `weak.` = ignore where the option is unregistered, i.e. in modules that never import Mathlib
+#    (the generated Sail model). No file-layout constraint follows from a weak option.
+#  * Generated modules (`SP1Clean/Extracted/`, the `*Vectors` test batteries) carry
+#    `set_option linter.all false`. Lean resolves an unset linter option as
+#    explicit value ⊳ `linter.all` ⊳ linter-set membership ⊳ default, so the set is off inside them
+#    without any per-library flags. An explicit `set_option linter.X` in a file still wins.
+#  * Enforcement is `lake build --wfail --iofail` in CI: a warning or a stray `info:` fails the build.
+# Opt-outs are measurements, not preferences; each names its count and has a docs/roadmap.md entry.
 [leanOptions]
 pp.unicode.fun = true
-synthInstance.maxHeartbeats = 1000000
+# No auto-bound implicits (Mathlib, Clean and PolyFun all set this); every binder is written. The
+# generated Sail model overrides both below. `synthInstance.maxHeartbeats` is the default: a
+# per-file probe of the whole tree (2026-09-21) found no instance search that needs more.
+autoImplicit = false
+relaxedAutoImplicit = false
+weak.linter.mathlibStandardSet = true
+# `style.admit` is not a member of the standard set; kept from the previous per-library flag set.
+weak.linter.style.admit = true
+# Temporary opt-outs, measured on the 2026-09-20 full build of every library (unique sites /
+# files). Every one is DEBT, not policy: the practices these linters enforce are adopted, the sites
+# are fixed while their owning modules migrate, and a line is deleted the
+# moment its count reaches 0. Do not add a line without a count.
+weak.linter.style.header = false               # ~950 files: no copyright headers in this tree; the
+                                               # upstream-destined files get Mathlib/Clean headers at PR time
+weak.linter.style.longLine = false             # 10 578 lines over 100 characters in 722 files
+weak.linter.style.show = false                 # 326 / 75: `show` used to change the goal form in proofs
+weak.linter.style.whitespace = false           # 218 / 10: missing/extra spaces around operators (172 in
+                                               # Native/Operations/MulOperation/RawSpec.lean)
+weak.linter.flexible = false                   # 191 / 64: non-terminal `simp` followed by goal-dependent tactics
+weak.linter.style.multiGoal = false            # 25 / 5: tactics run on several goals without focusing
+weak.linter.style.openClassical = false        # 21 / 21: file-level `open scoped Classical`
+weak.linter.style.emptyLine = false            # 15 / 5: blank lines inside `do` blocks / after docstrings
+weak.linter.unusedDecidableInType = false      # 10 / 5: `[Decidable …]` hypotheses unused in the statement
 
-# Public, non-fork dependencies, aligned on Lean 4.28 / Mathlib v4.28.0.
+# The language server sees the same linters (Lake feeds `leanOptions` to it, but `weak.`-prefixed
+# options are resolved by `lean` at file start; the non-weak mirror is what PolyFun ships).
+[moreServerOptions]
+linter.mathlibStandardSet = true
+
+# Every dependency is an immutable published pin, so a clean clone builds this project. Toolchain is
+# Lean v4.33.1 (see `lean-toolchain`); each pin below is at or compatible with it.
 [[require]]
 name = "mathlib"
 git = "https://github.com/leanprover-community/mathlib4"
-rev = "v4.28.0"
+rev = "v4.33.1"
 
-# Clean PR #398 head (fix-zero-multiplicity-channels): native gated channels.
-# Re-pin to main once the PR merges (roadmap W9).
+# Clean's built-in Rust export (upstream PR #446), ported to the installed module/toolchain
+# line, plus the canonical backend fix for public-only channels. These change existing
+# Component/Ensemble/Verifier declarations and cannot be supplied by an additive layer.
+# Additive adapters remain in ToClean. Return to upstream when it contains these changes
+# on a compatible toolchain; see docs/agents/clean-upstream.md and export campaign #28.
 [[require]]
 name = "Clean"
-git = "https://github.com/Verified-zkEVM/clean"
-rev = "292b9cc369be11baf816926a4bd5a697c01b1dcc"
+git = "https://github.com/dtumad/clean"
+rev = "c4abcbb9728e8e2805ffc0a383eba96422602c27"
 
+# lean-sail runtime: upstream release tag `v5` (`07946313`, the revision the in-tree generated
+# model pairs with — a v4-generated model against v5 fails with `unknown namespace
+# Sail.ConcurrencyInterfaceV2`) plus ONE line, the `open PreSail` disambiguation of
+# rems-project/lean-sail#14: Lean 4.33's `ambiguousOpen` linter warns on the original, Lake
+# replays a dependency's warnings on every build, and the build runs `--wfail`. TEMPORARY pin on
+# the fork branch `dtumad/lean-sail` `sp1-pin`; re-pin to the upstream merge commit when #14
+# merges (docs/agents/lean-sail-notes.md). The branch must stay reachable (see the PolyFun note).
 [[require]]
+name = "Sail"
+git = "https://github.com/dtumad/lean-sail"
+rev = "bde9ecc665b663bbdb29afb11fb6634870fdc7df"
+
+# PolyFun supplies the `DynSystem`/`Labeled`/`Prefix`/`ReachableIn` machine vocabulary. Lenses and
+# the broader extensible-machine theory are not used; circuit construction and bus proofs remain
+# independent. Pinned to `main` (upstream carries the v4.32.2 bump since PR #106) — not a side
+# branch and not a fork. NB: a rev must be reachable from a branch or tag — lake clones
+# `refs/heads/*` + tags and then checks out, so a commit that lives only on `refs/pull/*` fails with
+# `fatal: unable to read tree` on every machine that lacks a warm cache. That is exactly how the
+# previous pin (PR #34's head) broke.
+[[require]]
+name = "PolyFun"
+git = "https://github.com/Verified-zkEVM/PolyFun"
+rev = "997828ce4c04ccdc01f5f199069e26a6195ef6e7"
+
+# ---- Libraries ---------------------------------------------------------------------------------
+# Ownership (Lake `Package.findModule?` = `leanLibs.findSomeRev?`): a module belongs to the LAST
+# declared library that matches it, and a library without globs matches every module under its
+# root (`isBuildableModule`). No library carries options of its own except the two noted below, so
+# ownership only decides which (identical) configuration a module is built with.
+
+# Upstream-destined libraries, at the BOTTOM of the import DAG: `ToMathlib` imports only Mathlib;
+# `ToPolyFun` imports only PolyFun; `ToClean` imports Clean (and may import the other two, since
+# Clean plans to import PolyFun). NONE may import `SP1Clean` — that is what keeps them genuinely
+# contributable and makes the terminal step of an accepted upstream PR a plain deletion plus a
+# repoint of the importers. Root indices `ToMathlib.lean`/`ToPolyFun.lean`/`ToClean.lean` are
+# hand-maintained (this project has no `mk_all`) and gated by `scripts/check_root_index.sh`.
+# All three are module-system libraries, each file in its upstream's header idiom (`module` /
+# `public import` / `public section` for Mathlib-bound theorem files, `@[expose] public section`
+# for PolyFun- and Clean-bound definitions, `public meta section` for tactic/simproc files), so
+# acceptance upstream is a copy; `requiresModuleSystem` makes a non-module file here a warning,
+# and `--wfail` a failure.
+[[lean_lib]]
+name = "ToMathlib"
+requiresModuleSystem = true
+
+[[lean_lib]]
+name = "ToPolyFun"
+requiresModuleSystem = true
+
+[[lean_lib]]
+name = "ToClean"
+requiresModuleSystem = true
+
+# The Sail RV64 model, GENERATED and never hand-edited: the pinned rems-project/sail compiler run
+# over the pinned riscv/sail-riscv sources with the SP1 platform config
+# `scripts/sail-config/sp1_rv64d_cfg.json` (`scripts/sail-config/generate_lean_rv64d.sh --install`
+# writes it; `--sp1` and `.github/workflows/sail-regen.yml` gate byte-identity with a fresh
+# regeneration; `scripts/check_pins.py` checks the tree hash recorded in docs/assurance.md;
+# provenance in docs/agents/sail-model-provenance.md). It equals the opencompl base `11d8fa21`
+# except the four generated platform-value sites controlled by two config keys. Stock upstream is
+# not usable: its CLINT and signature windows lie inside the address range SP1's chips bound
+# accesses to, which makes the memory-bridge lemmas false as stated, not merely unproved. The
+# settings mirror the generator's own lakefile; the generated files carry their own option
+# escapes and are outside every hand-written-source guard, like `SP1Clean/Extracted/`. It imports
+# only `Sail`, so the package's weak linter options are unregistered here and ignored. The backend
+# emits auto-bound implicits (`k_n`, …), so the package's `autoImplicit = false` is overridden here.
+[[lean_lib]]
 name = "LeanRV64D"
-git = "https://github.com/succinctlabs/sail-riscv-lean"
-rev = "dtumad/clean-native"
+leanOptions.autoImplicit = true
+leanOptions.relaxedAutoImplicit = true
+leanOptions.weak.linter.style.nameCheck = false
+moreLeancArgs = ["-fbracket-depth=500"]
 
-[[require]]
-name = "RISCV"
-git = "https://github.com/succinctlabs/riscv-lean"
-rev = "dtumad/clean-native"
+# One generated module, `LeanRV64D.RvfiDii`, built with the legacy `do` elaborator. Its
+# `print_rvfi_exec` (18 consecutive `(pure (print_bits …))` statements) hits the new elaborator's
+# exponential re-elaboration (lean4#13858; fix lean4#13985 pending): 718 s and 15.4 GB on one
+# file, the head of a ≈ 60-minute critical path in every cold CI build; the legacy elaborator
+# takes 1.8 s and 1.4 GB (measured 2026-09-21, v4.33.1). The option cannot be library-wide — the
+# legacy elaborator rejects the `← doElem` forms other generated modules use — so this library,
+# declared after `LeanRV64D` and therefore the owner of exactly that module (Lake: the last
+# declared library matching a module owns it), carries it; every other setting mirrors the
+# model's. Same semantics by the option's contract; the library goes when the Sail backend emits
+# `let _ : Unit := e` for pure-unit calls or the Lean fix lands (issue #6).
+[[lean_lib]]
+name = "LeanRV64DRvfi"
+roots = ["LeanRV64D.RvfiDii"]
+leanOptions.autoImplicit = true
+leanOptions.relaxedAutoImplicit = true
+leanOptions.backward.do.legacy = true
+leanOptions.weak.linter.style.nameCheck = false
+moreLeancArgs = ["-fbracket-depth=500"]
 
-# The `lake lint` driver executable (see `lintDriver` above). A thin wrapper around the Batteries
-# `#lint` framework; `supportInterpreter` is required because the linters' `test` functions are run
-# through the interpreter. Built by `lake build` along with the libraries; invoked by `lake lint`.
-[[lean_exe]]
-name = "sp1Lint"
-srcDir = "scripts"
-supportInterpreter = true
+# The core: the root index `SP1Clean/Core.lean` imports every hand-written module of strata 0–6 of
+# `scripts/layering.txt`; `scripts/check_layering.sh` fails if the index and the stratum map
+# disagree. Generated `Extracted/` modules are not indexed; the ones the core needs are built as
+# imports. `lake build SP1Core` = the PR-CI build. Declared before the umbrella, which therefore
+# owns every `SP1Clean.*` module including this index — the configuration is the same either way.
+[[lean_lib]]
+name = "SP1Core"
+roots = ["SP1Clean.Core"]
+# Non-module tree importing module-mode libraries (Clean main, `To*`): allowed until the
+# `SP1Clean/` migration.
+allowNonModules = true
 
-# Umbrella library — root module `SP1Clean.lean` imports every module; `lake build` (the default
-# target) builds everything through it. Package-level `moreLeanArgs`/`[leanOptions]` above apply to
-# all libraries, so the layer libraries below inherit `--tstack`/heartbeats with no duplication.
+# Umbrella: `SP1Clean.lean` imports `SP1Clean.Core` plus strata 7–11 and every generated module;
+# `lake build SP1Clean` is the full CI build.
 [[lean_lib]]
 name = "SP1Clean"
+allowNonModules = true
 
-# Layer build-targets (select modules by submodule glob; module names stay `SP1Clean.*`, so these add
-# no import churn). They make each pillar independently buildable — `lake build SP1Extracted`, etc.
-# NOTE: isolation is by convention, not enforced — Lake does not forbid cross-layer imports within one
-# package.
-#
-# Lib-scoped Mathlib style linters. Every hand-written core pillar (Math/Model/FormalModel/Native +
-# Proofs/Faithful/Soundness) plus the `SP1CleanTest` test lib carries the SAME `moreLeanArgs` linter set
-# below; they all transitively import Mathlib (Native via Clean), so the `-D linter.*` options are
-# registered and these flags apply during `lake build SP1Clean` / `lake test`. All eight are at zero
-# violations. `linter.style.longLine` is the remaining candidate (real fallout, concentrated in
-# Native/FormalModel) — see `docs/roadmap.md` § "Cleanup / polish backlog". The auto-gen `SP1Extracted` library is
-# deliberately left OUT (it carries per-file `set_option linter.all false` instead), as are the
-# auto-gen `*Vectors` modules inside `SP1CleanTest` (same per-file suppression). KEEP THE SIX COPIES IN SYNC.
+# Test libraries (glob libraries, no root index). `SP1CoreTest` (the `lake test` driver) is the
+# subset whose import closure stays inside the core; `SP1CleanTest` is the whole tree, alignment
+# anchors included (`SP1CleanTest/Alignment/`, moved there by import closure, not by topic). They
+# import `SP1Clean` and are never imported by it, so the default build stays `native_decide`-free
+# (`scripts/check_no_native_decide.sh`); they are the ONLY place `native_decide` is allowed. Both
+# blocks must stay identical: `SP1CleanTest` matches every test module and is declared last, so it
+# supplies the options for all of them. `linter.hashCommand` fires on every
+# `#guard_msgs in #assert_exportable …` anchor (a passing `#guard_msgs` emits nothing).
 [[lean_lib]]
-name = "SP1Math"
-globs = ["SP1Clean.Math.+"]
-moreLeanArgs = [
-  "-Dlinter.style.lambdaSyntax=true", "-Dlinter.style.dollarSyntax=true",
-  "-Dlinter.style.refine=true", "-Dlinter.style.cases=true",
-  "-Dlinter.style.induction=true", "-Dlinter.style.admit=true",
-  "-Dlinter.oldObtain=true", "-Dlinter.style.cdot=true",
-]
+name = "SP1CoreTest"
+globs = ["SP1CleanTest.Core.+", "SP1CleanTest.TraceGenTests.+"]
+allowNonModules = true
+leanOptions.weak.linter.style.nativeDecide = false
+leanOptions.weak.linter.hashCommand = false
 
-[[lean_lib]]
-name = "SP1Model"
-globs = ["SP1Clean.Model.+"]
-moreLeanArgs = [
-  "-Dlinter.style.lambdaSyntax=true", "-Dlinter.style.dollarSyntax=true",
-  "-Dlinter.style.refine=true", "-Dlinter.style.cases=true",
-  "-Dlinter.style.induction=true", "-Dlinter.style.admit=true",
-  "-Dlinter.oldObtain=true", "-Dlinter.style.cdot=true",
-]
-
-# Auto-gen pillar — NO linter args (the generated modules carry `set_option linter.all false`).
-[[lean_lib]]
-name = "SP1Extracted"
-globs = ["SP1Clean.Extracted.+"]
-
-[[lean_lib]]
-name = "SP1FormalModel"
-globs = ["SP1Clean.FormalModel.+"]
-moreLeanArgs = [
-  "-Dlinter.style.lambdaSyntax=true", "-Dlinter.style.dollarSyntax=true",
-  "-Dlinter.style.refine=true", "-Dlinter.style.cases=true",
-  "-Dlinter.style.induction=true", "-Dlinter.style.admit=true",
-  "-Dlinter.oldObtain=true", "-Dlinter.style.cdot=true",
-]
-
-[[lean_lib]]
-name = "SP1Native"
-globs = ["SP1Clean.Native.+"]
-moreLeanArgs = [
-  "-Dlinter.style.lambdaSyntax=true", "-Dlinter.style.dollarSyntax=true",
-  "-Dlinter.style.refine=true", "-Dlinter.style.cases=true",
-  "-Dlinter.style.induction=true", "-Dlinter.style.admit=true",
-  "-Dlinter.oldObtain=true", "-Dlinter.style.cdot=true",
-]
-
-# The proof pillar: the sound/complete proofs (Proofs/), the faithfulness anchors (Faithful/),
-# and the whole-machine/trace layer (Soundness/). Same linter set as the other core pillars above.
-[[lean_lib]]
-name = "SP1Proofs"
-globs = ["SP1Clean.Proofs.+", "SP1Clean.Faithful.+", "SP1Clean.Soundness.+"]
-moreLeanArgs = [
-  "-Dlinter.style.lambdaSyntax=true", "-Dlinter.style.dollarSyntax=true",
-  "-Dlinter.style.refine=true", "-Dlinter.style.cases=true",
-  "-Dlinter.style.induction=true", "-Dlinter.style.admit=true",
-  "-Dlinter.oldObtain=true", "-Dlinter.style.cdot=true",
-]
-
-# The test pillar (the `lake test` driver, see `testDriver` above) — the witness-generation and
-# whole-trace conformance anchors (`SP1CleanTest.{WitnessTests,TraceGenTests}.*`), which import the
-# main `SP1Clean` library and check it against batteries dumped from SP1's real Rust prover. This is
-# the ONLY library that may use `native_decide`; it is NOT imported by the umbrella `SP1Clean`, so the
-# default `lake build` stays `native_decide`-free. Same syntactic linter set as the core pillars; the
-# auto-gen `SP1CleanTest.WitnessTests.Vectors.*` / `*TraceVectors` modules self-suppress with their own
-# `set_option linter.all false`. (The `lake lint` env-linter pass skips this lib too — `sp1Lint` keeps
-# only `SP1Clean`-prefixed declarations, and `SP1CleanTest` is not such a prefix.)
 [[lean_lib]]
 name = "SP1CleanTest"
 globs = ["SP1CleanTest.+"]
-moreLeanArgs = [
-  "-Dlinter.style.lambdaSyntax=true", "-Dlinter.style.dollarSyntax=true",
-  "-Dlinter.style.refine=true", "-Dlinter.style.cases=true",
-  "-Dlinter.style.induction=true", "-Dlinter.style.admit=true",
-  "-Dlinter.oldObtain=true", "-Dlinter.style.cdot=true",
-]
+allowNonModules = true
+leanOptions.weak.linter.style.nativeDecide = false
+leanOptions.weak.linter.hashCommand = false
+
+# Native exporter with a narrow, Sail-free import closure. Kept outside the proof/test indices:
+# it produces the deterministic WASM/R1CS fixtures checked by the alignment job.
+[[lean_exe]]
+name = "backendGadgets"
+root = "scripts.backendGadgets"
+allowNonModules = true

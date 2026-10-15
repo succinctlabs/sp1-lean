@@ -1,0 +1,6 @@
+# Generated sources required by the current build or independent conformance checks.
+# Keep them versioned until their consumers migrate; exclude them from language statistics.
+LeanRV64D/** linguist-generated=true
+LeanRV64D.lean linguist-generated=true
+SP1Clean/Extracted/** linguist-generated=true
+export/** linguist-generated=true

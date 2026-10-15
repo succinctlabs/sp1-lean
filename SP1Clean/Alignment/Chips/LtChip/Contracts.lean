@@ -1,0 +1,281 @@
+import SP1Clean.Alignment.Chips.LtChip.Bridge
+import SP1Clean.Soundness.TypedMemory
+
+/-! # Lt — circuit-grounding contracts
+
+Folded structural facts used by whole-machine grounding. Arithmetic meaning remains in
+`LtChip.Spec`; this file projects only the retained reader, adapter/state passthrough, and the
+chip-owned selector/routing constraints from the physical circuit.
+-/
+
+namespace SP1Clean.Soundness
+
+open Air.Flat Circuit
+
+variable {p : ℕ} [Fact p.Prime] [Fact (2 ^ 17 < p)]
+
+omit [Fact (2 ^ 17 < p)] in
+private theorem equalityConstraint_mem (x y : Expression (ZMod p)) (offset : ℕ) :
+    x - y ∈ ((Gadgets.Equality.main (M := field) (x, y)).operations offset).constraints := by
+  simp [Gadgets.Equality.main, Circuit.forEach.operations_eq, circuit_norm]
+  rfl
+
+omit [Fact p.Prime] [Fact (2 ^ 17 < p)] in
+private def LtChip.controlExpressions
+    (input : Var LtChip.Inputs (ZMod p)) : List (Expression (ZMod p)) :=
+  [ input.isSlt * (input.isSlt - 1) - 0,
+    input.isSltu * (input.isSltu - 1) - 0,
+    input.adapter.op_a_0 - 0 ]
+
+/-- The selector booleans and destination route needed for Lt grounding. -/
+structure LtChip.ControlFacts (isSlt isSltu opA0 : ZMod p) : Prop where
+  sltBinary : isSlt = 0 ∨ isSlt = 1
+  sltuBinary : isSltu = 0 ∨ isSltu = 1
+  opA0Zero : opA0 = 0
+
+/-- The exact one-hot selector proposition consumed by Lt's `advanceReady`. -/
+def LtChip.ActiveSelector (cols : LtChip.Columns (ZMod p)) : Prop :=
+  (cols.is_slt = 1 ∧ cols.is_sltu = 0) ∨ (cols.is_slt = 0 ∧ cols.is_sltu = 1)
+
+private theorem LtChip.controlExpressions_subset_constraints
+    (input : Var LtChip.Inputs (ZMod p)) (offset : ℕ) :
+    ∀ e ∈ LtChip.controlExpressions (p := p) input,
+      e ∈ ((LtChip.main input).operations offset).constraints := by
+  intro e he
+  simp only [LtChip.controlExpressions, List.mem_cons, List.not_mem_nil, or_false] at he
+  rcases he with rfl | rfl | rfl
+  · simp only [LtChip.main, circuit_norm]
+    right; right; right; right; right; left
+    simpa only [FormalAssertion.toSubcircuit, Operations.toNested_toFlat,
+      Operations.constraints_toFlat, Gadgets.Equality.circuit] using
+      equalityConstraint_mem (input.isSlt * (input.isSlt - 1)) (0 : Expression (ZMod p)) _
+  · simp only [LtChip.main, circuit_norm]
+    right; right; right; right; right; right; left
+    simpa only [FormalAssertion.toSubcircuit, Operations.toNested_toFlat,
+      Operations.constraints_toFlat, Gadgets.Equality.circuit] using
+      equalityConstraint_mem (input.isSltu * (input.isSltu - 1)) (0 : Expression (ZMod p)) _
+  · simp only [LtChip.main, circuit_norm]
+    right; right; right; right; right; right; right
+    simpa only [FormalAssertion.toSubcircuit, Operations.toNested_toFlat,
+      Operations.constraints_toFlat, Gadgets.Equality.circuit] using
+      equalityConstraint_mem input.adapter.op_a_0 (0 : Expression (ZMod p)) _
+
+/-- Physical Lt assertions make each explicit selector binary and enforce a non-`x0`
+destination. Activity is their sum by construction. -/
+theorem LtChip.controlFacts_of_mainConstraints
+    (input : Var LtChip.Inputs (ZMod p)) (offset : ℕ) (env : Environment (ZMod p))
+    (constraints : ((LtChip.main input).operations offset).ConstraintsHold env) :
+    LtChip.ControlFacts
+      (Expression.eval env input.isSlt)
+      (Expression.eval env input.isSltu)
+      (Expression.eval env input.adapter.op_a_0) := by
+  have allConstraints := constraints.1
+  have control (e : Expression (ZMod p))
+      (he : e ∈ LtChip.controlExpressions (p := p) input) :
+      Expression.eval env e = 0 :=
+    allConstraints e (LtChip.controlExpressions_subset_constraints input offset e he)
+  have g0 := control (input.isSlt * (input.isSlt - 1) - 0) (by
+    simp [LtChip.controlExpressions])
+  have g1 := control (input.isSltu * (input.isSltu - 1) - 0) (by
+    simp [LtChip.controlExpressions])
+  have route := control (input.adapter.op_a_0 - 0) (by
+    simp [LtChip.controlExpressions])
+  simp only [eval_sub, Expression.eval, sub_zero] at g0 g1 route
+  exact ⟨bool_of_mul_pred g0, bool_of_mul_pred g1, route⟩
+
+/-- A real physical Lt row has exactly one active opcode flag. -/
+theorem LtChip.selectorActive_of_mainConstraints
+    (input : Var LtChip.Inputs (ZMod p)) (offset : ℕ) (env : Environment (ZMod p))
+    (constraints : ((LtChip.main input).operations offset).ConstraintsHold env)
+    (real : Expression.eval env input.is_real = 1) :
+    (Expression.eval env input.isSlt = 1 ∧ Expression.eval env input.isSltu = 0) ∨
+      (Expression.eval env input.isSlt = 0 ∧ Expression.eval env input.isSltu = 1) := by
+  have control := LtChip.controlFacts_of_mainConstraints input offset env constraints
+  have sumOne : Expression.eval env input.isSlt + Expression.eval env input.isSltu = 1 := real
+  rcases control.sltuBinary with sltu0 | sltu1
+  · exact Or.inl ⟨by simpa only [sltu0, add_zero] using sumOne, sltu0⟩
+  · exact Or.inr ⟨by simpa only [sltu1, add_eq_right] using sumOne, sltu1⟩
+
+/-- Lt passes its independent state input through to the completed row. -/
+theorem LtChip.inputOutputState (env : Environment (ZMod p)) :
+    (({ circuit := LtChip.circuit (p := p) } : Component (ZMod p)).rowInput env).state =
+      (({ circuit := LtChip.circuit (p := p) } : Component (ZMod p)).rowOutput env).state := by
+  let input : Var LtChip.Inputs (ZMod p) := varFromOffset LtChip.Inputs 0
+  let offset := size LtChip.Inputs
+  have inputEq : Eval.eval env input =
+      (({ circuit := LtChip.circuit (p := p) } : Component (ZMod p)).rowInput env) :=
+    eval_varFromOffset_valueFromOffset LtChip.Inputs 0 env
+  have outputEq : Eval.eval env ((LtChip.circuit (p := p)).output input offset) =
+      (({ circuit := LtChip.circuit (p := p) } : Component (ZMod p)).rowOutput env) := by
+    simp only [input, offset, Component.rowOutput, circuit_norm]
+  rw [← inputEq, ← outputEq]
+  change (Eval.eval env input).state =
+    (Eval.eval env ((LtChip.elaborated (p := p)).output input offset)).state
+  rw [LtChip.directOutput_eq, LtChip.eval_inputs, LtChip.eval_columns]
+
+/-- Lt passes its independent ALU adapter input through to the completed row. -/
+theorem LtChip.inputOutputAdapter (env : Environment (ZMod p)) :
+    (({ circuit := LtChip.circuit (p := p) } : Component (ZMod p)).rowInput env).adapter =
+      (({ circuit := LtChip.circuit (p := p) } : Component (ZMod p)).rowOutput env).adapter := by
+  let input : Var LtChip.Inputs (ZMod p) := varFromOffset LtChip.Inputs 0
+  let offset := size LtChip.Inputs
+  have inputEq : Eval.eval env input =
+      (({ circuit := LtChip.circuit (p := p) } : Component (ZMod p)).rowInput env) :=
+    eval_varFromOffset_valueFromOffset LtChip.Inputs 0 env
+  have outputEq : Eval.eval env ((LtChip.circuit (p := p)).output input offset) =
+      (({ circuit := LtChip.circuit (p := p) } : Component (ZMod p)).rowOutput env) := by
+    simp only [input, offset, Component.rowOutput, circuit_norm]
+  rw [← inputEq, ← outputEq]
+  change (Eval.eval env input).adapter =
+    (Eval.eval env ((LtChip.elaborated (p := p)).output input offset)).adapter
+  rw [LtChip.directOutput_eq, LtChip.eval_inputs, LtChip.eval_columns]
+
+/-- The completed Lt columns at one physical component row. -/
+noncomputable def LtChip.physicalCols (env : Environment (ZMod p)) :
+    LtChip.Columns (ZMod p) :=
+  ({ circuit := LtChip.circuit (p := p) } : Component (ZMod p)).rowOutput env
+
+/-- The completed Lt row view at one physical component row. -/
+noncomputable def LtChip.physicalView (env : Environment (ZMod p)) : Trace.RowView (ZMod p) :=
+  LtChip.rowView
+    (({ circuit := LtChip.circuit (p := p) } : Component (ZMod p)).rowInput env)
+    (LtChip.physicalCols env)
+
+/-- The folded physical view's selector is exactly the evaluated typed input selector. -/
+theorem LtChip.physicalView_isReal (env : Environment (ZMod p)) :
+    (LtChip.physicalView env).is_real =
+      (Eval.eval env (varFromOffset (F := ZMod p) LtChip.Inputs 0)).is_real := by
+  have inputEq : Eval.eval env (varFromOffset LtChip.Inputs 0) =
+      ({ circuit := LtChip.circuit (p := p) } : Component (ZMod p)).rowInput env :=
+    eval_varFromOffset_valueFromOffset LtChip.Inputs 0 env
+  simpa only [LtChip.physicalView, LtChip.rowView] using
+    congrArg (fun input : LtChip.Inputs (ZMod p) => input.is_real) inputEq.symm
+
+/-- Component-level form of Lt's physical non-`x0` route. -/
+theorem LtChip.rowViewOpA0_eq_zero_of_constraints (env : Environment (ZMod p))
+    (constraints :
+      ({ circuit := LtChip.circuit (p := p) } : Component (ZMod p)).operations.ConstraintsHold env) :
+    (LtChip.physicalView env).adapter.op_a_0 = 0 := by
+  let input : Var LtChip.Inputs (ZMod p) := varFromOffset LtChip.Inputs 0
+  let offset := size LtChip.Inputs
+  have mainConstraints : ((LtChip.main input).operations offset).ConstraintsHold env :=
+    (Component.constraintsHold_iff env).mp constraints
+  have route := (LtChip.controlFacts_of_mainConstraints input offset env mainConstraints).opA0Zero
+  have inputEq : Eval.eval env input =
+      ({ circuit := LtChip.circuit (p := p) } : Component (ZMod p)).rowInput env :=
+    eval_varFromOffset_valueFromOffset LtChip.Inputs 0 env
+  change (({ circuit := LtChip.circuit (p := p) } : Component (ZMod p)).rowOutput env).adapter.op_a_0 = 0
+  rw [← LtChip.inputOutputAdapter env, ← inputEq, LtChip.eval_inputAdapter,
+    Readers.ALUTypeReader.eval_opA0]
+  exact route
+
+/-- Component-level exact opcode partition used by `advanceReady`. -/
+theorem LtChip.rowViewSelectorActive_of_constraints (env : Environment (ZMod p))
+    (constraints :
+      ({ circuit := LtChip.circuit (p := p) } : Component (ZMod p)).operations.ConstraintsHold env)
+    (real : (LtChip.physicalView env).is_real = 1) :
+    LtChip.ActiveSelector (LtChip.physicalCols env) := by
+  let input : Var LtChip.Inputs (ZMod p) := varFromOffset LtChip.Inputs 0
+  let offset := size LtChip.Inputs
+  have mainConstraints : ((LtChip.main input).operations offset).ConstraintsHold env :=
+    (Component.constraintsHold_iff env).mp constraints
+  have realInput : Expression.eval env input.is_real = 1 := by
+    have realValue : (Eval.eval env input).is_real = 1 :=
+      (LtChip.physicalView_isReal env).symm.trans real
+    exact (LtChip.eval_inputIsReal env input).symm.trans realValue
+  have active := LtChip.selectorActive_of_mainConstraints input offset env mainConstraints realInput
+  have outputEq : Eval.eval env ((LtChip.circuit (p := p)).output input offset) =
+      LtChip.physicalCols env := by
+    simp only [input, offset, LtChip.physicalCols, Component.rowOutput, circuit_norm]
+  rw [LtChip.ActiveSelector, ← outputEq]
+  change LtChip.ActiveSelector (Eval.eval env ((LtChip.elaborated (p := p)).output input offset))
+  rw [LtChip.ActiveSelector, LtChip.directOutput_eq, LtChip.eval_columns]
+  simpa only [offset, circuit_norm] using active
+
+/-- The exact ALU reader input retained after Lt's ten comparison witness cells. -/
+def LtChip.aluTypeReaderInput (input : Var LtChip.Inputs (ZMod p)) (offset : ℕ) :
+    Var Readers.ALUTypeReader.Inputs (ZMod p) :=
+  ⟨input.adapter, input.is_real, input.is_real, input.state.clk_high,
+    input.state.clk_0_16 + input.state.clk_16_24 * 65536, input.state.pc,
+    input.isSlt * 9 + input.isSltu * 10,
+    var ⟨offset⟩, 0, 0, 0⟩
+
+theorem LtChip.aluTypeReader_mem (input : Var LtChip.Inputs (ZMod p)) (offset : ℕ) :
+    ⟨offset + 10, Readers.ALUTypeReader.circuit.toSubcircuit (offset + 10)
+      (LtChip.aluTypeReaderInput input offset)⟩ ∈
+      ((LtChip.main input).operations offset).subcircuits := by
+  simp only [LtChip.main, LtChip.aluTypeReaderInput,
+    Readers.ALUTypeReader.circuit, circuit_norm]
+
+/-- The retained ALU reader binds source C to the decoded immediate on immediate rows. -/
+theorem LtChip.rowViewOpCBinding_of_constraints (env : Environment (ZMod p))
+    (constraints :
+      ({ circuit := LtChip.circuit (p := p) } : Component (ZMod p)).operations.ConstraintsHold env)
+    (immediate : (LtChip.physicalView env).adapter.imm_c = 1) :
+    (LtChip.physicalView env).adapter.op_c_memory.prev_value =
+      (LtChip.physicalView env).adapter.op_c := by
+  let input : Var LtChip.Inputs (ZMod p) := varFromOffset LtChip.Inputs 0
+  let offset := size LtChip.Inputs
+  let readerInput := LtChip.aluTypeReaderInput input offset
+  have mainConstraints : ((LtChip.main input).operations offset).ConstraintsHold env :=
+    (Component.constraintsHold_iff env).mp constraints
+  have readerConstraints := constraintsHold_generalSubcircuit_of_mem env
+    ((LtChip.main input).operations offset) Readers.ALUTypeReader.circuit readerInput
+    (offset + 10) (LtChip.aluTypeReader_mem input offset) mainConstraints
+  have inputEq : Eval.eval env input =
+      ({ circuit := LtChip.circuit (p := p) } : Component (ZMod p)).rowInput env :=
+    eval_varFromOffset_valueFromOffset LtChip.Inputs 0 env
+  have immediateInput : Expression.eval env readerInput.cols.imm_c = 1 := by
+    change Expression.eval env input.adapter.imm_c = 1
+    change (({ circuit := LtChip.circuit (p := p) } : Component (ZMod p)).rowOutput env).adapter.imm_c = 1
+      at immediate
+    rw [← LtChip.inputOutputAdapter env, ← inputEq, LtChip.eval_inputs,
+      Readers.ALUTypeReader.eval_immC] at immediate
+    exact immediate
+  have binding := Readers.ALUTypeReader.eval_opCPrev_eq_opC_of_mainConstraints
+    readerInput (offset + 10) env readerConstraints immediateInput
+  change (({ circuit := LtChip.circuit (p := p) } : Component (ZMod p)).rowOutput env).adapter.op_c_memory.prev_value =
+    (({ circuit := LtChip.circuit (p := p) } : Component (ZMod p)).rowOutput env).adapter.op_c
+  rw [← LtChip.inputOutputAdapter env, ← inputEq, LtChip.eval_inputs,
+    Readers.ALUTypeReader.eval_opCPrev, Readers.ALUTypeReader.eval_opC]
+  simpa only [readerInput, LtChip.aluTypeReaderInput] using binding
+
+/-- With binary flags, Lt's committed opcode combination avoids `ECALL`'s discriminant `50`. -/
+private theorem LtChip.flagCombo_ne_ecall {x y : ZMod p}
+    (hx : x = 0 ∨ x = 1) (hy : y = 0 ∨ y = 1) :
+    x * 9 + y * 10 ≠ (50 : ZMod p) := by
+  obtain ⟨a, ha, rfl⟩ : ∃ a : ℕ, a ≤ 1 ∧ x = (a : ZMod p) := by
+    rcases hx with h | h
+    · exact ⟨0, Nat.zero_le 1, by rw [h, Nat.cast_zero]⟩
+    · exact ⟨1, Nat.le_refl 1, by rw [h, Nat.cast_one]⟩
+  obtain ⟨b, hb, rfl⟩ : ∃ b : ℕ, b ≤ 1 ∧ y = (b : ZMod p) := by
+    rcases hy with h | h
+    · exact ⟨0, Nat.zero_le 1, by rw [h, Nat.cast_zero]⟩
+    · exact ⟨1, Nat.le_refl 1, by rw [h, Nat.cast_one]⟩
+  have hp : (131072 : ℕ) < p := by
+    have hfact : (2 : ℕ) ^ 17 < p := Fact.out
+    norm_num at hfact
+    exact hfact
+  intro h
+  have hcast : ((a * 9 + b * 10 : ℕ) : ZMod p) = ((50 : ℕ) : ZMod p) := by
+    exact_mod_cast h
+  have hval := congrArg ZMod.val hcast
+  rw [ZMod.val_natCast_of_lt (by omega), ZMod.val_natCast_of_lt (by omega)] at hval
+  omega
+
+/-- A real physical Lt row's Program-bus opcode is never the `ECALL` discriminant `50`
+(the committed-fragment re-base's per-chip strengthening fact). -/
+theorem LtChip.physicalViewOpcode_ne_ecall (env : Environment (ZMod p))
+    (constraints :
+      ({ circuit := LtChip.circuit (p := p) } : Component (ZMod p)).operations.ConstraintsHold env)
+    (real : (LtChip.physicalView env).is_real = 1) :
+    (LtChip.physicalView env).opcode ≠ (50 : ZMod p) := by
+  have active := LtChip.rowViewSelectorActive_of_constraints env constraints real
+  rw [LtChip.ActiveSelector] at active
+  show (LtChip.physicalCols env).is_slt * 9 + (LtChip.physicalCols env).is_sltu * 10 ≠
+    (50 : ZMod p)
+  rcases active with ⟨hslt, hsltu⟩ | ⟨hslt, hsltu⟩
+  · exact LtChip.flagCombo_ne_ecall (Or.inr hslt) (Or.inl hsltu)
+  · exact LtChip.flagCombo_ne_ecall (Or.inl hslt) (Or.inr hsltu)
+
+end SP1Clean.Soundness

@@ -1,0 +1,6 @@
+{
+  "platform": {
+    "clint": { "supported": false },
+    "simple_interrupt_generator": { "supported": false }
+  }
+}

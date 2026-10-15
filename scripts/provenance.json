@@ -1,0 +1,20 @@
+{
+  "sail": {
+    "compilerRevision": "41694abd58b27b687af5db275810dfeb8a88cfc0",
+    "modelRevision": "61266bd4dede6c7dd6e903e52dc80bcbf644b1b8",
+    "baseSnapshot": "11d8fa212a60c05dcc9fe5db925dd4d06dad65b5",
+    "ocamlVersion": "5.2.1",
+    "configSha256": "41311181e4cad458c21b01a0160a0087b407ee15e616243013169d52d3c1a854",
+    "generatedTreeSha256": "7426b9c3d35d1b625a1aa2a16248f8015f70acb80699dca3df552e8db2291af7",
+    "generatedFiles": 161
+  },
+  "sp1": {
+    "version": "v6.9.0",
+    "revision": "b8387fa61e1361d90ee7de49f551863418ca0f08",
+    "legacy": {
+      "semanticVersion": "v6.4.0",
+      "semanticRevision": "f66b4bff51d0ccff51d152e0f7f66b2ffedf3529",
+      "extractorRevision": "b5616f908c393d6050970630871f69afe233a21c"
+    }
+  }
+}

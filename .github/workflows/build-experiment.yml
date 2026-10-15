@@ -1,0 +1,210 @@
+name: Build experiment
+
+# A controlled build measurement on the hosted runner that never touches the shared build cache:
+# dispatch it on any branch to measure a cold build (`restore: none`), a warm one against `main`'s
+# entry (`restore: main-lineage`), or a build on top of an earlier experiment's entry
+# (`restore: key` + `restore_key`). Saves, when asked for, go under `sp1-exp-<label>-…` keys that
+# the production workflows' restore keys can never match. Every run records the runner (CPU model
+# — hosted runners alternate models, ±10–15 % between them —, memory, swap), samples memory and
+# swap every 30 s (`vmstat`) and the largest `lean` processes (`ps`), wraps `lake build` in
+# `/usr/bin/time -v` (max RSS of the largest child, total user+sys = the build's CPU-seconds),
+# stamps every log line with a UTC time so `scripts/build_semantics.py` can draw the concurrency
+# timeline locally, and writes the ranking, critical path and timeline into the job summary. The
+# raw logs are uploaded as an artifact. Measurement protocol and the reading of these numbers:
+# docs/agents/build-profiling.md; campaign tracking: the `build-time` issues.
+
+on:
+  workflow_dispatch:
+    inputs:
+      label:
+        description: "short tag for the summary/artifact/cache key (e.g. base, threads3)"
+        type: string
+        default: "exp"
+      targets:
+        description: "lake build targets"
+        type: string
+        default: "SP1Core ToClean ToMathlib ToPolyFun"
+      lean_num_threads:
+        description: "LEAN_NUM_THREADS for lake and every child lean (empty = hardware default)"
+        type: string
+        default: ""
+      restore:
+        description: "none = cold; main-lineage = nearest cached main ancestor; key = restore_key exactly"
+        type: choice
+        options: [none, main-lineage, key]
+        default: none
+      restore_key:
+        description: "exact cache key when restore = key (e.g. an sp1-exp-… key)"
+        type: string
+        default: ""
+      save:
+        description: "save the build under sp1-exp-<label>-<run id>-<attempt> afterwards"
+        type: boolean
+        default: false
+
+# One group per run: experiments never cancel or queue behind each other.
+concurrency:
+  group: exp-${{ github.run_id }}
+
+env:
+  SP1_CACHE_VERSION: v2
+  CACHE_PATHS: |
+    .lake/build
+    .lake/packages/*
+    !.lake/packages/mathlib
+    !.lake/packages/batteries
+    !.lake/packages/aesop
+    !.lake/packages/Qq
+    !.lake/packages/proofwidgets
+    !.lake/packages/importGraph
+    !.lake/packages/LeanSearchClient
+    !.lake/packages/plausible
+
+jobs:
+  experiment:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Runner inventory
+        run: |
+          {
+            echo "## Experiment \`${{ inputs.label }}\` — targets \`${{ inputs.targets }}\`, LEAN_NUM_THREADS=\`${{ inputs.lean_num_threads }}\`, restore=\`${{ inputs.restore }}\`"
+            echo
+            echo "- ref: \`${{ github.ref_name }}\` @ \`${{ github.sha }}\`"
+            echo "- cpu: $(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2- | xargs), nproc $(nproc)"
+            echo "- memory: $(free -g | awk '/^Mem:/ {print $2 " GB total"}'); swap: $(swapon --show --noheadings | awk '{print $1, $3}' | xargs || echo none)"
+            echo "- disk: $(df -h / | awk 'NR==2 {print $4 " free of " $2}')"
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+          nproc; free -g; swapon --show || true; df -h /
+      - name: Free disk space if the image is short of it
+        # The production workflows unconditionally remove ~25 GB of unused toolchains (38–234 s);
+        # the image has ~110 GB free after that step, so here it is a guarded no-op that keeps the
+        # safety net.
+        run: |
+          avail=$(df --output=avail -BG / | tail -1 | tr -dc 0-9)
+          if [ "$avail" -lt 25 ]; then
+            sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL \
+              /usr/local/share/boost /usr/local/.ghcup
+          fi
+          df -h /
+      - name: Compute cache keys
+        id: key
+        run: |
+          prefix="sp1-${SP1_CACHE_VERSION}-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}"
+          echo "prefix=${prefix}" >> "$GITHUB_OUTPUT"
+          echo "save=sp1-exp-${{ inputs.label }}-${{ github.run_id }}-${{ github.run_attempt }}" >> "$GITHUB_OUTPUT"
+      - name: Pick the main lineage entry
+        id: pick
+        if: inputs.restore == 'main-lineage'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git rev-list --first-parent -n 30 HEAD > lineage.txt
+          python3 scripts/ci/cache_pick.py --mode main --prefix "${{ steps.key.outputs.prefix }}" \
+            --lineage lineage.txt >> "$GITHUB_OUTPUT"
+      - name: Restore (main lineage — the production selection)
+        if: inputs.restore == 'main-lineage'
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.CACHE_PATHS }}
+          key: ${{ steps.pick.outputs.pick || format('{0}-none', steps.key.outputs.prefix) }}
+          restore-keys: |
+            ${{ steps.pick.outputs.fallback1 }}
+            ${{ steps.pick.outputs.fallback2 }}
+      - name: Restore (exact key)
+        if: inputs.restore == 'key'
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.CACHE_PATHS }}
+          key: ${{ inputs.restore_key }}
+          fail-on-cache-miss: true
+      - uses: leanprover/lean-action@v1
+        # Toolchain + `lake exe cache get` (mathlib), as in the production workflows; its step
+        # duration is the mathlib-fetch cost.
+        with:
+          build: "false"
+          test: "false"
+          lint: "false"
+          use-mathlib-cache: "true"
+          use-github-cache: "false"
+      - name: Does the mathlib cache restore the mathlib-closure packages?
+        # Informs the cache path exclusions: if batteries/aesop/… oleans are present after
+        # `lake exe cache get` alone, they need not be in our own cache entries.
+        run: |
+          for p in batteries aesop Qq proofwidgets importGraph LeanSearchClient plausible Cli; do
+            n=$(find ".lake/packages/$p/.lake/build/lib" -name '*.olean' 2>/dev/null | wc -l)
+            echo "$p: $n oleans"
+          done | tee -a mathlib-closure.txt
+      - name: Build under samplers
+        env:
+          THREADS: ${{ inputs.lean_num_threads }}
+          TARGETS: ${{ inputs.targets }}
+        run: |
+          set -o pipefail
+          if [ -n "$THREADS" ]; then export LEAN_NUM_THREADS="$THREADS"; fi
+          command -v /usr/bin/time >/dev/null || sudo apt-get install -y -q time
+          vmstat -t 30 > vmstat.log 2>&1 &
+          VMSTAT=$!
+          ( while :; do date -u +%FT%TZ; ps -eo rss,etimes,args --sort=-rss | awk '/[l]ean / && !/lake/' | head -6; sleep 30; done ) > ps.log 2>&1 &
+          PS=$!
+          # shellcheck disable=SC2086
+          timeout 5h /usr/bin/time -v -o time.txt lake build --wfail --iofail $TARGETS 2>&1 \
+            | python3 -u -c 'import sys, datetime
+          for line in iter(sys.stdin.readline, ""):
+              sys.stdout.write(datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000000Z ") + line)' \
+            | tee lake.log
+          rc=$?
+          kill $VMSTAT $PS 2>/dev/null || true
+          exit $rc
+      - name: Summary
+        if: always()
+        run: |
+          mkdir -p exp
+          python3 scripts/profile_aggregate.py --lake-log lake.log --out exp/build-log --top 30 || true
+          python3 scripts/build_semantics.py --lake-log lake.log --out exp/bsem || true
+          {
+            echo "### Build"
+            echo
+            echo '```'
+            grep -E 'Elapsed|Maximum resident|User time|System time|Exit status' time.txt || true
+            awk 'NR>2 && $1 ~ /^[0-9]+$/ { so += $8; if ($8 > mso) mso = $8; if (min == "" || $4 < min) min = $4 }
+                 END { printf "swap-out total: %.0f MB (vmstat 30 s samples); peak so/s: %s; min free: %.1f GB\n", so * 30 / 1024, mso, min / 1048576 }' vmstat.log || true
+            grep -E 'Built LeanRV64D\.RvfiDii|Build completed|error:' lake.log | head -5 || true
+            echo '```'
+            echo
+            echo "### Critical path"
+            echo
+            sed -n '3,6p' exp/bsem/critical_path.md 2>/dev/null || true
+            echo
+            echo "### Timeline"
+            echo
+            sed -n '3,5p' exp/bsem/timeline.md 2>/dev/null || true
+            echo
+            echo "### Mathlib-closure packages after \`lake exe cache get\`"
+            echo
+            echo '```'; cat mathlib-closure.txt 2>/dev/null || true; echo '```'
+            echo
+            sed -n '/^## Top/,/^## Per pillar/p' exp/build-log.md 2>/dev/null | sed '$d' || true
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: experiment-${{ inputs.label }}-${{ github.run_id }}
+          path: |
+            lake.log
+            vmstat.log
+            ps.log
+            time.txt
+            mathlib-closure.txt
+            exp/
+          retention-days: 30
+      - name: Save (experiment key)
+        if: inputs.save == true && (success() || failure())
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.CACHE_PATHS }}
+          key: ${{ steps.key.outputs.save }}
